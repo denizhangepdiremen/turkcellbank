@@ -1,15 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { MemoryRouter } from 'react-router-dom'
-import { Login } from './Login'
+import { Register } from './Register'
 
 /**
- * Login ekranının Storybook gösterimi.
- * Tüm sayfayı kapladığı için layout: 'fullscreen' kullanıyoruz.
- * Login içinde <Link> olduğu için MemoryRouter ile sarmalıyoruz.
+ * Register, içinde <Link> kullandığı için bir Router bağlamına ihtiyaç duyar.
+ * Storybook'ta bunu MemoryRouter ile sağlıyoruz.
  */
 const meta = {
-  title: 'Pages/Login',
-  component: Login,
+  title: 'Pages/Register',
+  component: Register,
   parameters: { layout: 'fullscreen' },
   decorators: [
     (Story) => (
@@ -18,7 +17,7 @@ const meta = {
       </MemoryRouter>
     ),
   ],
-} satisfies Meta<typeof Login>
+} satisfies Meta<typeof Register>
 
 export default meta
 type Story = StoryObj<typeof meta>

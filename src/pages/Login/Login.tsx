@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { Button } from '../../components/Button'
 import { Input } from '../../components/Input'
+import { Checkbox } from '../../components/Checkbox'
 import './Login.css'
 
 /**
@@ -107,10 +109,7 @@ export function Login() {
           />
 
           <div className="login-options">
-            <label className="login-remember">
-              <input type="checkbox" />
-              Beni hatırla
-            </label>
+            <Checkbox label="Beni hatırla" disabled={loading} />
             <a className="login-link" href="#">
               Şifremi unuttum
             </a>
@@ -123,9 +122,9 @@ export function Login() {
 
         <p className="login-footer">
           Hesabınız yok mu?{' '}
-          <a className="login-link" href="#">
+          <Link className="login-link" to="/register">
             Kayıt olun
-          </a>
+          </Link>
         </p>
       </div>
     </div>
