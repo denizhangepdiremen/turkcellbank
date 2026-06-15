@@ -1,0 +1,11 @@
+# .NET derleme çıktıları
+bin/
+obj/
+
+# IDE / kullanıcı dosyaları
+*.user
+.vs/
+.idea/
+
+# Ortam / gizli ayarlar (connection string, API key vb.)
+appsettings.*.local.json

@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TurkcellBank.API", "TurkcellBank.API\TurkcellBank.API.csproj", "{4302E231-AC71-4242-82F4-FC59A7A77210}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TurkcellBank.Application", "TurkcellBank.Application\TurkcellBank.Application.csproj", "{D178C2A5-C76B-4F6B-AAE1-39387D478548}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TurkcellBank.Domain", "TurkcellBank.Domain\TurkcellBank.Domain.csproj", "{8A6FA70F-47A8-49BD-95E3-2BF05C8F9A59}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TurkcellBank.Infrastructure", "TurkcellBank.Infrastructure\TurkcellBank.Infrastructure.csproj", "{42319EE4-9EDD-4C4E-BC7B-BD01CB7D3E55}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4302E231-AC71-4242-82F4-FC59A7A77210}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4302E231-AC71-4242-82F4-FC59A7A77210}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4302E231-AC71-4242-82F4-FC59A7A77210}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4302E231-AC71-4242-82F4-FC59A7A77210}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D178C2A5-C76B-4F6B-AAE1-39387D478548}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D178C2A5-C76B-4F6B-AAE1-39387D478548}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D178C2A5-C76B-4F6B-AAE1-39387D478548}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D178C2A5-C76B-4F6B-AAE1-39387D478548}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8A6FA70F-47A8-49BD-95E3-2BF05C8F9A59}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8A6FA70F-47A8-49BD-95E3-2BF05C8F9A59}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8A6FA70F-47A8-49BD-95E3-2BF05C8F9A59}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8A6FA70F-47A8-49BD-95E3-2BF05C8F9A59}.Release|Any CPU.Build.0 = Release|Any CPU
+		{42319EE4-9EDD-4C4E-BC7B-BD01CB7D3E55}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{42319EE4-9EDD-4C4E-BC7B-BD01CB7D3E55}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{42319EE4-9EDD-4C4E-BC7B-BD01CB7D3E55}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{42319EE4-9EDD-4C4E-BC7B-BD01CB7D3E55}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
