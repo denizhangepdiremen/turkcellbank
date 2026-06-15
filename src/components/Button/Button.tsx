@@ -19,23 +19,23 @@ const buttonVariants = cva(
     'cursor-pointer',
   {
     variants: {
-      // Renk teması seçenekleri
+      // Renk teması seçenekleri (Indigo paleti)
       variant: {
-        // Birincil aksiyon: Turkcell sarısı dolgulu
+        // Birincil aksiyon: indigo dolgulu
         primary:
-          'bg-yellow-400 text-gray-900 hover:bg-yellow-500 focus-visible:ring-yellow-400',
-        // İkincil aksiyon: gri dolgulu
+          'bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-600',
+        // İkincil aksiyon: açık indigo dolgulu
         secondary:
-          'bg-gray-200 text-gray-900 hover:bg-gray-300 focus-visible:ring-gray-400',
+          'bg-indigo-100 text-indigo-800 hover:bg-indigo-200 focus-visible:ring-indigo-400',
         // Çerçeveli (içi boş) buton
         outline:
-          'border border-gray-300 bg-transparent text-gray-900 hover:bg-gray-100 focus-visible:ring-gray-400',
+          'border border-indigo-300 bg-transparent text-indigo-700 hover:bg-indigo-50 focus-visible:ring-indigo-400',
         // Arka planı olmayan, sade buton (örn. "İptal" gibi)
         ghost:
-          'bg-transparent text-gray-900 hover:bg-gray-100 focus-visible:ring-gray-400',
-        // Tehlikeli/silme aksiyonu: kırmızı
+          'bg-transparent text-indigo-700 hover:bg-indigo-50 focus-visible:ring-indigo-400',
+        // Tehlikeli/silme aksiyonu: kırmızı (rose)
         destructive:
-          'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-600',
+          'bg-rose-600 text-white hover:bg-rose-700 focus-visible:ring-rose-600',
       },
       // Boyut seçenekleri
       size: {
