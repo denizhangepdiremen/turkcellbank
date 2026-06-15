@@ -110,9 +110,9 @@ export function Login() {
 
           <div className="login-options">
             <Checkbox label="Beni hatırla" disabled={loading} />
-            <a className="login-link" href="#">
+            <Link className="login-link" to="/forgot-password">
               Şifremi unuttum
-            </a>
+            </Link>
           </div>
 
           <Button type="submit" variant="primary" size="lg" loading={loading}>
