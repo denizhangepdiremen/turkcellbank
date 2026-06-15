@@ -1,17 +1,9 @@
-import './App.css'
+import { Login } from './pages/Login'
 
 function App() {
-  return (
-    <div className="welcome-page">
-      <h1 className="welcome-title">TurkcellBank</h1>
-      <p className="welcome-subtitle">
-        UI komponent kütüphanesi geliştirme ortamı hazır 🎉
-      </p>
-      <p className="welcome-hint">
-        Komponentleri Storybook üzerinden geliştireceğiz.
-      </p>
-    </div>
-  )
+  // Şimdilik tek ekran var: Login.
+  // Backend/routing aşamasında React Router ile diğer sayfaları ekleyeceğiz.
+  return <Login />
 }
 
 export default App
