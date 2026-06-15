@@ -1,0 +1,27 @@
+/* Geçici karşılama sayfası stilleri.
+   Her class adı, ne işe yaradığını anlatacak şekilde isimlendirildi. */
+
+.welcome-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  min-height: 100vh;
+  background-color: #f9fafb;
+}
+
+.welcome-title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: #f0b90b; /* Turkcell sarısı tonunda */
+}
+
+.welcome-subtitle {
+  color: #4b5563;
+}
+
+.welcome-hint {
+  font-size: 0.875rem;
+  color: #9ca3af;
+}
