@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/Button'
 import { Input } from '../../components/Input'
 import { Checkbox } from '../../components/Checkbox'
@@ -15,6 +15,9 @@ import './Login.css'
  *    çağrısıyla değiştireceğiz.
  */
 export function Login() {
+  // Başarılı giriş sonrası yönlendirme için
+  const navigate = useNavigate()
+
   // Form alanlarının değerleri
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -69,6 +72,9 @@ export function Login() {
     setTimeout(() => {
       setLoading(false)
       setSuccess(true)
+      // Başarılı girişte ana ekrana (dashboard) yönlendir.
+      // Backend aşamasında burada gerçek token kontrolü olacak.
+      navigate('/dashboard')
     }, 1500)
   }
 
