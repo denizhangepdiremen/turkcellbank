@@ -1,3 +1,4 @@
+using TurkcellBank.API.Middleware;
 using TurkcellBank.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,6 +19,10 @@ builder.Services.AddInfrastructure(builder.Configuration);
 var app = builder.Build();
 
 // --- HTTP pipeline ---
+
+// Global hata yakalama: pipeline'ın EN BAŞINDA olmalı ki altındaki
+// her şeyin (controller, middleware) hatalarını yakalayabilsin.
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // Swagger'ı sadece geliştirme ortamında aç
 if (app.Environment.IsDevelopment())
