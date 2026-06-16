@@ -39,14 +39,32 @@ public class ExceptionHandlingMiddleware
 
     private async Task HandleExceptionAsync(HttpContext context, Exception ex)
     {
-        // Hata tipine göre uygun HTTP kodu + mesaj belirle
-        var (statusCode, message) = ex switch
+        // Hata tipine göre uygun HTTP kodu, mesaj ve (varsa) hata listesi belirle
+        HttpStatusCode statusCode;
+        string message;
+        List<string>? errors = null;
+
+        switch (ex)
         {
-            NotFoundException => (HttpStatusCode.NotFound, ex.Message),
-            BusinessException => (HttpStatusCode.BadRequest, ex.Message),
-            // Beklenmeyen hatalarda detayı kullanıcıya sızdırma (güvenlik)
-            _ => (HttpStatusCode.InternalServerError, "Beklenmeyen bir hata oluştu."),
-        };
+            case ValidationException ve:
+                statusCode = HttpStatusCode.BadRequest;
+                message = ve.Message;
+                errors = ve.Errors; // doğrulama hatalarının tamamı
+                break;
+            case NotFoundException:
+                statusCode = HttpStatusCode.NotFound;
+                message = ex.Message;
+                break;
+            case BusinessException:
+                statusCode = HttpStatusCode.BadRequest;
+                message = ex.Message;
+                break;
+            default:
+                // Beklenmeyen hatalarda detayı kullanıcıya sızdırma (güvenlik)
+                statusCode = HttpStatusCode.InternalServerError;
+                message = "Beklenmeyen bir hata oluştu.";
+                break;
+        }
 
         // Beklenmeyen hataları Error, bilinen iş hatalarını Warning olarak logla
         if (statusCode == HttpStatusCode.InternalServerError)
@@ -54,7 +72,7 @@ public class ExceptionHandlingMiddleware
         else
             _logger.LogWarning("İşlem hatası: {Message}", ex.Message);
 
-        var response = ApiResponse<object?>.Fail(message);
+        var response = ApiResponse<object?>.Fail(message, errors);
 
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = (int)statusCode;

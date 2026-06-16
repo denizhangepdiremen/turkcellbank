@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using TurkcellBank.Application.Common.Interfaces;
 using TurkcellBank.Infrastructure.Persistence;
+using TurkcellBank.Infrastructure.Persistence.Repositories;
+using TurkcellBank.Infrastructure.Security;
 
 namespace TurkcellBank.Infrastructure;
 
@@ -23,6 +26,10 @@ public static class DependencyInjection
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString));
+
+        // Repository ve güvenlik servisleri (Application arayüzleri -> Infra uygulamaları)
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IPasswordHasher, PasswordHasher>();
 
         return services;
     }

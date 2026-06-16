@@ -1,4 +1,5 @@
 using TurkcellBank.API.Middleware;
+using TurkcellBank.Application;
 using TurkcellBank.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,6 +12,9 @@ builder.Services.AddControllers();
 // Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Application katmanı: iş mantığı servisleri + validator'lar
+builder.Services.AddApplication();
 
 // Infrastructure katmanı: veritabanı (PostgreSQL + EF Core) bağlantısı
 // Tek satırla; detaylar Infrastructure/DependencyInjection.cs içinde.
