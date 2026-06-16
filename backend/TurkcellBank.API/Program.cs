@@ -1,3 +1,6 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using TurkcellBank.API.Middleware;
 using TurkcellBank.Application;
 using TurkcellBank.Infrastructure;
@@ -20,6 +23,27 @@ builder.Services.AddApplication();
 // Tek satırla; detaylar Infrastructure/DependencyInjection.cs içinde.
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// --- JWT kimlik doğrulama ---
+// Gelen "Authorization: Bearer <token>" başlığındaki token'ı otomatik doğrular
+// (imza, süre, issuer, audience). Geçerliyse kullanıcıyı "giriş yapmış" sayar.
+var jwt = builder.Configuration.GetSection("Jwt");
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,        // süresi dolmuş token reddedilir
+            ValidateIssuerSigningKey = true, // imza kontrolü (sahte token engellenir)
+            ValidIssuer = jwt["Issuer"],
+            ValidAudience = jwt["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwt["Key"]!)),
+        };
+    });
+
 var app = builder.Build();
 
 // --- HTTP pipeline ---
@@ -35,6 +59,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// Sıra önemli: önce kimlik doğrulama (kim?), sonra yetkilendirme (izinli mi?)
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

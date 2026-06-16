@@ -9,5 +9,5 @@ namespace TurkcellBank.Application.Features.Auth;
 public interface IAuthService
 {
     Task<UserDto> RegisterAsync(RegisterRequest request);
-    // LoginAsync 6b'de eklenecek.
+    Task<AuthResponse> LoginAsync(LoginRequest request);
 }

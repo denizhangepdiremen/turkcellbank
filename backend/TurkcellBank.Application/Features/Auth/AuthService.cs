@@ -15,16 +15,22 @@ public class AuthService : IAuthService
 {
     private readonly IUserRepository _users;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly ITokenService _tokenService;
     private readonly IValidator<RegisterRequest> _registerValidator;
+    private readonly IValidator<LoginRequest> _loginValidator;
 
     public AuthService(
         IUserRepository users,
         IPasswordHasher passwordHasher,
-        IValidator<RegisterRequest> registerValidator)
+        ITokenService tokenService,
+        IValidator<RegisterRequest> registerValidator,
+        IValidator<LoginRequest> loginValidator)
     {
         _users = users;
         _passwordHasher = passwordHasher;
+        _tokenService = tokenService;
         _registerValidator = registerValidator;
+        _loginValidator = loginValidator;
     }
 
     public async Task<UserDto> RegisterAsync(RegisterRequest request)
@@ -63,5 +69,32 @@ public class AuthService : IAuthService
 
         // 5) Güvenli DTO dön (hash vb. hassas veri dışarı çıkmaz)
         return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString());
+    }
+
+    public async Task<AuthResponse> LoginAsync(LoginRequest request)
+    {
+        // 1) Doğrulama (alanlar boş mu)
+        var validation = await _loginValidator.ValidateAsync(request);
+        if (!validation.IsValid)
+        {
+            var messages = validation.Errors.Select(e => e.ErrorMessage).ToList();
+            throw new Common.Exceptions.ValidationException(messages);
+        }
+
+        var email = request.Email.Trim().ToLowerInvariant();
+        var user = await _users.GetByEmailAsync(email);
+
+        // 2) Güvenlik: kullanıcı yok VEYA şifre yanlış → AYNI genel mesaj.
+        //    (Hangisinin hatalı olduğunu söylemek saldırgana ipucu verir.)
+        if (user is null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
+        {
+            throw new BusinessException("E-posta veya şifre hatalı.");
+        }
+
+        // 3) Token üret ve cevabı oluştur
+        var (token, expiresAt) = _tokenService.GenerateToken(user);
+        var userDto = new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString());
+
+        return new AuthResponse(token, expiresAt, userDto);
     }
 }

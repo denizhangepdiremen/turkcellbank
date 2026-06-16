@@ -20,6 +20,9 @@ public class UserRepository : IUserRepository
     public Task<bool> EmailExistsAsync(string email)
         => _db.Users.AnyAsync(u => u.Email == email);
 
+    public Task<User?> GetByEmailAsync(string email)
+        => _db.Users.FirstOrDefaultAsync(u => u.Email == email);
+
     public async Task AddAsync(User user)
     {
         _db.Users.Add(user);

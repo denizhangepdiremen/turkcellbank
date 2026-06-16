@@ -12,6 +12,9 @@ public interface IUserRepository
     // Bu e-posta sistemde kayıtlı mı?
     Task<bool> EmailExistsAsync(string email);
 
+    // E-postaya göre kullanıcıyı getir (giriş için). Yoksa null döner.
+    Task<User?> GetByEmailAsync(string email);
+
     // Yeni kullanıcıyı kaydet (veritabanına yaz).
     Task AddAsync(User user);
 }
