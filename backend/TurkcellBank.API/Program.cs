@@ -1,16 +1,25 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using TurkcellBank.API.Middleware;
+using TurkcellBank.API.Services;
 using TurkcellBank.Application;
+using TurkcellBank.Application.Common.Interfaces;
 using TurkcellBank.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Servisler (DI konteyneri) ---
 
-// Controller'lar (sonraki adımda eklenecek) için
-builder.Services.AddControllers();
+// Controller'lar + enum'ları metin olarak (de)serialize et ("Bireysel" gibi)
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
+// Şu anki kullanıcıyı token'dan okuyabilmek için
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 // Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
