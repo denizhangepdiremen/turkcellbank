@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<ITransactionService, TransactionService>();
         services.AddScoped<Features.Admin.IAdminService, Features.Admin.AdminService>();
+        services.AddScoped<Features.Loans.ILoanService, Features.Loans.LoanService>();
 
         // Validator'lar
         services.AddScoped<IValidator<RegisterRequest>, RegisterRequestValidator>();
@@ -33,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IValidator<CreateAccountRequest>, CreateAccountRequestValidator>();
         services.AddScoped<IValidator<DepositRequest>, DepositRequestValidator>();
         services.AddScoped<IValidator<TransferRequest>, TransferRequestValidator>();
+        services.AddScoped<IValidator<Features.Loans.Dtos.LoanApplicationRequest>, Features.Loans.Validators.LoanApplicationRequestValidator>();
 
         return services;
     }

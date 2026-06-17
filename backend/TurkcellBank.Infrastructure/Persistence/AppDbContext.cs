@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
+    public DbSet<LoanApplication> LoanApplications => Set<LoanApplication>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -72,6 +73,21 @@ public class AppDbContext : DbContext
             // Geçmiş sorguları FromAccountId/ToAccountId üzerinden yapılır
             entity.HasIndex(t => t.FromAccountId);
             entity.HasIndex(t => t.ToAccountId);
+        });
+
+        // --- LoanApplication tablosu kuralları ---
+        modelBuilder.Entity<LoanApplication>(entity =>
+        {
+            entity.HasKey(l => l.Id);
+            entity.Property(l => l.Profession).IsRequired().HasMaxLength(100);
+            entity.Property(l => l.Income).HasPrecision(18, 2);
+            entity.Property(l => l.Amount).HasPrecision(18, 2);
+            entity.Property(l => l.Status).HasConversion<string>().HasMaxLength(20);
+
+            entity.HasOne(l => l.User)
+                .WithMany()
+                .HasForeignKey(l => l.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
