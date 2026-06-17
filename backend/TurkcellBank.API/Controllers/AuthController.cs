@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TurkcellBank.Application.Common;
@@ -39,20 +38,23 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Giriş yapan kullanıcının bilgisi. GET /api/auth/me
-    /// [Authorize] = sadece geçerli JWT token ile erişilebilir.
-    /// Bilgiyi token'ın içindeki claim'lerden okuruz (DB'ye gerek yok).
+    /// Giriş yapan kullanıcının güncel bilgisi. GET /api/auth/me
+    /// Veritabanından okunur (profil güncellenince anında yansır).
     /// </summary>
     [Authorize]
     [HttpGet("me")]
-    public IActionResult Me()
+    public async Task<IActionResult> Me()
     {
-        var user = new UserDto(
-            Id: Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!),
-            FullName: User.FindFirstValue(ClaimTypes.Name) ?? string.Empty,
-            Email: User.FindFirstValue(ClaimTypes.Email) ?? string.Empty,
-            Role: User.FindFirstValue(ClaimTypes.Role) ?? string.Empty);
-
+        var user = await _authService.GetProfileAsync();
         return Ok(ApiResponse<UserDto>.SuccessResponse(user));
+    }
+
+    /// <summary>Profil güncelle (Ad Soyad). PUT /api/auth/profile</summary>
+    [Authorize]
+    [HttpPut("profile")]
+    public async Task<IActionResult> UpdateProfile(UpdateProfileRequest request)
+    {
+        var user = await _authService.UpdateProfileAsync(request);
+        return Ok(ApiResponse<UserDto>.SuccessResponse(user, "Profil güncellendi."));
     }
 }

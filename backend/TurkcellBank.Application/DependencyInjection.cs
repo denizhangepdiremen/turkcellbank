@@ -28,6 +28,7 @@ public static class DependencyInjection
         // Validator'lar
         services.AddScoped<IValidator<RegisterRequest>, RegisterRequestValidator>();
         services.AddScoped<IValidator<LoginRequest>, LoginRequestValidator>();
+        services.AddScoped<IValidator<UpdateProfileRequest>, UpdateProfileRequestValidator>();
         services.AddScoped<IValidator<CreateAccountRequest>, CreateAccountRequestValidator>();
         services.AddScoped<IValidator<DepositRequest>, DepositRequestValidator>();
         services.AddScoped<IValidator<TransferRequest>, TransferRequestValidator>();

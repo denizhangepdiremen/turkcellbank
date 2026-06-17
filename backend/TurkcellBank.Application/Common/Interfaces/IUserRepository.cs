@@ -15,6 +15,12 @@ public interface IUserRepository
     // E-postaya göre kullanıcıyı getir (giriş için). Yoksa null döner.
     Task<User?> GetByEmailAsync(string email);
 
+    // Id ile kullanıcıyı getir (profil için). Yoksa null döner.
+    Task<User?> GetByIdAsync(Guid id);
+
     // Yeni kullanıcıyı kaydet (veritabanına yaz).
     Task AddAsync(User user);
+
+    // Takip edilen değişiklikleri kaydet (örn. profil güncelleme).
+    Task SaveChangesAsync();
 }

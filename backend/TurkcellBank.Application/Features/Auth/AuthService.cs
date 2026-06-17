@@ -16,21 +16,27 @@ public class AuthService : IAuthService
     private readonly IUserRepository _users;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokenService;
+    private readonly ICurrentUserService _currentUser;
     private readonly IValidator<RegisterRequest> _registerValidator;
     private readonly IValidator<LoginRequest> _loginValidator;
+    private readonly IValidator<UpdateProfileRequest> _updateProfileValidator;
 
     public AuthService(
         IUserRepository users,
         IPasswordHasher passwordHasher,
         ITokenService tokenService,
+        ICurrentUserService currentUser,
         IValidator<RegisterRequest> registerValidator,
-        IValidator<LoginRequest> loginValidator)
+        IValidator<LoginRequest> loginValidator,
+        IValidator<UpdateProfileRequest> updateProfileValidator)
     {
         _users = users;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
+        _currentUser = currentUser;
         _registerValidator = registerValidator;
         _loginValidator = loginValidator;
+        _updateProfileValidator = updateProfileValidator;
     }
 
     public async Task<UserDto> RegisterAsync(RegisterRequest request)
@@ -96,5 +102,30 @@ public class AuthService : IAuthService
         var userDto = new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString());
 
         return new AuthResponse(token, expiresAt, userDto);
+    }
+
+    public async Task<UserDto> GetProfileAsync()
+    {
+        var user = await _users.GetByIdAsync(_currentUser.UserId)
+            ?? throw new NotFoundException("Kullanıcı bulunamadı.");
+        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString());
+    }
+
+    public async Task<UserDto> UpdateProfileAsync(UpdateProfileRequest request)
+    {
+        var validation = await _updateProfileValidator.ValidateAsync(request);
+        if (!validation.IsValid)
+        {
+            var messages = validation.Errors.Select(e => e.ErrorMessage).ToList();
+            throw new Common.Exceptions.ValidationException(messages);
+        }
+
+        var user = await _users.GetByIdAsync(_currentUser.UserId)
+            ?? throw new NotFoundException("Kullanıcı bulunamadı.");
+
+        user.FullName = request.FullName.Trim();
+        await _users.SaveChangesAsync();
+
+        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString());
     }
 }

@@ -35,3 +35,11 @@ export async function getMe() {
   const { data } = await apiClient.get<ApiResponse<User>>('/api/auth/me')
   return data
 }
+
+// Profil güncelle (Ad Soyad).
+export async function updateProfile(fullName: string) {
+  const { data } = await apiClient.put<ApiResponse<User>>('/api/auth/profile', {
+    fullName,
+  })
+  return data
+}

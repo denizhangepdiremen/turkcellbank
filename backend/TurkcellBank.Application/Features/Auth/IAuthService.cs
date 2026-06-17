@@ -10,4 +10,10 @@ public interface IAuthService
 {
     Task<UserDto> RegisterAsync(RegisterRequest request);
     Task<AuthResponse> LoginAsync(LoginRequest request);
+
+    // Giriş yapan kullanıcının güncel profili (veritabanından)
+    Task<UserDto> GetProfileAsync();
+
+    // Profil güncelleme (şimdilik Ad Soyad)
+    Task<UserDto> UpdateProfileAsync(UpdateProfileRequest request);
 }

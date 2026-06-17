@@ -15,6 +15,7 @@ interface AuthContextValue {
   loading: boolean // başlangıçta token'dan kullanıcı yüklenirken true
   login: (email: string, password: string) => Promise<void>
   logout: () => void
+  updateUser: (user: User) => void // profil güncellenince context'i tazele
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -64,9 +65,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
+  function updateUser(updated: User) {
+    setUser(updated)
+  }
+
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated: !!token, loading, login, logout }}
+      value={{ user, isAuthenticated: !!token, loading, login, logout, updateUser }}
     >
       {children}
     </AuthContext.Provider>

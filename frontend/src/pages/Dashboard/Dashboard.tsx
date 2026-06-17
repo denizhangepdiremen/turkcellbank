@@ -11,6 +11,7 @@ import { Spinner } from '../../components/Spinner'
 import { Alert } from '../../components/Alert'
 import { useAuth } from '../../context/AuthContext'
 import { getAccounts, createAccount, closeAccount } from '../../api/accountApi'
+import { updateProfile } from '../../api/authApi'
 import { deposit, transfer, getHistory } from '../../api/transactionApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import type { AccountType } from '../../lib/types'
@@ -29,8 +30,25 @@ const trDate = (iso: string) =>
 
 export function Dashboard() {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, logout, updateUser } = useAuth()
   const queryClient = useQueryClient()
+
+  // Profil modalı
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [profileName, setProfileName] = useState('')
+  const profileMutation = useMutation({
+    mutationFn: () => updateProfile(profileName),
+    onSuccess: (res) => {
+      if (res.data) updateUser(res.data) // header/karşılama anında güncellenir
+      setProfileOpen(false)
+    },
+  })
+
+  function openProfile() {
+    setProfileName(user?.fullName ?? '')
+    profileMutation.reset()
+    setProfileOpen(true)
+  }
 
   // --- Hesaplar ---
   const { data, isLoading, isError } = useQuery({
@@ -144,6 +162,9 @@ export function Dashboard() {
         <span className="dashboard-brand">TurkcellBank</span>
         <div className="dashboard-user">
           <span className="dashboard-username">{user?.fullName}</span>
+          <Button variant="ghost" size="sm" onClick={openProfile}>
+            Profil
+          </Button>
           <Button variant="outline" size="sm" onClick={handleLogout}>
             Çıkış
           </Button>
@@ -382,6 +403,41 @@ export function Dashboard() {
         {transferMutation.isError && (
           <Alert variant="error">
             {getApiErrorMessage(transferMutation.error, 'Transfer başarısız.')}
+          </Alert>
+        )}
+      </Modal>
+
+      {/* --- Profil modalı --- */}
+      <Modal
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        title="Profilim"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setProfileOpen(false)}>
+              İptal
+            </Button>
+            <Button
+              variant="primary"
+              loading={profileMutation.isPending}
+              onClick={() => profileMutation.mutate()}
+            >
+              Kaydet
+            </Button>
+          </>
+        }
+      >
+        <div className="dashboard-modal-field">
+          <Input
+            label="Ad Soyad"
+            placeholder="Adınız ve soyadınız"
+            value={profileName}
+            onChange={(e) => setProfileName(e.target.value)}
+          />
+        </div>
+        {profileMutation.isError && (
+          <Alert variant="error">
+            {getApiErrorMessage(profileMutation.error, 'Profil güncellenemedi.')}
           </Alert>
         )}
       </Modal>
