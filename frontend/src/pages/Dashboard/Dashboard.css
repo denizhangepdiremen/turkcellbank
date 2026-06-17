@@ -22,21 +22,6 @@
   color: #4f46e5; /* indigo-600 */
 }
 
-.dashboard-nav {
-  display: flex;
-  gap: 1.5rem;
-}
-
-.dashboard-nav a {
-  font-size: 0.9rem;
-  color: #4b5563; /* gray-600 */
-  text-decoration: none;
-}
-
-.dashboard-nav a:hover {
-  color: #4f46e5;
-}
-
 .dashboard-user {
   display: flex;
   align-items: center;
@@ -84,12 +69,19 @@
   font-weight: 700;
 }
 
-/* Bölüm başlığı */
+/* Bölüm başlığı + yanındaki aksiyon (Hesap Aç) */
+.dashboard-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
 .dashboard-section-title {
   font-size: 1.1rem;
   font-weight: 600;
   color: #111827;
-  margin: 0 0 1rem;
+  margin: 0;
 }
 
 /* Hesap kartları ızgarası */
@@ -100,8 +92,14 @@
   margin-bottom: 2rem;
 }
 
+.dashboard-account-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .dashboard-account-iban {
-  margin: 0;
+  margin: 0.75rem 0 0;
   font-size: 0.8rem;
   color: #6b7280;
   letter-spacing: 0.5px;
@@ -114,47 +112,23 @@
   color: #111827;
 }
 
-/* İşlem listesi */
-.dashboard-tx-row {
+/* Yükleniyor / boş / bilgi durumları */
+.dashboard-state {
   display: flex;
+  justify-content: center;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 0;
-  border-top: 1px solid #f3f4f6;
-}
-
-.dashboard-tx-row:first-child {
-  border-top: none;
-}
-
-.dashboard-tx-desc {
-  font-size: 0.9rem;
-  color: #111827;
-  font-weight: 500;
-  margin: 0;
-}
-
-.dashboard-tx-date {
-  font-size: 0.8rem;
+  padding: 2rem;
   color: #6b7280;
-  margin: 0.15rem 0 0;
-}
-
-.dashboard-tx-right {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.dashboard-tx-amount {
   font-size: 0.95rem;
-  font-weight: 600;
+  margin-bottom: 2rem;
 }
 
-.dashboard-tx-amount.positive {
-  color: #059669; /* emerald-600 */
-}
-
-.dashboard-tx-amount.negative {
-  color: #dc2626; /* red-600 */
+/* "Yakında" notu (Sprint 2) */
+.dashboard-soon {
+  padding: 1.25rem;
+  border: 1px dashed #d1d5db;
+  border-radius: 12px;
+  color: #6b7280;
+  font-size: 0.9rem;
+  text-align: center;
 }
