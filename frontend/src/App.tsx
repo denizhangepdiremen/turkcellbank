@@ -3,6 +3,7 @@ import { Login } from './pages/Login'
 import { Register } from './pages/Register'
 import { ForgotPassword } from './pages/ForgotPassword'
 import { Dashboard } from './pages/Dashboard'
+import { AdminPanel } from './pages/Admin'
 import { ProtectedRoute } from './routes/ProtectedRoute'
 
 function App() {
@@ -18,6 +19,15 @@ function App() {
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      {/* Admin paneli: sadece Admin rolü */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute requiredRole="Admin">
+            <AdminPanel />
           </ProtectedRoute>
         }
       />

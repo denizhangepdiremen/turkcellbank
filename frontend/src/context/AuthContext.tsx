@@ -13,7 +13,7 @@ interface AuthContextValue {
   user: User | null
   isAuthenticated: boolean
   loading: boolean // başlangıçta token'dan kullanıcı yüklenirken true
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<User>
   logout: () => void
   updateUser: (user: User) => void // profil güncellenince context'i tazele
 }
@@ -50,13 +50,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser()
   }, [token])
 
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string): Promise<User> {
     const res = await authApi.login({ email, password })
     if (res.success && res.data) {
       localStorage.setItem(TOKEN_KEY, res.data.token)
       setToken(res.data.token)
       setUser(res.data.user)
+      return res.data.user
     }
+    throw new Error(res.message ?? 'Giriş başarısız')
   }
 
   function logout() {

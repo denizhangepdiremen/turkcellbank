@@ -39,8 +39,9 @@ export function Login() {
   async function onSubmit(values: LoginFormValues) {
     setServerError(null)
     try {
-      await login(values.email, values.password)
-      navigate('/dashboard')
+      const loggedIn = await login(values.email, values.password)
+      // Admin ise admin paneline, değilse dashboard'a
+      navigate(loggedIn.role === 'Admin' ? '/admin' : '/dashboard')
     } catch (err) {
       setServerError(getApiErrorMessage(err, 'Giriş başarısız.'))
     }
