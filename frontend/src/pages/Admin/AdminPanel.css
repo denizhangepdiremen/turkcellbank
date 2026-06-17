@@ -73,6 +73,17 @@
   color: #6b7280;
 }
 
+/* Tablo içi aksiyon butonları */
+.admin-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Bölümler arası boşluk */
+.admin-section {
+  margin-top: 2rem;
+}
+
 /* "Yakında" placeholder (kredi başvuruları buraya gelecek) */
 .admin-soon {
   margin-top: 2rem;

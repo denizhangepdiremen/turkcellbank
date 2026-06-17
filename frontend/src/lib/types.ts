@@ -41,3 +41,45 @@ export interface Transaction {
   description: string | null
   createdAt: string
 }
+
+export type LoanStatus = 'Pending' | 'Approved' | 'Rejected'
+
+export interface Installment {
+  no: number
+  dueDate: string
+  amount: number
+}
+
+export interface PaymentPlan {
+  monthlyRate: number
+  monthlyPayment: number
+  totalPayment: number
+  installments: Installment[]
+}
+
+export interface Loan {
+  id: string
+  income: number
+  profession: string
+  amount: number
+  termMonths: number
+  status: LoanStatus
+  score: number
+  createdAt: string
+  decidedAt: string | null
+  paymentPlan: PaymentPlan | null
+}
+
+export interface AdminLoan {
+  id: string
+  applicantName: string
+  applicantEmail: string
+  income: number
+  profession: string
+  amount: number
+  termMonths: number
+  status: LoanStatus
+  score: number
+  createdAt: string
+  decidedAt: string | null
+}

@@ -196,3 +196,52 @@
 .dashboard-modal-field {
   margin-bottom: 1rem;
 }
+
+/* Kredi satırı */
+.dashboard-loan-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid #f3f4f6;
+}
+
+.dashboard-loan-row:first-child {
+  border-top: none;
+}
+
+.dashboard-loan-amount {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.dashboard-loan-sub {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0.15rem 0 0;
+}
+
+.dashboard-loan-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Ödeme planı taksit satırı */
+.dashboard-plan-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.4rem 0;
+  border-top: 1px solid #f3f4f6;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.dashboard-plan-summary {
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  color: #111827;
+}

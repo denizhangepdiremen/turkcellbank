@@ -13,14 +13,21 @@ import { useAuth } from '../../context/AuthContext'
 import { getAccounts, createAccount, closeAccount } from '../../api/accountApi'
 import { updateProfile } from '../../api/authApi'
 import { deposit, transfer, getHistory } from '../../api/transactionApi'
+import { applyLoan, getMyLoans, getLoanDetail } from '../../api/loanApi'
 import { getApiErrorMessage } from '../../lib/apiError'
-import type { AccountType } from '../../lib/types'
+import type { AccountType, LoanStatus } from '../../lib/types'
 import './Dashboard.css'
 
 const accountTypeOptions = [
   { value: 'Bireysel', label: 'Bireysel Hesap' },
   { value: 'Isletme', label: 'İşletme Hesabı' },
 ]
+
+// Kredi durumu -> rozet rengi / Türkçe etiket
+const loanBadgeVariant = (s: LoanStatus) =>
+  s === 'Approved' ? 'success' : s === 'Rejected' ? 'error' : 'warning'
+const loanLabel = (s: LoanStatus) =>
+  s === 'Approved' ? 'Onaylandı' : s === 'Rejected' ? 'Reddedildi' : 'Bekliyor'
 
 const formatTL = (n: number) =>
   new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(n)
@@ -124,6 +131,51 @@ export function Dashboard() {
     enabled: !!historyAccountId,
   })
   const history = historyData?.data ?? []
+
+  // --- Krediler ---
+  const { data: loansData, isLoading: loansLoading } = useQuery({
+    queryKey: ['loans'],
+    queryFn: getMyLoans,
+  })
+  const loans = loansData?.data ?? []
+
+  const [loanOpen, setLoanOpen] = useState(false)
+  const [loanIncome, setLoanIncome] = useState('')
+  const [loanProfession, setLoanProfession] = useState('')
+  const [loanAmount, setLoanAmount] = useState('')
+  const [loanTerm, setLoanTerm] = useState('12')
+
+  const applyMutation = useMutation({
+    mutationFn: () =>
+      applyLoan({
+        income: Number(loanIncome),
+        profession: loanProfession,
+        amount: Number(loanAmount),
+        termMonths: Number(loanTerm),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['loans'] })
+      setLoanOpen(false)
+    },
+  })
+
+  function openLoanApply() {
+    setLoanIncome('')
+    setLoanProfession('')
+    setLoanAmount('')
+    setLoanTerm('12')
+    applyMutation.reset()
+    setLoanOpen(true)
+  }
+
+  // Ödeme planı modalı (onaylı kredi detayı)
+  const [planLoanId, setPlanLoanId] = useState<string | null>(null)
+  const { data: planData, isLoading: planLoading } = useQuery({
+    queryKey: ['loan', planLoanId],
+    queryFn: () => getLoanDetail(planLoanId!),
+    enabled: !!planLoanId,
+  })
+  const planLoan = planData?.data ?? null
 
   function handleLogout() {
     logout()
@@ -284,6 +336,53 @@ export function Dashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Krediler */}
+        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+          <h2 className="dashboard-section-title">Kredilerim</h2>
+          <Button size="sm" variant="primary" onClick={openLoanApply}>
+            + Kredi Başvur
+          </Button>
+        </div>
+
+        <Card>
+          <CardContent>
+            {loansLoading && (
+              <div className="dashboard-state">
+                <Spinner />
+              </div>
+            )}
+            {!loansLoading && loans.length === 0 && (
+              <div className="dashboard-state">Henüz kredi başvurunuz yok.</div>
+            )}
+            {loans.map((loan) => (
+              <div key={loan.id} className="dashboard-loan-row">
+                <div>
+                  <p className="dashboard-loan-amount">
+                    {formatTL(loan.amount)} · {loan.termMonths} ay
+                  </p>
+                  <p className="dashboard-loan-sub">
+                    {loan.profession} · skor {loan.score} · {trDate(loan.createdAt)}
+                  </p>
+                </div>
+                <div className="dashboard-loan-right">
+                  <Badge variant={loanBadgeVariant(loan.status)}>
+                    {loanLabel(loan.status)}
+                  </Badge>
+                  {loan.status === 'Approved' && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setPlanLoanId(loan.id)}
+                    >
+                      Ödeme Planı
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </div>
 
       {/* --- Hesap açma modalı --- */}
@@ -439,6 +538,101 @@ export function Dashboard() {
           <Alert variant="error">
             {getApiErrorMessage(profileMutation.error, 'Profil güncellenemedi.')}
           </Alert>
+        )}
+      </Modal>
+
+      {/* --- Kredi başvuru modalı --- */}
+      <Modal
+        open={loanOpen}
+        onClose={() => setLoanOpen(false)}
+        title="Kredi Başvurusu"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setLoanOpen(false)}>
+              İptal
+            </Button>
+            <Button
+              variant="primary"
+              loading={applyMutation.isPending}
+              onClick={() => applyMutation.mutate()}
+            >
+              Başvur
+            </Button>
+          </>
+        }
+      >
+        <div className="dashboard-modal-field">
+          <Input
+            label="Aylık Gelir (₺)"
+            type="number"
+            placeholder="0"
+            value={loanIncome}
+            onChange={(e) => setLoanIncome(e.target.value)}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Input
+            label="Meslek"
+            placeholder="Örn. Mühendis"
+            value={loanProfession}
+            onChange={(e) => setLoanProfession(e.target.value)}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Input
+            label="Kredi Tutarı (₺)"
+            type="number"
+            placeholder="0"
+            value={loanAmount}
+            onChange={(e) => setLoanAmount(e.target.value)}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Input
+            label="Vade (ay)"
+            type="number"
+            placeholder="12"
+            value={loanTerm}
+            onChange={(e) => setLoanTerm(e.target.value)}
+          />
+        </div>
+        {applyMutation.isError && (
+          <Alert variant="error">
+            {getApiErrorMessage(applyMutation.error, 'Başvuru yapılamadı.')}
+          </Alert>
+        )}
+      </Modal>
+
+      {/* --- Ödeme planı modalı --- */}
+      <Modal
+        open={!!planLoanId}
+        onClose={() => setPlanLoanId(null)}
+        title="Ödeme Planı"
+        footer={
+          <Button variant="primary" onClick={() => setPlanLoanId(null)}>
+            Kapat
+          </Button>
+        }
+      >
+        {planLoading && (
+          <div className="dashboard-state">
+            <Spinner />
+          </div>
+        )}
+        {planLoan?.paymentPlan && (
+          <>
+            <div className="dashboard-plan-summary">
+              Aylık taksit: <strong>{formatTL(planLoan.paymentPlan.monthlyPayment)}</strong>
+              {' · '}Toplam: <strong>{formatTL(planLoan.paymentPlan.totalPayment)}</strong>
+              {' · '}Faiz: %{(planLoan.paymentPlan.monthlyRate * 100).toFixed(1)}/ay
+            </div>
+            {planLoan.paymentPlan.installments.map((ins) => (
+              <div key={ins.no} className="dashboard-plan-row">
+                <span>{ins.no}. taksit · {trDate(ins.dueDate)}</span>
+                <span>{formatTL(ins.amount)}</span>
+              </div>
+            ))}
+          </>
         )}
       </Modal>
     </div>
