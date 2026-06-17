@@ -15,6 +15,9 @@ public interface IAccountRepository
     // Tek hesap (id ile). Yoksa null.
     Task<Account?> GetByIdAsync(Guid id);
 
+    // Tek hesap (IBAN ile). Transfer alıcısını bulmak için. Yoksa null.
+    Task<Account?> GetByIbanAsync(string iban);
+
     // Bu IBAN zaten var mı? (benzersizlik kontrolü için)
     Task<bool> IbanExistsAsync(string iban);
 

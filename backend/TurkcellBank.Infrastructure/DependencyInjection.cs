@@ -30,6 +30,7 @@ public static class DependencyInjection
         // Repository ve güvenlik servisleri (Application arayüzleri -> Infra uygulamaları)
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IAccountRepository, AccountRepository>();
+        services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, JwtTokenService>();
 

@@ -29,6 +29,9 @@ public class AccountRepository : IAccountRepository
     public Task<Account?> GetByIdAsync(Guid id)
         => _db.Accounts.FirstOrDefaultAsync(a => a.Id == id);
 
+    public Task<Account?> GetByIbanAsync(string iban)
+        => _db.Accounts.FirstOrDefaultAsync(a => a.Iban == iban);
+
     public Task<bool> IbanExistsAsync(string iban)
         => _db.Accounts.AnyAsync(a => a.Iban == iban);
 

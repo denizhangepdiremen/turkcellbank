@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<Transaction> Transactions => Set<Transaction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,6 +56,22 @@ public class AppDbContext : DbContext
                 .WithMany(u => u.Accounts)
                 .HasForeignKey(a => a.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- Transaction tablosu kuralları ---
+        modelBuilder.Entity<Transaction>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+
+            entity.Property(t => t.Type).HasConversion<string>().HasMaxLength(20);
+            entity.Property(t => t.Amount).HasPrecision(18, 2);
+            entity.Property(t => t.Description).HasMaxLength(200);
+            entity.Property(t => t.FromIban).HasMaxLength(34);
+            entity.Property(t => t.ToIban).HasMaxLength(34);
+
+            // Geçmiş sorguları FromAccountId/ToAccountId üzerinden yapılır
+            entity.HasIndex(t => t.FromAccountId);
+            entity.HasIndex(t => t.ToAccountId);
         });
     }
 }
