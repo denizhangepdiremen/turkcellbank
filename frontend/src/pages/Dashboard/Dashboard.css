@@ -132,3 +132,67 @@
   font-size: 0.9rem;
   text-align: center;
 }
+
+/* Hesap kartı aksiyon butonları alt alta sığsın */
+.dashboard-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* İşlem geçmişi: başlık + hesap seçici */
+.dashboard-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard-history-select {
+  width: 240px;
+}
+
+/* İşlem satırı */
+.dashboard-tx-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-top: 1px solid #f3f4f6;
+}
+
+.dashboard-tx-row:first-child {
+  border-top: none;
+}
+
+.dashboard-tx-desc {
+  font-size: 0.9rem;
+  color: #111827;
+  font-weight: 500;
+  margin: 0;
+}
+
+.dashboard-tx-sub {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0.15rem 0 0;
+}
+
+.dashboard-tx-amount {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.dashboard-tx-amount.in {
+  color: #059669; /* emerald-600 */
+}
+
+.dashboard-tx-amount.out {
+  color: #dc2626; /* red-600 */
+}
+
+/* Modal içi alanlar arası boşluk */
+.dashboard-modal-field {
+  margin-bottom: 1rem;
+}

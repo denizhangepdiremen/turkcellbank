@@ -31,3 +31,13 @@ export interface Account {
   isActive: boolean
   createdAt: string
 }
+
+export interface Transaction {
+  id: string
+  type: 'Deposit' | 'Transfer'
+  direction: 'In' | 'Out' // gelen / giden (o hesabın bakışıyla)
+  amount: number
+  counterpartyIban: string | null
+  description: string | null
+  createdAt: string
+}
