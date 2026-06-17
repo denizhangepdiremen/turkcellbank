@@ -13,6 +13,6 @@ public class TransferRequestValidator : AbstractValidator<TransferRequest>
         RuleFor(x => x.Amount)
             .GreaterThan(0).WithMessage("Tutar 0'dan büyük olmalı.");
         RuleFor(x => x.Description)
-            .MaximumLength(200).WithMessage("Açıklama en fazla 200 karakter.");
+            .MaximumLength(20).WithMessage("Açıklama en fazla 20 karakter.");
     }
 }

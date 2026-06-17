@@ -65,7 +65,7 @@ public class AppDbContext : DbContext
 
             entity.Property(t => t.Type).HasConversion<string>().HasMaxLength(20);
             entity.Property(t => t.Amount).HasPrecision(18, 2);
-            entity.Property(t => t.Description).HasMaxLength(200);
+            entity.Property(t => t.Description).HasMaxLength(20);
             entity.Property(t => t.FromIban).HasMaxLength(34);
             entity.Property(t => t.ToIban).HasMaxLength(34);
 
