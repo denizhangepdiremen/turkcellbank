@@ -25,6 +25,16 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// CORS: frontend (Vite dev sunucusu) backend'i çağırabilsin diye izin ver.
+const string FrontendCors = "FrontendCors";
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(FrontendCors, policy =>
+        policy.WithOrigins("http://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod());
+});
+
 // Application katmanı: iş mantığı servisleri + validator'lar
 builder.Services.AddApplication();
 
@@ -67,6 +77,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// CORS, kimlik doğrulamadan önce gelmeli
+app.UseCors(FrontendCors);
 
 // Sıra önemli: önce kimlik doğrulama (kim?), sonra yetkilendirme (izinli mi?)
 app.UseAuthentication();
