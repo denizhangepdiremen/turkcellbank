@@ -26,6 +26,9 @@ public class UserRepository : IUserRepository
     public Task<User?> GetByIdAsync(Guid id)
         => _db.Users.FirstOrDefaultAsync(u => u.Id == id);
 
+    public Task<List<User>> GetAllAsync()
+        => _db.Users.OrderByDescending(u => u.CreatedAt).ToListAsync();
+
     public async Task AddAsync(User user)
     {
         _db.Users.Add(user);

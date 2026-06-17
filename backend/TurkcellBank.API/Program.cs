@@ -7,6 +7,7 @@ using TurkcellBank.API.Services;
 using TurkcellBank.Application;
 using TurkcellBank.Application.Common.Interfaces;
 using TurkcellBank.Infrastructure;
+using TurkcellBank.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -64,6 +65,14 @@ builder.Services
     });
 
 var app = builder.Build();
+
+// Açılışta admin seed (yoksa varsayılan admin oluşturulur)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+    await DbSeeder.SeedAsync(db, hasher);
+}
 
 // --- HTTP pipeline ---
 

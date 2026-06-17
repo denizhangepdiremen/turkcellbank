@@ -18,6 +18,9 @@ public interface IUserRepository
     // Id ile kullanıcıyı getir (profil için). Yoksa null döner.
     Task<User?> GetByIdAsync(Guid id);
 
+    // Tüm kullanıcılar (admin listesi için).
+    Task<List<User>> GetAllAsync();
+
     // Yeni kullanıcıyı kaydet (veritabanına yaz).
     Task AddAsync(User user);
 
