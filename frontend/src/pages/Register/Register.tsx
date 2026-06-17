@@ -1,93 +1,52 @@
-import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '../../components/Button'
 import { Input } from '../../components/Input'
 import { Checkbox } from '../../components/Checkbox'
+import { Alert } from '../../components/Alert'
+import { register as registerUser } from '../../api/authApi'
+import { registerSchema, type RegisterFormValues } from '../../lib/validation'
+import { getApiErrorMessage } from '../../lib/apiError'
 import './Register.css'
 
 /**
- * Register (Kayıt) ekranı.
- *
- * NOT: Backend henüz yok. Kayıt şimdilik SİMÜLASYON:
- *  - Alanlar ve doğrulama (validation) çalışır.
- *  - "Kayıt Ol"a basınca kısa bekleme sonrası başarı mesajı gösterilir.
- *  - Backend aşamasında burayı React Hook Form + Zod ve gerçek API ile değiştireceğiz.
+ * Register ekranı — gerçek backend'e bağlı.
+ * Form: React Hook Form + Zod. Başarılı kayıtta login'e yönlendirir.
  */
 export function Register() {
-  // Form alanları
-  const [fullName, setFullName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const navigate = useNavigate()
+  const [serverError, setServerError] = useState<string | null>(null)
 
-  // Alan bazlı hata mesajları
-  const [errors, setErrors] = useState<{
-    fullName?: string
-    email?: string
-    password?: string
-    confirmPassword?: string
-    terms?: string
-  }>({})
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      fullName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      acceptedTerms: false,
+    },
+  })
 
-  const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(false)
-
-  /** Basit/manuel doğrulama. Hata bulursa errors nesnesi döndürür. */
-  function validate() {
-    const nextErrors: typeof errors = {}
-
-    // Ad Soyad: en az 3 karakter
-    if (!fullName.trim()) {
-      nextErrors.fullName = 'Ad Soyad gerekli.'
-    } else if (fullName.trim().length < 3) {
-      nextErrors.fullName = 'Ad Soyad en az 3 karakter olmalı.'
+  async function onSubmit(values: RegisterFormValues) {
+    setServerError(null)
+    try {
+      await registerUser({
+        fullName: values.fullName,
+        email: values.email,
+        password: values.password,
+      })
+      // Başarılı: login ekranına git, orada başarı mesajı göster
+      navigate('/login', { state: { registered: true } })
+    } catch (err) {
+      setServerError(getApiErrorMessage(err, 'Kayıt başarısız.'))
     }
-
-    // E-posta: boş olmamalı + format
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!email.trim()) {
-      nextErrors.email = 'E-posta adresi gerekli.'
-    } else if (!emailPattern.test(email)) {
-      nextErrors.email = 'Geçerli bir e-posta adresi girin.'
-    }
-
-    // Şifre: en az 6 karakter
-    if (!password) {
-      nextErrors.password = 'Şifre gerekli.'
-    } else if (password.length < 6) {
-      nextErrors.password = 'Şifre en az 6 karakter olmalı.'
-    }
-
-    // Şifre tekrar: dolu olmalı ve eşleşmeli
-    if (!confirmPassword) {
-      nextErrors.confirmPassword = 'Şifreyi tekrar girin.'
-    } else if (confirmPassword !== password) {
-      nextErrors.confirmPassword = 'Şifreler eşleşmiyor.'
-    }
-
-    // Koşullar kabul edilmeli
-    if (!acceptedTerms) {
-      nextErrors.terms = 'Devam etmek için koşulları kabul etmelisiniz.'
-    }
-
-    return nextErrors
-  }
-
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault()
-    setSuccess(false)
-
-    const nextErrors = validate()
-    setErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0) return
-
-    // --- Kayıt simülasyonu (backend yerine) ---
-    setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      setSuccess(true)
-    }, 1500)
   }
 
   return (
@@ -98,61 +57,60 @@ export function Register() {
           <p className="register-subtitle">Yeni hesap oluşturun</p>
         </div>
 
-        {success && (
-          <div className="register-success">
-            Kayıt başarılı! (simülasyon — backend bağlanınca gerçek olacak)
+        {serverError && (
+          <div style={{ marginBottom: '1rem' }}>
+            <Alert variant="error">{serverError}</Alert>
           </div>
         )}
 
-        <form className="register-form" onSubmit={handleSubmit} noValidate>
+        <form
+          className="register-form"
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+        >
           <Input
             label="Ad Soyad"
             placeholder="Adınızı ve soyadınızı girin"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            error={errors.fullName}
-            disabled={loading}
+            error={errors.fullName?.message}
+            disabled={isSubmitting}
+            {...register('fullName')}
           />
 
           <Input
             label="E-posta"
             type="email"
             placeholder="ornek@turkcellbank.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            error={errors.email}
-            disabled={loading}
+            error={errors.email?.message}
+            disabled={isSubmitting}
+            {...register('email')}
           />
 
           <Input
             label="Şifre"
             type="password"
             placeholder="En az 6 karakter"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            error={errors.password}
-            disabled={loading}
+            error={errors.password?.message}
+            disabled={isSubmitting}
+            {...register('password')}
           />
 
           <Input
             label="Şifre (Tekrar)"
             type="password"
             placeholder="Şifrenizi tekrar girin"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            error={errors.confirmPassword}
-            disabled={loading}
+            error={errors.confirmPassword?.message}
+            disabled={isSubmitting}
+            {...register('confirmPassword')}
           />
 
           <Checkbox
             label="Kullanım koşullarını ve gizlilik politikasını kabul ediyorum"
-            checked={acceptedTerms}
-            onChange={(e) => setAcceptedTerms(e.target.checked)}
-            error={errors.terms}
-            disabled={loading}
+            error={errors.acceptedTerms?.message}
+            disabled={isSubmitting}
+            {...register('acceptedTerms')}
           />
 
-          <Button type="submit" variant="primary" size="lg" loading={loading}>
+          <Button type="submit" variant="primary" size="lg" loading={isSubmitting}>
             Kayıt Ol
           </Button>
         </form>

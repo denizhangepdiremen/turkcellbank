@@ -1,11 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { MemoryRouter } from 'react-router-dom'
 import { Login } from './Login'
+import { AuthProvider } from '../../context/AuthContext'
 
 /**
  * Login ekranının Storybook gösterimi.
  * Tüm sayfayı kapladığı için layout: 'fullscreen' kullanıyoruz.
- * Login içinde <Link> olduğu için MemoryRouter ile sarmalıyoruz.
+ * Login içinde <Link> (Router) ve useAuth (AuthProvider) olduğu için ikisiyle sarmalıyoruz.
  */
 const meta = {
   title: 'Pages/Login',
@@ -14,7 +15,9 @@ const meta = {
   decorators: [
     (Story) => (
       <MemoryRouter>
-        <Story />
+        <AuthProvider>
+          <Story />
+        </AuthProvider>
       </MemoryRouter>
     ),
   ],

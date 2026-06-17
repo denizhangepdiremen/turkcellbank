@@ -1,81 +1,49 @@
-import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '../../components/Button'
 import { Input } from '../../components/Input'
 import { Checkbox } from '../../components/Checkbox'
+import { Alert } from '../../components/Alert'
+import { useAuth } from '../../context/AuthContext'
+import { loginSchema, type LoginFormValues } from '../../lib/validation'
+import { getApiErrorMessage } from '../../lib/apiError'
 import './Login.css'
 
 /**
- * Login ekranı.
- *
- * NOT: Backend henüz yok. Bu yüzden giriş şimdilik SİMÜLASYON:
- *  - Form alanları çalışır, doğrulama (validation) çalışır.
- *  - "Giriş Yap"a basınca kısa bir bekleme (loading) sonrası başarı mesajı gösterilir.
- *  - Backend aşamasına geçince burayı React Hook Form + Zod ve gerçek API
- *    çağrısıyla değiştireceğiz.
+ * Login ekranı — gerçek backend'e bağlı.
+ * Form: React Hook Form + Zod. Giriş: AuthContext.login (JWT alır, saklar).
  */
 export function Login() {
-  // Başarılı giriş sonrası yönlendirme için
   const navigate = useNavigate()
+  const location = useLocation()
+  const { login } = useAuth()
 
-  // Form alanlarının değerleri
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  // Backend'den dönen genel hata (örn. "E-posta veya şifre hatalı")
+  const [serverError, setServerError] = useState<string | null>(null)
 
-  // Her alanın hata mesajı (boşsa hata yok)
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>(
-    {},
-  )
+  // Kayıt ekranından yönlendirildiyse başarı mesajı göster
+  const registered = (location.state as { registered?: boolean } | null)
+    ?.registered
 
-  // "Giriş Yap"a basılınca dönen spinner için
-  const [loading, setLoading] = useState(false)
-  // Simülasyon başarılıysa gösterilecek mesaj
-  const [success, setSuccess] = useState(false)
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  })
 
-  /**
-   * Basit/manuel doğrulama.
-   * Hata bulursa errors nesnesi döndürür; hata yoksa boş nesne döner.
-   */
-  function validate() {
-    const nextErrors: { email?: string; password?: string } = {}
-
-    // E-posta: boş olmamalı ve basit bir e-posta kalıbına uymalı
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!email.trim()) {
-      nextErrors.email = 'E-posta adresi gerekli.'
-    } else if (!emailPattern.test(email)) {
-      nextErrors.email = 'Geçerli bir e-posta adresi girin.'
-    }
-
-    // Şifre: boş olmamalı ve en az 6 karakter olmalı
-    if (!password) {
-      nextErrors.password = 'Şifre gerekli.'
-    } else if (password.length < 6) {
-      nextErrors.password = 'Şifre en az 6 karakter olmalı.'
-    }
-
-    return nextErrors
-  }
-
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault() // sayfanın yeniden yüklenmesini engelle
-    setSuccess(false)
-
-    const nextErrors = validate()
-    setErrors(nextErrors)
-
-    // Hata varsa giriş işlemini başlatma
-    if (Object.keys(nextErrors).length > 0) return
-
-    // --- Giriş simülasyonu (backend yerine) ---
-    setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      setSuccess(true)
-      // Başarılı girişte ana ekrana (dashboard) yönlendir.
-      // Backend aşamasında burada gerçek token kontrolü olacak.
+  async function onSubmit(values: LoginFormValues) {
+    setServerError(null)
+    try {
+      await login(values.email, values.password)
       navigate('/dashboard')
-    }, 1500)
+    } catch (err) {
+      setServerError(getApiErrorMessage(err, 'Giriş başarısız.'))
+    }
   }
 
   return (
@@ -86,42 +54,51 @@ export function Login() {
           <p className="login-subtitle">Hesabınıza giriş yapın</p>
         </div>
 
-        {/* Başarılı giriş simülasyonu mesajı */}
-        {success && (
-          <div className="login-success">
-            Giriş başarılı! (simülasyon — backend bağlanınca gerçek olacak)
+        {registered && (
+          <div style={{ marginBottom: '1rem' }}>
+            <Alert variant="success">
+              Kayıt başarılı! Şimdi giriş yapabilirsiniz.
+            </Alert>
           </div>
         )}
 
-        <form className="login-form" onSubmit={handleSubmit} noValidate>
+        {serverError && (
+          <div style={{ marginBottom: '1rem' }}>
+            <Alert variant="error">{serverError}</Alert>
+          </div>
+        )}
+
+        <form
+          className="login-form"
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+        >
           <Input
             label="E-posta"
             type="email"
             placeholder="ornek@turkcellbank.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            error={errors.email}
-            disabled={loading}
+            error={errors.email?.message}
+            disabled={isSubmitting}
+            {...register('email')}
           />
 
           <Input
             label="Şifre"
             type="password"
             placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            error={errors.password}
-            disabled={loading}
+            error={errors.password?.message}
+            disabled={isSubmitting}
+            {...register('password')}
           />
 
           <div className="login-options">
-            <Checkbox label="Beni hatırla" disabled={loading} />
+            <Checkbox label="Beni hatırla" disabled={isSubmitting} />
             <Link className="login-link" to="/forgot-password">
               Şifremi unuttum
             </Link>
           </div>
 
-          <Button type="submit" variant="primary" size="lg" loading={loading}>
+          <Button type="submit" variant="primary" size="lg" loading={isSubmitting}>
             Giriş Yap
           </Button>
         </form>
