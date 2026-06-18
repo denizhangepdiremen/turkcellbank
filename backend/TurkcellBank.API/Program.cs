@@ -22,9 +22,30 @@ builder.Services.AddControllers()
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
-// Swagger / OpenAPI
+// Swagger / OpenAPI + JWT "Authorize" butonu
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    var jwtScheme = new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "JWT token'ı buraya yapıştırın ('Bearer' yazmadan).",
+        Reference = new Microsoft.OpenApi.Models.OpenApiReference
+        {
+            Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+            Id = "Bearer",
+        },
+    };
+    options.AddSecurityDefinition("Bearer", jwtScheme);
+    options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        { jwtScheme, Array.Empty<string>() },
+    });
+});
 
 // CORS: frontend (Vite dev sunucusu) backend'i çağırabilsin diye izin ver.
 const string FrontendCors = "FrontendCors";
@@ -47,6 +68,15 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // Gelen "Authorization: Bearer <token>" başlığındaki token'ı otomatik doğrular
 // (imza, süre, issuer, audience). Geçerliyse kullanıcıyı "giriş yapmış" sayar.
 var jwt = builder.Configuration.GetSection("Jwt");
+// Guard: JWT key yapılandırılmamışsa uygulama net bir hatayla dursun
+// (user-secrets veya environment variable ile sağlanmalı).
+var jwtKey = jwt["Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+{
+    throw new InvalidOperationException(
+        "Jwt:Key yapılandırılmamış. Geliştirmede 'dotnet user-secrets', " +
+        "production'da environment variable ile sağlayın.");
+}
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -59,8 +89,7 @@ builder.Services
             ValidateIssuerSigningKey = true, // imza kontrolü (sahte token engellenir)
             ValidIssuer = jwt["Issuer"],
             ValidAudience = jwt["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwt["Key"]!)),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
         };
     });
 
@@ -71,7 +100,8 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-    await DbSeeder.SeedAsync(db, hasher);
+    var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+    await DbSeeder.SeedAsync(db, hasher, config);
 }
 
 // --- HTTP pipeline ---
