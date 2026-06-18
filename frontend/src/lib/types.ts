@@ -34,12 +34,35 @@ export interface Account {
 
 export interface Transaction {
   id: string
-  type: 'Deposit' | 'Transfer'
+  type: 'Deposit' | 'Transfer' | 'Payment' | 'Refund'
   direction: 'In' | 'Out' // gelen / giden (o hesabın bakışıyla)
   amount: number
   counterpartyIban: string | null
   description: string | null
   createdAt: string
+}
+
+export type CardStatus = 'Pending' | 'Approved' | 'Rejected'
+
+export interface Card {
+  id: string
+  maskedCardNumber: string
+  expiryMonth: number
+  expiryYear: number
+  status: CardStatus
+  accountIban: string
+  createdAt: string
+}
+
+export interface AdminCard {
+  id: string
+  holderName: string
+  holderEmail: string
+  maskedCardNumber: string
+  accountIban: string
+  status: CardStatus
+  createdAt: string
+  decidedAt: string | null
 }
 
 export type LoanStatus = 'Pending' | 'Approved' | 'Rejected'

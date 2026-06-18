@@ -1,8 +1,10 @@
 import { apiClient } from '../lib/apiClient'
 import type {
+  AdminCard,
   AdminLoan,
   AdminPayment,
   ApiResponse,
+  Card,
   Loan,
   Payment,
   User,
@@ -49,6 +51,29 @@ export async function getPayments() {
 export async function refundPayment(id: string) {
   const { data } = await apiClient.post<ApiResponse<Payment>>(
     `/api/admin/payments/${id}/refund`,
+    {},
+  )
+  return data
+}
+
+// Tüm kart başvuruları (sahip + hesapla)
+export async function getCards() {
+  const { data } = await apiClient.get<ApiResponse<AdminCard[]>>('/api/admin/cards')
+  return data
+}
+
+// Kartı onayla / reddet
+export async function approveCard(id: string) {
+  const { data } = await apiClient.post<ApiResponse<Card>>(
+    `/api/admin/cards/${id}/approve`,
+    {},
+  )
+  return data
+}
+
+export async function rejectCard(id: string) {
+  const { data } = await apiClient.post<ApiResponse<Card>>(
+    `/api/admin/cards/${id}/reject`,
     {},
   )
   return data

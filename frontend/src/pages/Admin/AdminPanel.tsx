@@ -16,10 +16,13 @@ import {
   rejectLoan,
   getPayments,
   refundPayment,
+  getCards,
+  approveCard,
+  rejectCard,
 } from '../../api/adminApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
-import type { LoanStatus, PaymentStatus } from '../../lib/types'
+import type { CardStatus, LoanStatus, PaymentStatus } from '../../lib/types'
 import './AdminPanel.css'
 
 const formatTL = (n: number) =>
@@ -34,6 +37,11 @@ const paymentBadgeVariant = (s: PaymentStatus) =>
   s === 'Success' ? 'success' : s === 'Failed' ? 'error' : 'info'
 const paymentLabel = (s: PaymentStatus) =>
   s === 'Success' ? 'Başarılı' : s === 'Failed' ? 'Başarısız' : 'İade'
+
+const cardBadgeVariant = (s: CardStatus) =>
+  s === 'Approved' ? 'success' : s === 'Rejected' ? 'error' : 'warning'
+const cardLabel = (s: CardStatus) =>
+  s === 'Approved' ? 'Onaylı' : s === 'Rejected' ? 'Reddedildi' : 'Bekliyor'
 
 function TableSkeleton() {
   return (
@@ -54,6 +62,32 @@ export function AdminPanel() {
   // Onay diyaloğu durumları
   const [rejectLoanId, setRejectLoanId] = useState<string | null>(null)
   const [refundPaymentId, setRefundPaymentId] = useState<string | null>(null)
+  const [rejectCardId, setRejectCardId] = useState<string | null>(null)
+
+  // --- Kart Başvuruları ---
+  const { data: cardsData, isLoading: cardsLoading, isError: cardsError } =
+    useQuery({ queryKey: ['admin-cards'], queryFn: getCards })
+  const cards = cardsData?.data ?? []
+  const refreshCards = () =>
+    queryClient.invalidateQueries({ queryKey: ['admin-cards'] })
+
+  const approveCardMutation = useMutation({
+    mutationFn: (id: string) => approveCard(id),
+    onSuccess: () => {
+      refreshCards()
+      toast.success('Kart onaylandı.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'İşlem başarısız.')),
+  })
+  const rejectCardMutation = useMutation({
+    mutationFn: (id: string) => rejectCard(id),
+    onSuccess: () => {
+      refreshCards()
+      setRejectCardId(null)
+      toast.success('Kart reddedildi.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'İşlem başarısız.')),
+  })
 
   // --- Krediler ---
   const { data: loansData, isLoading: loansLoading, isError: loansError } =
@@ -120,8 +154,81 @@ export function AdminPanel() {
       </header>
 
       <div className="admin-body">
+        {/* Kart Başvuruları */}
+        <h2 className="admin-section-title">Kart Başvuruları</h2>
+        <Card>
+          <CardContent>
+            {cardsLoading && <TableSkeleton />}
+            {cardsError && <Alert variant="error">Kartlar yüklenemedi.</Alert>}
+            {!cardsLoading && !cardsError && cards.length === 0 && (
+              <div className="admin-state">Henüz kart başvurusu yok.</div>
+            )}
+            {!cardsLoading && !cardsError && cards.length > 0 && (
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Sahip</th>
+                      <th>Kart</th>
+                      <th>Hesap</th>
+                      <th>Durum</th>
+                      <th>İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cards.map((c) => (
+                      <tr key={c.id}>
+                        <td>
+                          {c.holderName}
+                          <br />
+                          <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>
+                            {c.holderEmail}
+                          </span>
+                        </td>
+                        <td>{c.maskedCardNumber}</td>
+                        <td>...{c.accountIban.slice(-4)}</td>
+                        <td>
+                          <Badge variant={cardBadgeVariant(c.status)}>
+                            {cardLabel(c.status)}
+                          </Badge>
+                        </td>
+                        <td>
+                          {c.status === 'Pending' ? (
+                            <div className="admin-actions">
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                loading={
+                                  approveCardMutation.isPending &&
+                                  approveCardMutation.variables === c.id
+                                }
+                                onClick={() => approveCardMutation.mutate(c.id)}
+                              >
+                                Onayla
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => setRejectCardId(c.id)}
+                              >
+                                Reddet
+                              </Button>
+                            </div>
+                          ) : (
+                            <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Kredi Başvuruları */}
-        <h2 className="admin-section-title">Kredi Başvuruları</h2>
+        <h2 className="admin-section-title admin-section">Kredi Başvuruları</h2>
         <Card>
           <CardContent>
             {loansLoading && <TableSkeleton />}
@@ -313,6 +420,16 @@ export function AdminPanel() {
         loading={refundMutation.isPending}
         onConfirm={() => refundPaymentId && refundMutation.mutate(refundPaymentId)}
         onClose={() => setRefundPaymentId(null)}
+      />
+      <ConfirmDialog
+        open={!!rejectCardId}
+        title="Kartı Reddet"
+        message="Bu kart başvurusunu reddetmek istediğinize emin misiniz?"
+        confirmLabel="Reddet"
+        confirmVariant="destructive"
+        loading={rejectCardMutation.isPending}
+        onConfirm={() => rejectCardId && rejectCardMutation.mutate(rejectCardId)}
+        onClose={() => setRejectCardId(null)}
       />
     </div>
   )

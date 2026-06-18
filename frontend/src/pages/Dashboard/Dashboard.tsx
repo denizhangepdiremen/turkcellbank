@@ -18,10 +18,17 @@ import { updateProfile } from '../../api/authApi'
 import { deposit, transfer, getHistory } from '../../api/transactionApi'
 import { applyLoan, getMyLoans, getLoanDetail } from '../../api/loanApi'
 import { pay, getMyPayments } from '../../api/paymentApi'
+import { createCard, getMyCards } from '../../api/cardApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
-import { formatCardNumber, digitsOnly } from '../../lib/format'
-import type { AccountType, LoanStatus, PaymentStatus } from '../../lib/types'
+import { digitsOnly } from '../../lib/format'
+import type {
+  AccountType,
+  CardStatus,
+  LoanStatus,
+  PaymentStatus,
+  Transaction,
+} from '../../lib/types'
 import './Dashboard.css'
 
 const accountTypeOptions = [
@@ -42,6 +49,22 @@ const paymentBadgeVariant = (s: PaymentStatus) =>
   s === 'Success' ? 'success' : s === 'Failed' ? 'error' : 'info'
 const paymentLabel = (s: PaymentStatus) =>
   s === 'Success' ? 'Başarılı' : s === 'Failed' ? 'Başarısız' : 'İade'
+
+// Kart durumu -> rozet rengi / Türkçe etiket
+const cardBadgeVariant = (s: CardStatus) =>
+  s === 'Approved' ? 'success' : s === 'Rejected' ? 'error' : 'warning'
+const cardLabel = (s: CardStatus) =>
+  s === 'Approved' ? 'Onaylı' : s === 'Rejected' ? 'Reddedildi' : 'Bekliyor'
+
+// İşlem geçmişi satır başlığı (tipe göre)
+const txTitle = (tx: Transaction) => {
+  if (tx.type === 'Deposit') return 'Para Yatırma'
+  if (tx.type === 'Payment') return 'POS Ödemesi'
+  if (tx.type === 'Refund') return 'POS İade'
+  return tx.direction === 'Out'
+    ? `Transfer → ${tx.counterpartyIban}`
+    : `Transfer ← ${tx.counterpartyIban}`
+}
 
 const formatTL = (n: number) =>
   new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(n)
@@ -219,6 +242,32 @@ export function Dashboard() {
   })
   const planLoan = planData?.data ?? null
 
+  // --- Kartlar ---
+  const { data: cardsData, isLoading: cardsLoading } = useQuery({
+    queryKey: ['cards'],
+    queryFn: getMyCards,
+  })
+  const cards = cardsData?.data ?? []
+  const approvedCards = cards.filter((c) => c.status === 'Approved')
+  const activeAccounts = accounts.filter((a) => a.isActive)
+
+  const [cardModalOpen, setCardModalOpen] = useState(false)
+  const [cardAccountId, setCardAccountId] = useState('')
+  const createCardMutation = useMutation({
+    mutationFn: () => createCard(cardAccountId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cards'] })
+      setCardModalOpen(false)
+      toast.success('Kart başvurunuz alındı.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Kart açılamadı.')),
+  })
+
+  function openCardModal() {
+    setCardAccountId(accounts.find((a) => a.isActive)?.id ?? '')
+    setCardModalOpen(true)
+  }
+
   // --- Sanal POS (ödemeler) ---
   const { data: paymentsData, isLoading: paymentsLoading } = useQuery({
     queryKey: ['payments'],
@@ -229,10 +278,7 @@ export function Dashboard() {
 
   const [payOpen, setPayOpen] = useState(false)
   const [payStep, setPayStep] = useState<'form' | '3ds'>('form')
-  const [cardNumber, setCardNumber] = useState('')
-  const [expMonth, setExpMonth] = useState('')
-  const [expYear, setExpYear] = useState('')
-  const [cvv, setCvv] = useState('')
+  const [payCardId, setPayCardId] = useState('')
   const [payAmount, setPayAmount] = useState('')
   const [payDesc, setPayDesc] = useState('')
   const [threeDS, setThreeDS] = useState('')
@@ -240,16 +286,15 @@ export function Dashboard() {
   const payMutation = useMutation({
     mutationFn: () =>
       pay({
-        cardNumber,
-        expiryMonth: Number(expMonth),
-        expiryYear: Number(expYear),
-        cvv,
+        cardId: payCardId,
         amount: Number(payAmount),
         threeDSCode: threeDS,
         description: payDesc || undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
       setPayOpen(false)
       toast.success('Ödeme başarılı.')
     },
@@ -258,10 +303,7 @@ export function Dashboard() {
 
   function openPay() {
     setPayStep('form')
-    setCardNumber('')
-    setExpMonth('')
-    setExpYear('')
-    setCvv('')
+    setPayCardId(approvedCards[0]?.id ?? '')
     setPayAmount('')
     setPayDesc('')
     setThreeDS('')
@@ -427,13 +469,7 @@ export function Dashboard() {
                 {history.slice(0, txVisible).map((tx) => (
                   <div key={tx.id} className="dashboard-tx-row">
                     <div>
-                      <p className="dashboard-tx-desc">
-                        {tx.type === 'Deposit'
-                          ? 'Para Yatırma'
-                          : tx.direction === 'Out'
-                            ? `Transfer → ${tx.counterpartyIban}`
-                            : `Transfer ← ${tx.counterpartyIban}`}
-                      </p>
+                      <p className="dashboard-tx-desc">{txTitle(tx)}</p>
                       <p className="dashboard-tx-sub">
                         {trDate(tx.createdAt)}
                         {tx.description ? ` · ${tx.description}` : ''}
@@ -502,6 +538,40 @@ export function Dashboard() {
                       </Button>
                     )}
                   </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Kartlarım */}
+        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+          <h2 className="dashboard-section-title">Kartlarım</h2>
+          <Button size="sm" variant="primary" onClick={openCardModal}>
+            + Kart Aç
+          </Button>
+        </div>
+
+        <Card>
+          <CardContent>
+            {cardsLoading ? (
+              <ListSkeleton />
+            ) : cards.length === 0 ? (
+              <div className="dashboard-state">Henüz kartınız yok.</div>
+            ) : (
+              cards.map((c) => (
+                <div key={c.id} className="dashboard-loan-row">
+                  <div>
+                    <p className="dashboard-loan-amount">{c.maskedCardNumber}</p>
+                    <p className="dashboard-loan-sub">
+                      Son kullanma {String(c.expiryMonth).padStart(2, '0')}/{c.expiryYear}
+                      {' · '}
+                      Hesap ...{c.accountIban.slice(-4)}
+                    </p>
+                  </div>
+                  <Badge variant={cardBadgeVariant(c.status)}>
+                    {cardLabel(c.status)}
+                  </Badge>
                 </div>
               ))
             )}
@@ -795,7 +865,11 @@ export function Dashboard() {
               <Button variant="ghost" onClick={() => setPayOpen(false)}>
                 İptal
               </Button>
-              <Button variant="primary" onClick={() => setPayStep('3ds')}>
+              <Button
+                variant="primary"
+                disabled={!payCardId}
+                onClick={() => setPayStep('3ds')}
+              >
                 Devam Et
               </Button>
             </>
@@ -816,61 +890,43 @@ export function Dashboard() {
         }
       >
         {payStep === 'form' ? (
-          <>
-            <div className="dashboard-modal-field">
-              <Input
-                label="Kart Numarası"
-                placeholder="1234 5678 9012 3456"
-                value={cardNumber}
-                onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <div className="dashboard-modal-field" style={{ flex: 1 }}>
+          approvedCards.length === 0 ? (
+            <Alert variant="warning">
+              Ödeme yapmak için önce onaylı bir kartınız olmalı. “Kartlarım”dan
+              kart açıp admin onayını bekleyin.
+            </Alert>
+          ) : (
+            <>
+              <div className="dashboard-modal-field">
+                <Select
+                  label="Kart"
+                  options={approvedCards.map((c) => ({
+                    value: c.id,
+                    label: `${c.maskedCardNumber} · Hesap ...${c.accountIban.slice(-4)}`,
+                  }))}
+                  value={payCardId}
+                  onChange={(e) => setPayCardId(e.target.value)}
+                />
+              </div>
+              <div className="dashboard-modal-field">
                 <Input
-                  label="Ay"
+                  label="Tutar (₺)"
                   type="number"
-                  placeholder="12"
-                  value={expMonth}
-                  onChange={(e) => setExpMonth(e.target.value)}
+                  placeholder="0"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
                 />
               </div>
-              <div className="dashboard-modal-field" style={{ flex: 1 }}>
+              <div className="dashboard-modal-field">
                 <Input
-                  label="Yıl"
-                  type="number"
-                  placeholder="2030"
-                  value={expYear}
-                  onChange={(e) => setExpYear(e.target.value)}
+                  label="Açıklama (opsiyonel)"
+                  placeholder="Örn. Market alışverişi"
+                  value={payDesc}
+                  onChange={(e) => setPayDesc(e.target.value)}
                 />
               </div>
-              <div className="dashboard-modal-field" style={{ flex: 1 }}>
-                <Input
-                  label="CVV"
-                  placeholder="123"
-                  value={cvv}
-                  onChange={(e) => setCvv(digitsOnly(e.target.value, 4))}
-                />
-              </div>
-            </div>
-            <div className="dashboard-modal-field">
-              <Input
-                label="Tutar (₺)"
-                type="number"
-                placeholder="0"
-                value={payAmount}
-                onChange={(e) => setPayAmount(e.target.value)}
-              />
-            </div>
-            <div className="dashboard-modal-field">
-              <Input
-                label="Açıklama (opsiyonel)"
-                placeholder="Örn. Market alışverişi"
-                value={payDesc}
-                onChange={(e) => setPayDesc(e.target.value)}
-              />
-            </div>
-          </>
+            </>
+          )
         ) : (
           <>
             <p style={{ marginTop: 0, color: '#374151', fontSize: '0.9rem' }}>
@@ -887,6 +943,46 @@ export function Dashboard() {
               />
             </div>
           </>
+        )}
+      </Modal>
+
+      {/* --- Kart açma modalı --- */}
+      <Modal
+        open={cardModalOpen}
+        onClose={() => setCardModalOpen(false)}
+        title="Kart Aç"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setCardModalOpen(false)}>
+              İptal
+            </Button>
+            <Button
+              variant="primary"
+              loading={createCardMutation.isPending}
+              disabled={!cardAccountId}
+              onClick={() => createCardMutation.mutate()}
+            >
+              Kart Aç
+            </Button>
+          </>
+        }
+      >
+        {activeAccounts.length === 0 ? (
+          <Alert variant="warning">
+            Kart açmak için önce aktif bir hesabınız olmalı.
+          </Alert>
+        ) : (
+          <div className="dashboard-modal-field">
+            <Select
+              label="Bağlanacak Hesap"
+              options={activeAccounts.map((a) => ({
+                value: a.id,
+                label: `${a.accountType} · ...${a.iban.slice(-4)}`,
+              }))}
+              value={cardAccountId}
+              onChange={(e) => setCardAccountId(e.target.value)}
+            />
+          </div>
         )}
       </Modal>
 
