@@ -147,7 +147,12 @@ export function AdminPanel() {
         </span>
         <div className="admin-user">
           <span>{user?.fullName}</span>
-          <Button variant="outline" size="sm" onClick={handleLogout}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-white/50 text-white hover:bg-white/10 focus-visible:ring-white"
+            onClick={handleLogout}
+          >
             Çıkış
           </Button>
         </div>

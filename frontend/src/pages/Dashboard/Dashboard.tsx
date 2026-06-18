@@ -788,7 +788,7 @@ export function Dashboard() {
           <Input
             label="Aylık Gelir (₺)"
             type="number"
-            placeholder="0"
+            placeholder="Örn. 45000"
             value={loanIncome}
             onChange={(e) => setLoanIncome(e.target.value)}
           />
@@ -805,7 +805,7 @@ export function Dashboard() {
           <Input
             label="Kredi Tutarı (₺)"
             type="number"
-            placeholder="0"
+            placeholder="Örn. 100000"
             value={loanAmount}
             onChange={(e) => setLoanAmount(e.target.value)}
           />
