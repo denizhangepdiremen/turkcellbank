@@ -6,8 +6,15 @@ import { Spinner } from '../../components/Spinner'
 import { Alert } from '../../components/Alert'
 import { Card, CardContent } from '../../components/Card'
 import { useAuth } from '../../context/AuthContext'
-import { getUsers, getLoans, approveLoan, rejectLoan } from '../../api/adminApi'
-import type { LoanStatus } from '../../lib/types'
+import {
+  getUsers,
+  getLoans,
+  approveLoan,
+  rejectLoan,
+  getPayments,
+  refundPayment,
+} from '../../api/adminApi'
+import type { LoanStatus, PaymentStatus } from '../../lib/types'
 import './AdminPanel.css'
 
 const formatTL = (n: number) =>
@@ -17,6 +24,11 @@ const loanBadgeVariant = (s: LoanStatus) =>
   s === 'Approved' ? 'success' : s === 'Rejected' ? 'error' : 'warning'
 const loanLabel = (s: LoanStatus) =>
   s === 'Approved' ? 'Onaylandı' : s === 'Rejected' ? 'Reddedildi' : 'Bekliyor'
+
+const paymentBadgeVariant = (s: PaymentStatus) =>
+  s === 'Success' ? 'success' : s === 'Failed' ? 'error' : 'info'
+const paymentLabel = (s: PaymentStatus) =>
+  s === 'Success' ? 'Başarılı' : s === 'Failed' ? 'Başarısız' : 'İade'
 
 export function AdminPanel() {
   const navigate = useNavigate()
@@ -41,6 +53,17 @@ export function AdminPanel() {
   const rejectMutation = useMutation({
     mutationFn: (id: string) => rejectLoan(id),
     onSuccess: refreshLoans,
+  })
+
+  // Ödemeler
+  const { data: paymentsData, isLoading: paymentsLoading, isError: paymentsError } =
+    useQuery({ queryKey: ['admin-payments'], queryFn: getPayments })
+  const payments = paymentsData?.data ?? []
+
+  const refundMutation = useMutation({
+    mutationFn: (id: string) => refundPayment(id),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['admin-payments'] }),
   })
 
   function handleLogout() {
@@ -134,6 +157,72 @@ export function AdminPanel() {
                               Reddet
                             </Button>
                           </div>
+                        ) : (
+                          <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Ödemeler */}
+        <h2 className="admin-section-title admin-section">Ödemeler</h2>
+        <Card>
+          <CardContent>
+            {paymentsLoading && (
+              <div className="admin-state">
+                <Spinner />
+              </div>
+            )}
+            {paymentsError && <Alert variant="error">Ödemeler yüklenemedi.</Alert>}
+            {!paymentsLoading && !paymentsError && payments.length === 0 && (
+              <div className="admin-state">Henüz ödeme yok.</div>
+            )}
+            {!paymentsLoading && !paymentsError && payments.length > 0 && (
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Ödeyen</th>
+                    <th>Kart</th>
+                    <th>Tutar</th>
+                    <th>Durum</th>
+                    <th>İşlem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map((p) => (
+                    <tr key={p.id}>
+                      <td>
+                        {p.payerName}
+                        <br />
+                        <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>
+                          {p.payerEmail}
+                        </span>
+                      </td>
+                      <td>{p.maskedCardNumber}</td>
+                      <td>{formatTL(p.amount)}</td>
+                      <td>
+                        <Badge variant={paymentBadgeVariant(p.status)}>
+                          {paymentLabel(p.status)}
+                        </Badge>
+                      </td>
+                      <td>
+                        {p.status === 'Success' ? (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            loading={
+                              refundMutation.isPending &&
+                              refundMutation.variables === p.id
+                            }
+                            onClick={() => refundMutation.mutate(p.id)}
+                          >
+                            İade Et
+                          </Button>
                         ) : (
                           <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>—</span>
                         )}

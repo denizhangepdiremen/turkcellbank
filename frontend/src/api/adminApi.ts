@@ -1,5 +1,12 @@
 import { apiClient } from '../lib/apiClient'
-import type { AdminLoan, ApiResponse, Loan, User } from '../lib/types'
+import type {
+  AdminLoan,
+  AdminPayment,
+  ApiResponse,
+  Loan,
+  Payment,
+  User,
+} from '../lib/types'
 
 // Tüm kullanıcılar (admin-only endpoint).
 export async function getUsers() {
@@ -25,6 +32,23 @@ export async function approveLoan(id: string) {
 export async function rejectLoan(id: string) {
   const { data } = await apiClient.post<ApiResponse<Loan>>(
     `/api/admin/loans/${id}/reject`,
+    {},
+  )
+  return data
+}
+
+// Tüm ödemeler (ödeyenle)
+export async function getPayments() {
+  const { data } = await apiClient.get<ApiResponse<AdminPayment[]>>(
+    '/api/admin/payments',
+  )
+  return data
+}
+
+// Ödemeyi iade et
+export async function refundPayment(id: string) {
+  const { data } = await apiClient.post<ApiResponse<Payment>>(
+    `/api/admin/payments/${id}/refund`,
     {},
   )
   return data

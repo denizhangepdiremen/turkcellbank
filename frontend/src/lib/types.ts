@@ -83,3 +83,25 @@ export interface AdminLoan {
   createdAt: string
   decidedAt: string | null
 }
+
+export type PaymentStatus = 'Success' | 'Failed' | 'Refunded'
+
+export interface Payment {
+  id: string
+  maskedCardNumber: string
+  amount: number
+  status: PaymentStatus
+  description: string | null
+  createdAt: string
+}
+
+export interface AdminPayment {
+  id: string
+  payerName: string
+  payerEmail: string
+  maskedCardNumber: string
+  amount: number
+  status: PaymentStatus
+  description: string | null
+  createdAt: string
+}

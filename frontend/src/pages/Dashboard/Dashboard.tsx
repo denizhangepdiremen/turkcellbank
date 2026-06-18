@@ -14,8 +14,9 @@ import { getAccounts, createAccount, closeAccount } from '../../api/accountApi'
 import { updateProfile } from '../../api/authApi'
 import { deposit, transfer, getHistory } from '../../api/transactionApi'
 import { applyLoan, getMyLoans, getLoanDetail } from '../../api/loanApi'
+import { pay, getMyPayments } from '../../api/paymentApi'
 import { getApiErrorMessage } from '../../lib/apiError'
-import type { AccountType, LoanStatus } from '../../lib/types'
+import type { AccountType, LoanStatus, PaymentStatus } from '../../lib/types'
 import './Dashboard.css'
 
 const accountTypeOptions = [
@@ -28,6 +29,12 @@ const loanBadgeVariant = (s: LoanStatus) =>
   s === 'Approved' ? 'success' : s === 'Rejected' ? 'error' : 'warning'
 const loanLabel = (s: LoanStatus) =>
   s === 'Approved' ? 'Onaylandı' : s === 'Rejected' ? 'Reddedildi' : 'Bekliyor'
+
+// Ödeme durumu -> rozet rengi / Türkçe etiket
+const paymentBadgeVariant = (s: PaymentStatus) =>
+  s === 'Success' ? 'success' : s === 'Failed' ? 'error' : 'info'
+const paymentLabel = (s: PaymentStatus) =>
+  s === 'Success' ? 'Başarılı' : s === 'Failed' ? 'Başarısız' : 'İade'
 
 const formatTL = (n: number) =>
   new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(n)
@@ -176,6 +183,53 @@ export function Dashboard() {
     enabled: !!planLoanId,
   })
   const planLoan = planData?.data ?? null
+
+  // --- Sanal POS (ödemeler) ---
+  const { data: paymentsData, isLoading: paymentsLoading } = useQuery({
+    queryKey: ['payments'],
+    queryFn: getMyPayments,
+  })
+  const payments = paymentsData?.data ?? []
+
+  const [payOpen, setPayOpen] = useState(false)
+  const [payStep, setPayStep] = useState<'form' | '3ds'>('form')
+  const [cardNumber, setCardNumber] = useState('')
+  const [expMonth, setExpMonth] = useState('')
+  const [expYear, setExpYear] = useState('')
+  const [cvv, setCvv] = useState('')
+  const [payAmount, setPayAmount] = useState('')
+  const [payDesc, setPayDesc] = useState('')
+  const [threeDS, setThreeDS] = useState('')
+
+  const payMutation = useMutation({
+    mutationFn: () =>
+      pay({
+        cardNumber,
+        expiryMonth: Number(expMonth),
+        expiryYear: Number(expYear),
+        cvv,
+        amount: Number(payAmount),
+        threeDSCode: threeDS,
+        description: payDesc || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] })
+      setPayOpen(false)
+    },
+  })
+
+  function openPay() {
+    setPayStep('form')
+    setCardNumber('')
+    setExpMonth('')
+    setExpYear('')
+    setCvv('')
+    setPayAmount('')
+    setPayDesc('')
+    setThreeDS('')
+    payMutation.reset()
+    setPayOpen(true)
+  }
 
   function handleLogout() {
     logout()
@@ -379,6 +433,43 @@ export function Dashboard() {
                     </Button>
                   )}
                 </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Sanal POS — Ödemeler */}
+        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+          <h2 className="dashboard-section-title">Ödemelerim</h2>
+          <Button size="sm" variant="primary" onClick={openPay}>
+            + Ödeme Yap
+          </Button>
+        </div>
+
+        <Card>
+          <CardContent>
+            {paymentsLoading && (
+              <div className="dashboard-state">
+                <Spinner />
+              </div>
+            )}
+            {!paymentsLoading && payments.length === 0 && (
+              <div className="dashboard-state">Henüz ödemeniz yok.</div>
+            )}
+            {payments.map((p) => (
+              <div key={p.id} className="dashboard-loan-row">
+                <div>
+                  <p className="dashboard-loan-amount">
+                    {formatTL(p.amount)} · {p.maskedCardNumber}
+                  </p>
+                  <p className="dashboard-loan-sub">
+                    {trDate(p.createdAt)}
+                    {p.description ? ` · ${p.description}` : ''}
+                  </p>
+                </div>
+                <Badge variant={paymentBadgeVariant(p.status)}>
+                  {paymentLabel(p.status)}
+                </Badge>
               </div>
             ))}
           </CardContent>
@@ -633,6 +724,117 @@ export function Dashboard() {
               </div>
             ))}
           </>
+        )}
+      </Modal>
+
+      {/* --- Sanal POS ödeme modalı (2 adım: kart -> 3D Secure) --- */}
+      <Modal
+        open={payOpen}
+        onClose={() => setPayOpen(false)}
+        title={payStep === 'form' ? 'Ödeme' : '3D Secure Doğrulama'}
+        footer={
+          payStep === 'form' ? (
+            <>
+              <Button variant="ghost" onClick={() => setPayOpen(false)}>
+                İptal
+              </Button>
+              <Button variant="primary" onClick={() => setPayStep('3ds')}>
+                Devam Et
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={() => setPayStep('form')}>
+                Geri
+              </Button>
+              <Button
+                variant="primary"
+                loading={payMutation.isPending}
+                onClick={() => payMutation.mutate()}
+              >
+                Öde
+              </Button>
+            </>
+          )
+        }
+      >
+        {payStep === 'form' ? (
+          <>
+            <div className="dashboard-modal-field">
+              <Input
+                label="Kart Numarası"
+                placeholder="1234 5678 9012 3456"
+                value={cardNumber}
+                onChange={(e) => setCardNumber(e.target.value)}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div className="dashboard-modal-field" style={{ flex: 1 }}>
+                <Input
+                  label="Ay"
+                  type="number"
+                  placeholder="12"
+                  value={expMonth}
+                  onChange={(e) => setExpMonth(e.target.value)}
+                />
+              </div>
+              <div className="dashboard-modal-field" style={{ flex: 1 }}>
+                <Input
+                  label="Yıl"
+                  type="number"
+                  placeholder="2030"
+                  value={expYear}
+                  onChange={(e) => setExpYear(e.target.value)}
+                />
+              </div>
+              <div className="dashboard-modal-field" style={{ flex: 1 }}>
+                <Input
+                  label="CVV"
+                  placeholder="123"
+                  value={cvv}
+                  onChange={(e) => setCvv(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="dashboard-modal-field">
+              <Input
+                label="Tutar (₺)"
+                type="number"
+                placeholder="0"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+              />
+            </div>
+            <div className="dashboard-modal-field">
+              <Input
+                label="Açıklama (opsiyonel)"
+                placeholder="Örn. Market alışverişi"
+                value={payDesc}
+                onChange={(e) => setPayDesc(e.target.value)}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ marginTop: 0, color: '#374151', fontSize: '0.9rem' }}>
+              Bankanız tarafından gönderilen 6 haneli kodu girin.
+              <br />
+              <span style={{ color: '#9ca3af' }}>(test kodu: 123456)</span>
+            </p>
+            <div className="dashboard-modal-field">
+              <Input
+                label="Doğrulama Kodu"
+                placeholder="123456"
+                value={threeDS}
+                onChange={(e) => setThreeDS(e.target.value)}
+              />
+            </div>
+          </>
+        )}
+        {payMutation.isError && (
+          <Alert variant="error">
+            {getApiErrorMessage(payMutation.error, 'Ödeme başarısız.')}
+          </Alert>
         )}
       </Modal>
     </div>
