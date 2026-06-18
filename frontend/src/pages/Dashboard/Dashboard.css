@@ -84,10 +84,10 @@
   margin: 0;
 }
 
-/* Hesap kartları ızgarası */
+/* Hesap kartları ızgarası — en fazla 2 sütun (3. hesap alta geçer) */
 .dashboard-accounts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
   margin-bottom: 2rem;
 }
@@ -110,6 +110,8 @@
   font-size: 0.8rem;
   color: #6b7280;
   letter-spacing: 0.5px;
+  min-width: 0;          /* uzun IBAN'ın kutuyu taşırmasını engelle */
+  word-break: break-all; /* gerekiyorsa alt satıra kır */
 }
 
 .dashboard-iban-copy {
@@ -121,6 +123,7 @@
   cursor: pointer;
   padding: 0;
   white-space: nowrap;
+  flex-shrink: 0;        /* "Kopyala" hep görünür kalsın */
 }
 
 .dashboard-iban-copy:hover {
@@ -288,4 +291,41 @@
   margin-bottom: 0.75rem;
   font-size: 0.9rem;
   color: #111827;
+}
+
+/* --- Responsive: dar ekranlar (telefon/tablet) --- */
+@media (max-width: 640px) {
+  /* Hesap kartları tek sütuna düşsün */
+  .dashboard-accounts {
+    grid-template-columns: 1fr;
+  }
+
+  /* Üst bar dar ekranda taşmasın, alt alta geçsin */
+  .dashboard-header {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .dashboard-body {
+    padding: 1.25rem 1rem;
+  }
+
+  .dashboard-greeting {
+    font-size: 1.25rem;
+  }
+
+  .dashboard-summary-value {
+    font-size: 1.6rem;
+  }
+
+  /* İşlem geçmişi başlığı + hesap seçici alt alta */
+  .dashboard-history-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-history-select {
+    width: 100%;
+  }
 }
