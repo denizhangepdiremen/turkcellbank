@@ -4,6 +4,7 @@ import { Register } from './pages/Register'
 import { ForgotPassword } from './pages/ForgotPassword'
 import { Dashboard } from './pages/Dashboard'
 import { AdminPanel } from './pages/Admin'
+import { NotFound } from './pages/NotFound'
 import { ProtectedRoute } from './routes/ProtectedRoute'
 
 function App() {
@@ -33,8 +34,8 @@ function App() {
       />
       {/* Ana adres açılınca login'e yönlendir */}
       <Route path="/" element={<Navigate to="/login" replace />} />
-      {/* Tanımsız adresler de login'e gitsin */}
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      {/* Tanımsız adresler -> 404 sayfası */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   )
 }

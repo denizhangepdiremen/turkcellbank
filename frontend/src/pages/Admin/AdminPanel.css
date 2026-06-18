@@ -45,6 +45,11 @@
   margin: 0 0 1rem;
 }
 
+/* Dar ekranda tablo yatay kaydırılabilsin */
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
 /* Kullanıcı tablosu */
 .admin-table {
   width: 100%;

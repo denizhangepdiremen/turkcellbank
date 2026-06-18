@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
 import { Card, CardContent, CardFooter } from '../../components/Card'
 import { Badge } from '../../components/Badge'
 import { Button } from '../../components/Button'
@@ -8,7 +9,9 @@ import { Modal } from '../../components/Modal'
 import { Select } from '../../components/Select'
 import { Input } from '../../components/Input'
 import { Spinner } from '../../components/Spinner'
+import { Skeleton } from '../../components/Skeleton'
 import { Alert } from '../../components/Alert'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { useAuth } from '../../context/AuthContext'
 import { getAccounts, createAccount, closeAccount } from '../../api/accountApi'
 import { updateProfile } from '../../api/authApi'
@@ -16,6 +19,8 @@ import { deposit, transfer, getHistory } from '../../api/transactionApi'
 import { applyLoan, getMyLoans, getLoanDetail } from '../../api/loanApi'
 import { pay, getMyPayments } from '../../api/paymentApi'
 import { getApiErrorMessage } from '../../lib/apiError'
+import { usePageTitle } from '../../lib/usePageTitle'
+import { formatCardNumber, digitsOnly } from '../../lib/format'
 import type { AccountType, LoanStatus, PaymentStatus } from '../../lib/types'
 import './Dashboard.css'
 
@@ -23,6 +28,8 @@ const accountTypeOptions = [
   { value: 'Bireysel', label: 'Bireysel Hesap' },
   { value: 'Isletme', label: 'İşletme Hesabı' },
 ]
+
+const PAGE_SIZE = 5
 
 // Kredi durumu -> rozet rengi / Türkçe etiket
 const loanBadgeVariant = (s: LoanStatus) =>
@@ -42,7 +49,19 @@ const formatTL = (n: number) =>
 const trDate = (iso: string) =>
   new Date(iso).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })
 
+// Liste yüklenirken gösterilen skeleton satırlar
+function ListSkeleton() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.5rem 0' }}>
+      <Skeleton className="h-6 w-2/3" />
+      <Skeleton className="h-6 w-1/2" />
+      <Skeleton className="h-6 w-3/5" />
+    </div>
+  )
+}
+
 export function Dashboard() {
+  usePageTitle('Panel')
   const navigate = useNavigate()
   const { user, logout, updateUser } = useAuth()
   const queryClient = useQueryClient()
@@ -53,14 +72,15 @@ export function Dashboard() {
   const profileMutation = useMutation({
     mutationFn: () => updateProfile(profileName),
     onSuccess: (res) => {
-      if (res.data) updateUser(res.data) // header/karşılama anında güncellenir
+      if (res.data) updateUser(res.data)
       setProfileOpen(false)
+      toast.success('Profil güncellendi.')
     },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Profil güncellenemedi.')),
   })
 
   function openProfile() {
     setProfileName(user?.fullName ?? '')
-    profileMutation.reset()
     setProfileOpen(true)
   }
 
@@ -71,7 +91,6 @@ export function Dashboard() {
   })
   const accounts = data?.data ?? []
 
-  // İşlem sonrası hem hesapları hem geçmişi tazele
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['accounts'] })
     queryClient.invalidateQueries({ queryKey: ['transactions'] })
@@ -91,24 +110,36 @@ export function Dashboard() {
   const [transferAmount, setTransferAmount] = useState('')
   const [transferDesc, setTransferDesc] = useState('')
 
+  // Hesap kapatma onayı
+  const [closeAccountId, setCloseAccountId] = useState<string | null>(null)
+
   // --- Mutations ---
   const createMutation = useMutation({
     mutationFn: (type: AccountType) => createAccount(type),
     onSuccess: () => {
       refresh()
       setCreateOpen(false)
+      toast.success('Hesap açıldı.')
     },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Hesap açılamadı.')),
   })
   const closeMutation = useMutation({
     mutationFn: (id: string) => closeAccount(id),
-    onSuccess: refresh,
+    onSuccess: () => {
+      refresh()
+      setCloseAccountId(null)
+      toast.success('Hesap kapatıldı.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Hesap kapatılamadı.')),
   })
   const depositMutation = useMutation({
     mutationFn: () => deposit(depositAccountId, Number(depositAmount)),
     onSuccess: () => {
       refresh()
       setDepositOpen(false)
+      toast.success('Para yatırıldı.')
     },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Para yatırılamadı.')),
   })
   const transferMutation = useMutation({
     mutationFn: () =>
@@ -121,18 +152,21 @@ export function Dashboard() {
     onSuccess: () => {
       refresh()
       setTransferOpen(false)
+      toast.success('Transfer başarılı.')
     },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Transfer başarısız.')),
   })
 
   // --- İşlem geçmişi (seçili hesap) ---
   const [historyAccountId, setHistoryAccountId] = useState('')
+  const [txVisible, setTxVisible] = useState(PAGE_SIZE)
   useEffect(() => {
     if (!historyAccountId && accounts.length > 0) {
       setHistoryAccountId(accounts[0].id)
     }
   }, [accounts, historyAccountId])
 
-  const { data: historyData } = useQuery({
+  const { data: historyData, isLoading: historyLoading } = useQuery({
     queryKey: ['transactions', historyAccountId],
     queryFn: () => getHistory(historyAccountId),
     enabled: !!historyAccountId,
@@ -163,7 +197,9 @@ export function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['loans'] })
       setLoanOpen(false)
+      toast.success('Kredi başvurunuz alındı.')
     },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Başvuru yapılamadı.')),
   })
 
   function openLoanApply() {
@@ -171,7 +207,6 @@ export function Dashboard() {
     setLoanProfession('')
     setLoanAmount('')
     setLoanTerm('12')
-    applyMutation.reset()
     setLoanOpen(true)
   }
 
@@ -190,6 +225,7 @@ export function Dashboard() {
     queryFn: getMyPayments,
   })
   const payments = paymentsData?.data ?? []
+  const [payVisible, setPayVisible] = useState(PAGE_SIZE)
 
   const [payOpen, setPayOpen] = useState(false)
   const [payStep, setPayStep] = useState<'form' | '3ds'>('form')
@@ -215,7 +251,9 @@ export function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] })
       setPayOpen(false)
+      toast.success('Ödeme başarılı.')
     },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Ödeme başarısız.')),
   })
 
   function openPay() {
@@ -227,7 +265,6 @@ export function Dashboard() {
     setPayAmount('')
     setPayDesc('')
     setThreeDS('')
-    payMutation.reset()
     setPayOpen(true)
   }
 
@@ -236,12 +273,20 @@ export function Dashboard() {
     navigate('/login')
   }
 
+  async function copyIban(iban: string) {
+    try {
+      await navigator.clipboard.writeText(iban)
+      toast.success('IBAN kopyalandı.')
+    } catch {
+      toast.error('Kopyalanamadı.')
+    }
+  }
+
   const totalBalance = accounts
     .filter((a) => a.isActive)
     .reduce((sum, a) => sum + a.balance, 0)
   const firstName = user?.fullName?.split(' ')[0] ?? ''
 
-  // Hesap seçici opsiyonları (kısa etiket)
   const accountOptions = accounts.map((a) => ({
     value: a.id,
     label: `${a.accountType} · ...${a.iban.slice(-4)}`,
@@ -250,7 +295,6 @@ export function Dashboard() {
   function openDeposit(accountId: string) {
     setDepositAccountId(accountId)
     setDepositAmount('')
-    depositMutation.reset()
     setDepositOpen(true)
   }
   function openTransfer(accountId: string) {
@@ -258,7 +302,6 @@ export function Dashboard() {
     setToIban('')
     setTransferAmount('')
     setTransferDesc('')
-    transferMutation.reset()
     setTransferOpen(true)
   }
 
@@ -293,8 +336,9 @@ export function Dashboard() {
         </div>
 
         {isLoading && (
-          <div className="dashboard-state">
-            <Spinner />
+          <div className="dashboard-accounts">
+            <Skeleton className="h-44" />
+            <Skeleton className="h-44" />
           </div>
         )}
         {isError && <Alert variant="error">Hesaplar yüklenemedi.</Alert>}
@@ -315,28 +359,38 @@ export function Dashboard() {
                     </Badge>
                     {!acc.isActive && <Badge variant="error">Kapalı</Badge>}
                   </div>
-                  <p className="dashboard-account-iban">{acc.iban}</p>
-                  <p className="dashboard-account-balance">
-                    {formatTL(acc.balance)}
-                  </p>
+                  <div className="dashboard-account-iban-row">
+                    <span className="dashboard-account-iban">{acc.iban}</span>
+                    <button
+                      type="button"
+                      className="dashboard-iban-copy"
+                      onClick={() => copyIban(acc.iban)}
+                    >
+                      Kopyala
+                    </button>
+                  </div>
+                  <p className="dashboard-account-balance">{formatTL(acc.balance)}</p>
                 </CardContent>
                 {acc.isActive && (
                   <CardFooter>
-                    <div className="dashboard-account-actions">
-                      <Button size="sm" variant="primary" onClick={() => openDeposit(acc.id)}>
-                        Para Yatır
-                      </Button>
-                      <Button size="sm" variant="secondary" onClick={() => openTransfer(acc.id)}>
-                        Gönder
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        loading={closeMutation.isPending && closeMutation.variables === acc.id}
-                        onClick={() => closeMutation.mutate(acc.id)}
-                      >
-                        Kapat
-                      </Button>
+                    <div className="dashboard-account-footer">
+                      <div className="dashboard-account-actions">
+                        <Button size="sm" variant="primary" onClick={() => openDeposit(acc.id)}>
+                          Para Yatır
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => openTransfer(acc.id)}>
+                          Gönder
+                        </Button>
+                      </div>
+                      <div className="dashboard-account-close">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setCloseAccountId(acc.id)}
+                        >
+                          Hesabı Kapat
+                        </Button>
+                      </div>
                     </div>
                   </CardFooter>
                 )}
@@ -353,7 +407,10 @@ export function Dashboard() {
               <Select
                 options={accountOptions}
                 value={historyAccountId}
-                onChange={(e) => setHistoryAccountId(e.target.value)}
+                onChange={(e) => {
+                  setHistoryAccountId(e.target.value)
+                  setTxVisible(PAGE_SIZE)
+                }}
               />
             </div>
           )}
@@ -361,32 +418,47 @@ export function Dashboard() {
 
         <Card>
           <CardContent>
-            {history.length === 0 ? (
+            {historyLoading ? (
+              <ListSkeleton />
+            ) : history.length === 0 ? (
               <div className="dashboard-state">Bu hesapta henüz işlem yok.</div>
             ) : (
-              history.map((tx) => (
-                <div key={tx.id} className="dashboard-tx-row">
-                  <div>
-                    <p className="dashboard-tx-desc">
-                      {tx.type === 'Deposit'
-                        ? 'Para Yatırma'
-                        : tx.direction === 'Out'
-                          ? `Transfer → ${tx.counterpartyIban}`
-                          : `Transfer ← ${tx.counterpartyIban}`}
-                    </p>
-                    <p className="dashboard-tx-sub">
-                      {trDate(tx.createdAt)}
-                      {tx.description ? ` · ${tx.description}` : ''}
-                    </p>
+              <>
+                {history.slice(0, txVisible).map((tx) => (
+                  <div key={tx.id} className="dashboard-tx-row">
+                    <div>
+                      <p className="dashboard-tx-desc">
+                        {tx.type === 'Deposit'
+                          ? 'Para Yatırma'
+                          : tx.direction === 'Out'
+                            ? `Transfer → ${tx.counterpartyIban}`
+                            : `Transfer ← ${tx.counterpartyIban}`}
+                      </p>
+                      <p className="dashboard-tx-sub">
+                        {trDate(tx.createdAt)}
+                        {tx.description ? ` · ${tx.description}` : ''}
+                      </p>
+                    </div>
+                    <span
+                      className={`dashboard-tx-amount ${tx.direction === 'In' ? 'in' : 'out'}`}
+                    >
+                      {tx.direction === 'In' ? '+' : '-'}
+                      {formatTL(tx.amount)}
+                    </span>
                   </div>
-                  <span
-                    className={`dashboard-tx-amount ${tx.direction === 'In' ? 'in' : 'out'}`}
-                  >
-                    {tx.direction === 'In' ? '+' : '-'}
-                    {formatTL(tx.amount)}
-                  </span>
-                </div>
-              ))
+                ))}
+                {history.length > txVisible && (
+                  <div className="dashboard-loadmore">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setTxVisible((v) => v + PAGE_SIZE)}
+                    >
+                      Daha fazla göster
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -401,40 +473,38 @@ export function Dashboard() {
 
         <Card>
           <CardContent>
-            {loansLoading && (
-              <div className="dashboard-state">
-                <Spinner />
-              </div>
-            )}
-            {!loansLoading && loans.length === 0 && (
+            {loansLoading ? (
+              <ListSkeleton />
+            ) : loans.length === 0 ? (
               <div className="dashboard-state">Henüz kredi başvurunuz yok.</div>
+            ) : (
+              loans.map((loan) => (
+                <div key={loan.id} className="dashboard-loan-row">
+                  <div>
+                    <p className="dashboard-loan-amount">
+                      {formatTL(loan.amount)} · {loan.termMonths} ay
+                    </p>
+                    <p className="dashboard-loan-sub">
+                      {loan.profession} · skor {loan.score} · {trDate(loan.createdAt)}
+                    </p>
+                  </div>
+                  <div className="dashboard-loan-right">
+                    <Badge variant={loanBadgeVariant(loan.status)}>
+                      {loanLabel(loan.status)}
+                    </Badge>
+                    {loan.status === 'Approved' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setPlanLoanId(loan.id)}
+                      >
+                        Ödeme Planı
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))
             )}
-            {loans.map((loan) => (
-              <div key={loan.id} className="dashboard-loan-row">
-                <div>
-                  <p className="dashboard-loan-amount">
-                    {formatTL(loan.amount)} · {loan.termMonths} ay
-                  </p>
-                  <p className="dashboard-loan-sub">
-                    {loan.profession} · skor {loan.score} · {trDate(loan.createdAt)}
-                  </p>
-                </div>
-                <div className="dashboard-loan-right">
-                  <Badge variant={loanBadgeVariant(loan.status)}>
-                    {loanLabel(loan.status)}
-                  </Badge>
-                  {loan.status === 'Approved' && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setPlanLoanId(loan.id)}
-                    >
-                      Ödeme Planı
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
           </CardContent>
         </Card>
 
@@ -448,30 +518,41 @@ export function Dashboard() {
 
         <Card>
           <CardContent>
-            {paymentsLoading && (
-              <div className="dashboard-state">
-                <Spinner />
-              </div>
-            )}
-            {!paymentsLoading && payments.length === 0 && (
+            {paymentsLoading ? (
+              <ListSkeleton />
+            ) : payments.length === 0 ? (
               <div className="dashboard-state">Henüz ödemeniz yok.</div>
+            ) : (
+              <>
+                {payments.slice(0, payVisible).map((p) => (
+                  <div key={p.id} className="dashboard-loan-row">
+                    <div>
+                      <p className="dashboard-loan-amount">
+                        {formatTL(p.amount)} · {p.maskedCardNumber}
+                      </p>
+                      <p className="dashboard-loan-sub">
+                        {trDate(p.createdAt)}
+                        {p.description ? ` · ${p.description}` : ''}
+                      </p>
+                    </div>
+                    <Badge variant={paymentBadgeVariant(p.status)}>
+                      {paymentLabel(p.status)}
+                    </Badge>
+                  </div>
+                ))}
+                {payments.length > payVisible && (
+                  <div className="dashboard-loadmore">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setPayVisible((v) => v + PAGE_SIZE)}
+                    >
+                      Daha fazla göster
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
-            {payments.map((p) => (
-              <div key={p.id} className="dashboard-loan-row">
-                <div>
-                  <p className="dashboard-loan-amount">
-                    {formatTL(p.amount)} · {p.maskedCardNumber}
-                  </p>
-                  <p className="dashboard-loan-sub">
-                    {trDate(p.createdAt)}
-                    {p.description ? ` · ${p.description}` : ''}
-                  </p>
-                </div>
-                <Badge variant={paymentBadgeVariant(p.status)}>
-                  {paymentLabel(p.status)}
-                </Badge>
-              </div>
-            ))}
           </CardContent>
         </Card>
       </div>
@@ -502,11 +583,6 @@ export function Dashboard() {
           value={selectedType}
           onChange={(e) => setSelectedType(e.target.value as AccountType)}
         />
-        {createMutation.isError && (
-          <div style={{ marginTop: '1rem' }}>
-            <Alert variant="error">Hesap açılamadı, tekrar deneyin.</Alert>
-          </div>
-        )}
       </Modal>
 
       {/* --- Para yatırma modalı --- */}
@@ -538,11 +614,6 @@ export function Dashboard() {
             onChange={(e) => setDepositAmount(e.target.value)}
           />
         </div>
-        {depositMutation.isError && (
-          <Alert variant="error">
-            {getApiErrorMessage(depositMutation.error, 'Para yatırılamadı.')}
-          </Alert>
-        )}
       </Modal>
 
       {/* --- Transfer modalı --- */}
@@ -586,15 +657,11 @@ export function Dashboard() {
           <Input
             label="Açıklama (opsiyonel)"
             placeholder="Örn. Kira"
+            maxLength={20}
             value={transferDesc}
             onChange={(e) => setTransferDesc(e.target.value)}
           />
         </div>
-        {transferMutation.isError && (
-          <Alert variant="error">
-            {getApiErrorMessage(transferMutation.error, 'Transfer başarısız.')}
-          </Alert>
-        )}
       </Modal>
 
       {/* --- Profil modalı --- */}
@@ -625,11 +692,6 @@ export function Dashboard() {
             onChange={(e) => setProfileName(e.target.value)}
           />
         </div>
-        {profileMutation.isError && (
-          <Alert variant="error">
-            {getApiErrorMessage(profileMutation.error, 'Profil güncellenemedi.')}
-          </Alert>
-        )}
       </Modal>
 
       {/* --- Kredi başvuru modalı --- */}
@@ -687,11 +749,6 @@ export function Dashboard() {
             onChange={(e) => setLoanTerm(e.target.value)}
           />
         </div>
-        {applyMutation.isError && (
-          <Alert variant="error">
-            {getApiErrorMessage(applyMutation.error, 'Başvuru yapılamadı.')}
-          </Alert>
-        )}
       </Modal>
 
       {/* --- Ödeme planı modalı --- */}
@@ -765,7 +822,7 @@ export function Dashboard() {
                 label="Kart Numarası"
                 placeholder="1234 5678 9012 3456"
                 value={cardNumber}
-                onChange={(e) => setCardNumber(e.target.value)}
+                onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
               />
             </div>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -792,7 +849,7 @@ export function Dashboard() {
                   label="CVV"
                   placeholder="123"
                   value={cvv}
-                  onChange={(e) => setCvv(e.target.value)}
+                  onChange={(e) => setCvv(digitsOnly(e.target.value, 4))}
                 />
               </div>
             </div>
@@ -826,17 +883,24 @@ export function Dashboard() {
                 label="Doğrulama Kodu"
                 placeholder="123456"
                 value={threeDS}
-                onChange={(e) => setThreeDS(e.target.value)}
+                onChange={(e) => setThreeDS(digitsOnly(e.target.value, 6))}
               />
             </div>
           </>
         )}
-        {payMutation.isError && (
-          <Alert variant="error">
-            {getApiErrorMessage(payMutation.error, 'Ödeme başarısız.')}
-          </Alert>
-        )}
       </Modal>
+
+      {/* --- Hesap kapatma onayı --- */}
+      <ConfirmDialog
+        open={!!closeAccountId}
+        title="Hesabı Kapat"
+        message="Bu hesabı kapatmak istediğinize emin misiniz? Kapalı hesaplar pasifleştirilir."
+        confirmLabel="Hesabı Kapat"
+        confirmVariant="destructive"
+        loading={closeMutation.isPending}
+        onConfirm={() => closeAccountId && closeMutation.mutate(closeAccountId)}
+        onClose={() => setCloseAccountId(null)}
+      />
     </div>
   )
 }

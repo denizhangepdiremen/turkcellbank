@@ -9,6 +9,7 @@ import { Alert } from '../../components/Alert'
 import { register as registerUser } from '../../api/authApi'
 import { registerSchema, type RegisterFormValues } from '../../lib/validation'
 import { getApiErrorMessage } from '../../lib/apiError'
+import { usePageTitle } from '../../lib/usePageTitle'
 import './Register.css'
 
 /**
@@ -16,6 +17,7 @@ import './Register.css'
  * Form: React Hook Form + Zod. Başarılı kayıtta login'e yönlendirir.
  */
 export function Register() {
+  usePageTitle('Kayıt Ol')
   const navigate = useNavigate()
   const [serverError, setServerError] = useState<string | null>(null)
 

@@ -9,6 +9,7 @@ import { Alert } from '../../components/Alert'
 import { useAuth } from '../../context/AuthContext'
 import { loginSchema, type LoginFormValues } from '../../lib/validation'
 import { getApiErrorMessage } from '../../lib/apiError'
+import { usePageTitle } from '../../lib/usePageTitle'
 import './Login.css'
 
 /**
@@ -16,6 +17,7 @@ import './Login.css'
  * Form: React Hook Form + Zod. Giriş: AuthContext.login (JWT alır, saklar).
  */
 export function Login() {
+  usePageTitle('Giriş')
   const navigate = useNavigate()
   const location = useLocation()
   const { login } = useAuth()

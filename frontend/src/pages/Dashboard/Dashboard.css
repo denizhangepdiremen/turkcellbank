@@ -98,11 +98,55 @@
   justify-content: space-between;
 }
 
+.dashboard-account-iban-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
 .dashboard-account-iban {
-  margin: 0.75rem 0 0;
   font-size: 0.8rem;
   color: #6b7280;
   letter-spacing: 0.5px;
+}
+
+.dashboard-iban-copy {
+  background: none;
+  border: none;
+  color: #4f46e5;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.dashboard-iban-copy:hover {
+  text-decoration: underline;
+}
+
+/* Hesap kartı footer: aksiyonlar üstte, kapat ayrı/altta sağda */
+.dashboard-account-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
+}
+
+.dashboard-account-close {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 0.6rem;
+}
+
+/* "Daha fazla göster" */
+.dashboard-loadmore {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.75rem;
 }
 
 .dashboard-account-balance {

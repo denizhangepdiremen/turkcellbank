@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '../../components/Button'
 import { Input } from '../../components/Input'
 import { Alert } from '../../components/Alert'
+import { usePageTitle } from '../../lib/usePageTitle'
 import './ForgotPassword.css'
 
 /**
@@ -15,6 +16,7 @@ import './ForgotPassword.css'
  *  - Backend aşamasında gerçek e-posta gönderimi + API çağrısı eklenecek.
  */
 export function ForgotPassword() {
+  usePageTitle('Şifremi Unuttum')
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string>()
   const [loading, setLoading] = useState(false)
