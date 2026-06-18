@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<LoanApplication> LoanApplications => Set<LoanApplication>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<Card> Cards => Set<Card>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -96,18 +97,38 @@ public class AppDbContext : DbContext
         {
             entity.HasKey(p => p.Id);
             entity.Property(p => p.MaskedCardNumber).IsRequired().HasMaxLength(25);
-            entity.Property(p => p.CardFingerprint).IsRequired().HasMaxLength(64);
             entity.Property(p => p.Amount).HasPrecision(18, 2);
             entity.Property(p => p.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(p => p.Description).HasMaxLength(200);
 
-            entity.HasIndex(p => p.CardFingerprint); // fraud sorgusu
             entity.HasIndex(p => p.UserId);
 
             entity.HasOne(p => p.User)
                 .WithMany()
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- Card tablosu kuralları ---
+        modelBuilder.Entity<Card>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.CardNumber).IsRequired().HasMaxLength(16);
+            entity.HasIndex(c => c.CardNumber).IsUnique();
+            entity.Property(c => c.Cvv).IsRequired().HasMaxLength(4);
+            entity.Property(c => c.Status).HasConversion<string>().HasMaxLength(20);
+
+            // Sahibi: kullanıcı silinince kartları da silinsin
+            entity.HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Bağlı hesap: çoklu cascade yolunu önlemek için Restrict
+            entity.HasOne(c => c.Account)
+                .WithMany()
+                .HasForeignKey(c => c.AccountId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

@@ -1,8 +1,10 @@
 namespace TurkcellBank.Domain.Enums;
 
-/// <summary>İşlem tipi: para yatırma veya transfer (banka içi havale).</summary>
+/// <summary>İşlem tipi.</summary>
 public enum TransactionType
 {
     Deposit,   // para yatırma
     Transfer,  // hesaplar arası transfer
+    Payment,   // sanal POS ödemesi (hesaptan çıkış)
+    Refund,    // ödeme iadesi (hesaba giriş)
 }

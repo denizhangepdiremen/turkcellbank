@@ -3,9 +3,8 @@ using TurkcellBank.Domain.Enums;
 namespace TurkcellBank.Domain.Entities;
 
 /// <summary>
-/// Sanal POS ödeme kaydı. Kart simülasyonu — banka hesabına dokunmaz.
-/// Ham kart numarası SAKLANMAZ; sadece maskeli hali ve fraud eşleştirmesi
-/// için bir hash (fingerprint) tutulur.
+/// Sanal POS ödeme kaydı. Ödeme, kullanıcının onaylı banka kartıyla yapılır
+/// ve tutar karta bağlı hesaptan düşülür.
 /// </summary>
 public class Payment
 {
@@ -14,8 +13,10 @@ public class Payment
     public Guid UserId { get; set; }
     public User? User { get; set; } // ödeyen (admin listesinde gösterilir)
 
+    public Guid? CardId { get; set; }     // kullanılan kart
+    public Guid? AccountId { get; set; }  // parası çekilen/iade edilen hesap
+
     public string MaskedCardNumber { get; set; } = string.Empty; // **** **** **** 3456
-    public string CardFingerprint { get; set; } = string.Empty;  // kart no'nun hash'i
 
     public decimal Amount { get; set; }
     public PaymentStatus Status { get; set; }

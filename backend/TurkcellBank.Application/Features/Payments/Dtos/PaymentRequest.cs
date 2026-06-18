@@ -1,11 +1,11 @@
 namespace TurkcellBank.Application.Features.Payments.Dtos;
 
-/// <summary>Sanal POS ödeme isteği.</summary>
+/// <summary>
+/// Sanal POS ödeme isteği. Kullanıcı onaylı kartlarından birini seçer;
+/// tutar karta bağlı hesaptan düşülür.
+/// </summary>
 public record PaymentRequest(
-    string CardNumber,
-    int ExpiryMonth,
-    int ExpiryYear,
-    string Cvv,
+    Guid CardId,
     decimal Amount,
     string ThreeDSCode,
     string? Description);

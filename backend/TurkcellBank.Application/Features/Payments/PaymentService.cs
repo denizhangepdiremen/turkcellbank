@@ -9,21 +9,27 @@ namespace TurkcellBank.Application.Features.Payments;
 
 public class PaymentService : IPaymentService
 {
-    // Sabit simülasyon kuralları (kilitli kararlar)
-    private const string ValidCard = "1234567890123456";
     private const string Valid3DSCode = "123456";
-    private const int FraudFailLimit = 3; // aynı kartla 3 başarısız -> blokaj
 
     private readonly IPaymentRepository _payments;
+    private readonly ICardRepository _cards;
+    private readonly IAccountRepository _accounts;
+    private readonly ITransactionRepository _transactions;
     private readonly ICurrentUserService _currentUser;
     private readonly IValidator<PaymentRequest> _validator;
 
     public PaymentService(
         IPaymentRepository payments,
+        ICardRepository cards,
+        IAccountRepository accounts,
+        ITransactionRepository transactions,
         ICurrentUserService currentUser,
         IValidator<PaymentRequest> validator)
     {
         _payments = payments;
+        _cards = cards;
+        _accounts = accounts;
+        _transactions = transactions;
         _currentUser = currentUser;
         _validator = validator;
     }
@@ -35,42 +41,76 @@ public class PaymentService : IPaymentService
             throw new Common.Exceptions.ValidationException(
                 validation.Errors.Select(e => e.ErrorMessage).ToList());
 
-        var normalized = CardHelper.Normalize(request.CardNumber);
-        var fingerprint = CardHelper.Fingerprint(normalized);
-        var masked = CardHelper.Mask(normalized);
+        // 1) Kart bu kullanıcıya mı ait?
+        var card = await _cards.GetByIdAsync(request.CardId);
+        if (card is null || card.UserId != _currentUser.UserId)
+            throw new NotFoundException("Kart bulunamadı.");
 
-        // 1) Fraud: bu kartla çok sayıda başarısız işlem varsa blokaj
-        var failedCount = await _payments.CountFailedByFingerprintAsync(fingerprint);
-        if (failedCount >= FraudFailLimit)
-            throw new BusinessException("Bu kart çok sayıda başarısız işlem nedeniyle bloke edildi.");
+        // 2) Kart onaylı mı?
+        if (card.Status != CardStatus.Approved)
+            throw new BusinessException("Kartınız henüz onaylı değil.");
 
-        // 2) Kart kontrolü
-        if (normalized != ValidCard)
-        {
-            await RecordFailedAsync(masked, fingerprint, request);
-            throw new BusinessException("Kart bilgileri hatalı.");
-        }
+        // 3) Bağlı hesap (tracked)
+        var account = await _accounts.GetByIdAsync(card.AccountId);
+        if (account is null)
+            throw new NotFoundException("Karta bağlı hesap bulunamadı.");
+        if (!account.IsActive)
+            throw new BusinessException("Karta bağlı hesap kapalı.");
 
-        // 3) 3D Secure kod kontrolü
+        var masked = CardHelper.Mask(card.CardNumber);
+
+        // 4) 3D Secure kodu yanlışsa: başarısız kaydı oluştur + hata
         if (request.ThreeDSCode != Valid3DSCode)
         {
-            await RecordFailedAsync(masked, fingerprint, request);
+            await _payments.AddAsync(new Payment
+            {
+                Id = Guid.NewGuid(),
+                UserId = _currentUser.UserId,
+                CardId = card.Id,
+                AccountId = account.Id,
+                MaskedCardNumber = masked,
+                Amount = request.Amount,
+                Status = PaymentStatus.Failed,
+                Description = request.Description,
+                CreatedAt = DateTime.UtcNow,
+            });
             throw new BusinessException("3D Secure kodu hatalı.");
         }
 
-        // 4) Başarılı ödeme
+        // 5) Bakiye yeterli mi?
+        if (account.Balance < request.Amount)
+            throw new BusinessException("Yetersiz bakiye.");
+
+        // 6) Başarılı ödeme: hesaptan düş + ödeme kaydı + işlem kaydı (atomik)
+        account.Balance -= request.Amount;
+
         var payment = new Payment
         {
             Id = Guid.NewGuid(),
             UserId = _currentUser.UserId,
+            CardId = card.Id,
+            AccountId = account.Id,
             MaskedCardNumber = masked,
-            CardFingerprint = fingerprint,
             Amount = request.Amount,
             Status = PaymentStatus.Success,
             Description = request.Description,
             CreatedAt = DateTime.UtcNow,
         };
-        await _payments.AddAsync(payment);
+        _payments.Add(payment); // kaydetmez
+
+        var tx = new Transaction
+        {
+            Id = Guid.NewGuid(),
+            Type = TransactionType.Payment,
+            FromAccountId = account.Id,
+            FromIban = account.Iban,
+            Amount = request.Amount,
+            Description = request.Description ?? "POS ödemesi",
+            CreatedAt = DateTime.UtcNow,
+        };
+        // Tek SaveChanges: bakiye + ödeme + işlem birlikte
+        await _transactions.AddAsync(tx);
+
         return Map(payment);
     }
 
@@ -101,27 +141,29 @@ public class PaymentService : IPaymentService
 
         if (payment.Status != PaymentStatus.Success)
             throw new BusinessException("Sadece başarılı ödemeler iade edilebilir.");
+        if (payment.AccountId is null)
+            throw new BusinessException("Bu ödeme iade edilemiyor.");
 
+        var account = await _accounts.GetByIdAsync(payment.AccountId.Value)
+            ?? throw new NotFoundException("İade edilecek hesap bulunamadı.");
+
+        // Tutarı hesaba geri yükle + ödeme durumu + iade işlemi (atomik)
+        account.Balance += payment.Amount;
         payment.Status = PaymentStatus.Refunded;
-        await _payments.SaveChangesAsync();
-        return Map(payment);
-    }
 
-    // Başarısız ödeme kaydı (fraud sayımı bunları sayar)
-    private async Task RecordFailedAsync(string masked, string fingerprint, PaymentRequest request)
-    {
-        var failed = new Payment
+        var refundTx = new Transaction
         {
             Id = Guid.NewGuid(),
-            UserId = _currentUser.UserId,
-            MaskedCardNumber = masked,
-            CardFingerprint = fingerprint,
-            Amount = request.Amount,
-            Status = PaymentStatus.Failed,
-            Description = request.Description,
+            Type = TransactionType.Refund,
+            ToAccountId = account.Id,
+            ToIban = account.Iban,
+            Amount = payment.Amount,
+            Description = "POS iade",
             CreatedAt = DateTime.UtcNow,
         };
-        await _payments.AddAsync(failed);
+        await _transactions.AddAsync(refundTx);
+
+        return Map(payment);
     }
 
     private static PaymentDto Map(Payment p) =>

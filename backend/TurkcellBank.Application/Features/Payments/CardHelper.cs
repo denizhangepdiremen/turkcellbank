@@ -1,28 +1,26 @@
-using System.Security.Cryptography;
 using System.Text;
 
 namespace TurkcellBank.Application.Features.Payments;
 
-/// <summary>
-/// Kart numarası yardımcıları: normalize, maskeleme ve fingerprint (hash).
-/// Ham kart numarası asla saklanmaz — maskeli hali gösterilir, fingerprint
-/// fraud eşleştirmesi için kullanılır.
-/// </summary>
+/// <summary>Kart numarası yardımcıları: rastgele üretim ve maskeleme.</summary>
 public static class CardHelper
 {
-    public static string Normalize(string cardNumber)
-        => cardNumber.Replace(" ", "").Replace("-", "");
-
-    public static string Mask(string normalized)
+    // 16 haneli rastgele kart numarası üretir
+    public static string Generate16Digits()
     {
-        var last4 = normalized.Length >= 4 ? normalized[^4..] : normalized;
-        return $"**** **** **** {last4}";
+        var sb = new StringBuilder(16);
+        for (var i = 0; i < 16; i++)
+            sb.Append(Random.Shared.Next(0, 10));
+        return sb.ToString()!;
     }
 
-    // SHA-256 hash (hex) — aynı kartı saklamadan eşleştirmek için
-    public static string Fingerprint(string normalized)
+    // 3 haneli rastgele CVV
+    public static string GenerateCvv()
+        => Random.Shared.Next(100, 1000).ToString();
+
+    public static string Mask(string cardNumber)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(normalized));
-        return Convert.ToHexString(bytes);
+        var last4 = cardNumber.Length >= 4 ? cardNumber[^4..] : cardNumber;
+        return $"**** **** **** {last4}";
     }
 }
