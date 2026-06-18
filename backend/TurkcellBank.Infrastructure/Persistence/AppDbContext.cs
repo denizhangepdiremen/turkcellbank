@@ -18,6 +18,7 @@ public class AppDbContext : DbContext
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<LoanApplication> LoanApplications => Set<LoanApplication>();
+    public DbSet<Payment> Payments => Set<Payment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -87,6 +88,25 @@ public class AppDbContext : DbContext
             entity.HasOne(l => l.User)
                 .WithMany()
                 .HasForeignKey(l => l.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- Payment tablosu kuralları ---
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.MaskedCardNumber).IsRequired().HasMaxLength(25);
+            entity.Property(p => p.CardFingerprint).IsRequired().HasMaxLength(64);
+            entity.Property(p => p.Amount).HasPrecision(18, 2);
+            entity.Property(p => p.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(p => p.Description).HasMaxLength(200);
+
+            entity.HasIndex(p => p.CardFingerprint); // fraud sorgusu
+            entity.HasIndex(p => p.UserId);
+
+            entity.HasOne(p => p.User)
+                .WithMany()
+                .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

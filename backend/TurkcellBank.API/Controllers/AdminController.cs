@@ -5,6 +5,8 @@ using TurkcellBank.Application.Features.Admin;
 using TurkcellBank.Application.Features.Auth.Dtos;
 using TurkcellBank.Application.Features.Loans;
 using TurkcellBank.Application.Features.Loans.Dtos;
+using TurkcellBank.Application.Features.Payments;
+using TurkcellBank.Application.Features.Payments.Dtos;
 
 namespace TurkcellBank.API.Controllers;
 
@@ -19,11 +21,16 @@ public class AdminController : ControllerBase
 {
     private readonly IAdminService _adminService;
     private readonly ILoanService _loanService;
+    private readonly IPaymentService _paymentService;
 
-    public AdminController(IAdminService adminService, ILoanService loanService)
+    public AdminController(
+        IAdminService adminService,
+        ILoanService loanService,
+        IPaymentService paymentService)
     {
         _adminService = adminService;
         _loanService = loanService;
+        _paymentService = paymentService;
     }
 
     /// <summary>Tüm kullanıcıları listele. GET /api/admin/users</summary>
@@ -56,5 +63,21 @@ public class AdminController : ControllerBase
     {
         var loan = await _loanService.RejectAsync(id);
         return Ok(ApiResponse<LoanDto>.SuccessResponse(loan, "Başvuru reddedildi."));
+    }
+
+    /// <summary>Tüm ödemeler (ödeyenle). GET /api/admin/payments</summary>
+    [HttpGet("payments")]
+    public async Task<IActionResult> GetPayments()
+    {
+        var payments = await _paymentService.GetAllPaymentsAsync();
+        return Ok(ApiResponse<List<AdminPaymentDto>>.SuccessResponse(payments));
+    }
+
+    /// <summary>Ödemeyi iade et. POST /api/admin/payments/{id}/refund</summary>
+    [HttpPost("payments/{id:guid}/refund")]
+    public async Task<IActionResult> RefundPayment(Guid id)
+    {
+        var payment = await _paymentService.RefundAsync(id);
+        return Ok(ApiResponse<PaymentDto>.SuccessResponse(payment, "Ödeme iade edildi."));
     }
 }

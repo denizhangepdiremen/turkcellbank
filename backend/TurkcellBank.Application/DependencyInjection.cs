@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<ITransactionService, TransactionService>();
         services.AddScoped<Features.Admin.IAdminService, Features.Admin.AdminService>();
         services.AddScoped<Features.Loans.ILoanService, Features.Loans.LoanService>();
+        services.AddScoped<Features.Payments.IPaymentService, Features.Payments.PaymentService>();
 
         // Validator'lar
         services.AddScoped<IValidator<RegisterRequest>, RegisterRequestValidator>();
@@ -35,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IValidator<DepositRequest>, DepositRequestValidator>();
         services.AddScoped<IValidator<TransferRequest>, TransferRequestValidator>();
         services.AddScoped<IValidator<Features.Loans.Dtos.LoanApplicationRequest>, Features.Loans.Validators.LoanApplicationRequestValidator>();
+        services.AddScoped<IValidator<Features.Payments.Dtos.PaymentRequest>, Features.Payments.Validators.PaymentRequestValidator>();
 
         return services;
     }
