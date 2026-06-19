@@ -45,4 +45,10 @@ test.describe('Auth & yönlendirme', () => {
     await expect(page).toHaveURL(/\/register$/)
   })
 
+  test('Şifremi unuttum tuşuna basınca forgot-password ekranına gider', async ({ page}) => {
+    await page.goto('/login')
+    await page.getByRole('link', { name: 'Şifremi unuttum' }).click()
+    await expect(page).toHaveURL(/\/forgot-password$/)
+  })
+
 })

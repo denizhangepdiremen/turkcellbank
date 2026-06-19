@@ -25,5 +25,10 @@ test.describe('Giriş akışı', () => {
     await expect(page).toHaveURL(/\/login$/)
   })
 
-  // ↓ Buraya kendi testlerini ekleyebilirsin
+  test('yanlış e-posta hata bildirimi gösterir', async ({ page}) => {
+    await loginViaUi(page, 'yanlışmail@gmail.com', DUMMY.password)
+    await expect(page.getByText('Geçerli bir e-posta adresi girin.')).toBeVisible()
+    await expect(page).toHaveURL(/\/login$/)
+  })
+
 })

@@ -5,7 +5,10 @@ import { defineConfig, devices } from '@playwright/test'
 // Not: backend gerektiren senaryolar için backend'i 5099'da çalıştırın.
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: true,
+  // E2E testleri paylaşılan bir backend/veritabanına karşı koşar; eşzamanlı
+  // mutasyonların birbirini bozmaması için tek worker (serial) kullanılır.
+  fullyParallel: false,
+  workers: 1,
   retries: 0,
   reporter: 'list',
   use: {
