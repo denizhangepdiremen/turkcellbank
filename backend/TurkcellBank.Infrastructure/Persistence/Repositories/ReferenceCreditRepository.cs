@@ -13,16 +13,17 @@ public class ReferenceCreditRepository : IReferenceCreditRepository
         _db = db;
     }
 
-    public Task<List<ReferenceCreditRecord>> GetSimilarByIncomeAsync(decimal income, int maxCount)
+    public Task<List<ReferenceCreditRecord>> GetCandidatesByIncomeAsync(decimal income, int poolSize)
     {
-        // Gelir bandına yakın (±%40) kayıtlar, gelire en yakından uzağa
-        var low = income * 0.6m;
-        var high = income * 1.4m;
+        // Gelir bandı ±%50 (geniş aday havuzu); index'li MonthlyIncome ile hızlı.
+        // Çok-faktörlü nihai sıralama Application katmanındaki PeerMatcher'da yapılır.
+        var low = income * 0.5m;
+        var high = income * 1.5m;
 
         return _db.ReferenceCreditRecords
             .Where(r => r.MonthlyIncome >= low && r.MonthlyIncome <= high)
             .OrderBy(r => Math.Abs(r.MonthlyIncome - income))
-            .Take(maxCount)
+            .Take(poolSize)
             .ToListAsync();
     }
 }

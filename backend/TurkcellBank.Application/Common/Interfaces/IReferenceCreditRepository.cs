@@ -6,8 +6,9 @@ namespace TurkcellBank.Application.Common.Interfaces;
 public interface IReferenceCreditRepository
 {
     /// <summary>
-    /// Verilen gelire yakın (benzer profil) referans kayıtları getirir.
-    /// En fazla <paramref name="maxCount"/> kayıt döner (değerlendirme bağlamı için).
+    /// Gelir bandına yakın bir ADAY HAVUZU getirir (index'li, hızlı). Nihai
+    /// benzerlik sıralaması (gelir+gider+yaş+konut...) Application katmanında
+    /// <c>PeerMatcher</c> ile yapılır. En fazla <paramref name="poolSize"/> kayıt döner.
     /// </summary>
-    Task<List<ReferenceCreditRecord>> GetSimilarByIncomeAsync(decimal income, int maxCount);
+    Task<List<ReferenceCreditRecord>> GetCandidatesByIncomeAsync(decimal income, int poolSize);
 }
