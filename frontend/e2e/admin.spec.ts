@@ -8,25 +8,23 @@ import {
   openAccount,
   applyForLoan,
   applyForCard,
-  API,
 } from './helpers'
-import { request } from '@playwright/test'
 
-// Admin paneli CRUD akışları — backend gerektirir.
-// Her test grubunda: kullanıcı başvuru yapar → admin onaylar/reddeder.
+// Admin paneli akışları — backend gerektirir.
+// NOT: Krediler artık otomatik karara bağlanır; admin onay/red YETKİSİ YOKTUR.
+// Kredi tablosu salt-okunurdur (AI kararı + limit gösterir). Kartlar admin onaylı.
 
-test.describe('Admin: Kredi yönetimi', () => {
+test.describe('Admin: Kredi görünümü (salt-okunur)', () => {
   test.beforeAll(async () => {
     await ensureRegistered(DUMMY)
   })
 
-  test('admin kredi başvurusunu onaylar', async ({ browser }) => {
-    // 1. Kullanıcı olarak kredi başvurusu yap
+  test('kredi tablosu salt-okunurdur (Onayla/Reddet yok)', async ({ browser }) => {
+    // 1. Kullanıcı kredi başvurusu yapar (otomatik karara bağlanır)
     const userCtx = await browser.newContext()
     const userPage = await userCtx.newPage()
     await loginViaUi(userPage, DUMMY.email, DUMMY.password)
     await expect(userPage).toHaveURL(/\/dashboard$/)
-
     await applyForLoan(userPage, {
       income: '50000',
       profession: 'Yazılımcı',
@@ -36,52 +34,19 @@ test.describe('Admin: Kredi yönetimi', () => {
     await userPage.close()
     await userCtx.close()
 
-    // 2. Admin olarak giriş yap ve onayla
+    // 2. Admin panelinde kredi tablosu görünür ama onay/red butonu yoktur
     const adminCtx = await browser.newContext()
     const adminPage = await adminCtx.newPage()
     await loginAsAdmin(adminPage)
 
-    // Kredi tablosunu hedefle (Skor sütunu yalnızca kredilerde var)
+    // Kredi tablosu (Skor sütunu yalnızca kredilerde)
     const loanTable = adminPage.locator('table.admin-table', {
       has: adminPage.getByRole('columnheader', { name: 'Skor' }),
     })
-    // En yeni (bu testin oluşturduğu) başvuru ilk satırdadır
-    await loanTable.getByRole('button', { name: 'Onayla' }).first().click()
-    await expect(adminPage.getByText('Başvuru onaylandı.')).toBeVisible()
-
-    await adminPage.close()
-    await adminCtx.close()
-  })
-
-  test('admin kredi başvurusunu reddeder', async ({ browser }) => {
-    // 1. Kullanıcı olarak kredi başvurusu yap
-    const userCtx = await browser.newContext()
-    const userPage = await userCtx.newPage()
-    await loginViaUi(userPage, DUMMY.email, DUMMY.password)
-    await expect(userPage).toHaveURL(/\/dashboard$/)
-
-    await applyForLoan(userPage, {
-      income: '15000',
-      profession: 'Stajyer',
-      amount: '200000',
-      term: '36',
-    })
-    await userPage.close()
-    await userCtx.close()
-
-    // 2. Admin olarak giriş yap ve reddet
-    const adminCtx = await browser.newContext()
-    const adminPage = await adminCtx.newPage()
-    await loginAsAdmin(adminPage)
-
-    // Kredi tablosundaki en yeni başvuruyu reddet
-    const loanTable = adminPage.locator('table.admin-table', {
-      has: adminPage.getByRole('columnheader', { name: 'Skor' }),
-    })
-    await loanTable.getByRole('button', { name: 'Reddet' }).first().click()
-    // ConfirmDialog onayı
-    await adminPage.getByRole('dialog').getByRole('button', { name: 'Reddet' }).click()
-    await expect(adminPage.getByText('Başvuru reddedildi.')).toBeVisible()
+    await expect(loanTable).toBeVisible()
+    // Otomatik karar olduğundan kredi tablosunda Onayla/Reddet bulunmaz
+    await expect(loanTable.getByRole('button', { name: 'Onayla' })).toHaveCount(0)
+    await expect(loanTable.getByRole('button', { name: 'Reddet' })).toHaveCount(0)
 
     await adminPage.close()
     await adminCtx.close()

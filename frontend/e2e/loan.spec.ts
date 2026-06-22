@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test'
-import { DUMMY, ensureRegistered, loginViaUi, openAccount, applyForLoan } from './helpers'
+import { DUMMY, ensureRegistered, loginViaUi, openTab, applyForLoan } from './helpers'
 
 // Kredi başvuru akışı — backend gerektirir.
+// Krediler artık başvuru anında AI/kural motoruyla OTOMATİK karara bağlanır
+// (Onaylandı/Reddedildi); admin onayı yoktur, "Bekliyor" durumu kalmaz.
 test.describe('Kredi işlemleri', () => {
   test.beforeAll(async () => {
     await ensureRegistered(DUMMY)
@@ -12,7 +14,8 @@ test.describe('Kredi işlemleri', () => {
     await expect(page).toHaveURL(/\/dashboard$/)
   })
 
-  test('kredi başvurusu yapılır', async ({ page }) => {
+  test('kredi başvurusu yapılır ve otomatik karara bağlanır', async ({ page }) => {
+    // applyForLoan, sonuç modalını (Onaylandı/Reddedildi) bekleyip kapatır
     await applyForLoan(page, {
       income: '45000',
       profession: 'Mühendis',
@@ -20,11 +23,12 @@ test.describe('Kredi işlemleri', () => {
       term: '24',
     })
 
-    // Kredilerim bölümünde başvuru görünmeli
-    await expect(page.getByText('Bekliyor').first()).toBeVisible()
+    // Kredilerim listesinde karara bağlanmış başvuru görünmeli
+    await expect(page.getByText(/Onaylandı|Reddedildi/).first()).toBeVisible()
   })
 
   test('kredi başvuru modalı iptal edilebilir', async ({ page }) => {
+    await openTab(page, 'Krediler')
     await page.getByRole('button', { name: '+ Kredi Başvur' }).click()
     await expect(page.getByLabel('Aylık Gelir (₺)')).toBeVisible()
 

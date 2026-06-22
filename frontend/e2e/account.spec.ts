@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { DUMMY, ensureRegistered, loginViaUi } from './helpers'
+import { DUMMY, ensureRegistered, loginViaUi, openTab } from './helpers'
 import { openAccount } from './helpers'
 
 // Backend gerektirir. Her testten önce dummy kullanıcıyla giriş yapılır.
@@ -13,11 +13,26 @@ test.describe('Genel hesap işlemleri', () => {
     await expect(page).toHaveURL(/\/dashboard$/)
   })
 
-  test('dashboard ana bölümleri görünür', async ({ page }) => {
+  test('panel sekmeleri görünür ve bölümler sekmeyle açılır', async ({ page }) => {
+    // Sekme butonları (üst menü)
+    for (const tab of ['Hesaplarım', 'İşlemler', 'Krediler', 'Kartlar', 'Ödemeler']) {
+      await expect(page.getByRole('button', { name: tab, exact: true })).toBeVisible()
+    }
+
+    // Varsayılan sekme: Hesaplarım bölümü görünür
     await expect(page.getByRole('heading', { name: 'Hesaplarım' })).toBeVisible()
+
+    // Sekmelere tıklayınca ilgili bölüm açılır
+    await openTab(page, 'İşlemler')
     await expect(page.getByRole('heading', { name: 'Son İşlemler' })).toBeVisible()
+
+    await openTab(page, 'Krediler')
     await expect(page.getByRole('heading', { name: 'Kredilerim' })).toBeVisible()
+
+    await openTab(page, 'Kartlar')
     await expect(page.getByRole('heading', { name: 'Kartlarım' })).toBeVisible()
+
+    await openTab(page, 'Ödemeler')
     await expect(page.getByRole('heading', { name: 'Ödemelerim' })).toBeVisible()
   })
 

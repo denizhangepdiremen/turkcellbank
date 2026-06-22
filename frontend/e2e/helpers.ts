@@ -43,6 +43,14 @@ export async function loginViaUi(page: Page, email: string, password: string) {
   await page.getByRole('button', { name: 'Giriş Yap' }).click()
 }
 
+/** Panel sekmeleri arasında geçiş (Hesaplarım/İşlemler/Krediler/Kartlar/Ödemeler). */
+export async function openTab(
+  page: Page,
+  label: 'Hesaplarım' | 'İşlemler' | 'Krediler' | 'Kartlar' | 'Ödemeler',
+) {
+  await page.getByRole('button', { name: label, exact: true }).click()
+}
+
 export async function openAccount(page: Page): Promise<string> {
   const ibans = page.locator('.dashboard-account-iban')
   // Açmadan önceki IBAN'lar (yeni eklenen, farktan bulunur)
@@ -73,25 +81,58 @@ export async function depositToAccount(page: Page, accountId: string, amount: st
   await expect(page.getByText('Para yatırıldı.')).toBeVisible()
 }
 
-/** Kredi başvurusu yapar (UI üzerinden). */
+/**
+ * Genişletilmiş kredi başvurusu (Krediler sekmesinden). Başvuru anında AI/kural
+ * motoru otomatik karar verir; "değerlendiriliyor" ekranından sonra sonuç modalı
+ * (Onaylandı/Reddedildi) açılır. Yardımcı, sonuç modalını bekleyip kapatır.
+ * Zorunlu olmayan alanlar makul varsayılanlarla doldurulur.
+ */
 export async function applyForLoan(
   page: Page,
-  opts: { income: string; profession: string; amount: string; term?: string },
+  opts: {
+    income: string
+    profession: string
+    amount: string
+    term?: string
+    tc?: string
+    age?: string
+    marital?: 'Single' | 'Married'
+    children?: string
+    housing?: 'Tenant' | 'Owner'
+    expenses?: string
+    employment?: string
+  },
 ) {
+  await openTab(page, 'Krediler')
   await page.getByRole('button', { name: '+ Kredi Başvur' }).click()
+
   const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('TC Kimlik No').fill(opts.tc ?? '12345678950')
+  await dialog.getByLabel('Yaş').fill(opts.age ?? '35')
+  await dialog.getByLabel('Medeni Hal').selectOption(opts.marital ?? 'Single')
+  await dialog.getByLabel('Çocuk Sayısı').fill(opts.children ?? '0')
+  await dialog.getByLabel('Konut Durumu').selectOption(opts.housing ?? 'Tenant')
   await dialog.getByLabel('Aylık Gelir (₺)').fill(opts.income)
+  await dialog.getByLabel('Aylık Gider (₺)').fill(opts.expenses ?? '10000')
+  await dialog.getByLabel('Çalışma Kıdemi (ay)').fill(opts.employment ?? '24')
   await dialog.getByLabel('Meslek').fill(opts.profession)
   await dialog.getByLabel('Kredi Tutarı (₺)').fill(opts.amount)
-  if (opts.term) {
-    await dialog.getByLabel('Vade (ay)').fill(opts.term)
-  }
+  await dialog.getByLabel('Vade (ay)').fill(opts.term ?? '12')
   await dialog.getByRole('button', { name: 'Başvur', exact: true }).click()
-  await expect(page.getByText('Kredi başvurunuz alındı.')).toBeVisible()
+
+  // Otomatik karar: sonuç modalı (onay veya red). AI çağrısı için geniş timeout.
+  await expect(
+    page.getByRole('heading', { name: /Başvurunuz (Onaylandı|Reddedildi)/ }),
+  ).toBeVisible({ timeout: 50_000 })
+
+  // Sonuç modalını kapat. Modalda iki "Kapat" var (başlıktaki X + footer butonu);
+  // footer butonu son sıradadır.
+  await page.getByRole('dialog').getByRole('button', { name: 'Kapat' }).last().click()
 }
 
-/** Kart başvurusu yapar (UI üzerinden). */
+/** Kart başvurusu yapar (Kartlar sekmesinden). */
 export async function applyForCard(page: Page) {
+  await openTab(page, 'Kartlar')
   await page.getByRole('button', { name: '+ Kart Aç' }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('button', { name: 'Kart Aç', exact: true }).click()

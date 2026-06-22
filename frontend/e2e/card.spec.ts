@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { DUMMY, ensureRegistered, loginViaUi, openAccount, applyForCard } from './helpers'
+import { DUMMY, ensureRegistered, loginViaUi, openTab, openAccount, applyForCard } from './helpers'
 
 // Kart başvuru akışı — backend gerektirir.
 test.describe('Kart işlemleri', () => {
@@ -23,6 +23,7 @@ test.describe('Kart işlemleri', () => {
   })
 
   test('kart başvuru modalı iptal edilebilir', async ({ page }) => {
+    await openTab(page, 'Kartlar')
     await page.getByRole('button', { name: '+ Kart Aç' }).click()
     await expect(page.getByText('Bağlanacak Hesap').or(page.getByText('Kart açmak için'))).toBeVisible()
 
