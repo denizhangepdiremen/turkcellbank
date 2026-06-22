@@ -50,7 +50,7 @@ public static class DependencyInjection
         {
             services.AddScoped<RuleBasedLoanAiEvaluator>(); // Gemini fallback'i
             services.AddHttpClient<ILoanAiEvaluator, GeminiLoanAiEvaluator>(client =>
-                client.Timeout = TimeSpan.FromSeconds(20));
+                client.Timeout = TimeSpan.FromSeconds(45));
         }
         else
         {

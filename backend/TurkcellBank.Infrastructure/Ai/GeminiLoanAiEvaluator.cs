@@ -37,7 +37,7 @@ public class GeminiLoanAiEvaluator : ILoanAiEvaluator
         _fallback = fallback;
         _logger = logger;
         _apiKey = configuration["Gemini:ApiKey"] ?? string.Empty;
-        _model = configuration["Gemini:Model"] ?? "gemini-2.0-flash";
+        _model = configuration["Gemini:Model"] ?? "gemini-2.5-flash";
         _baseUrl = configuration["Gemini:BaseUrl"] ?? "https://generativelanguage.googleapis.com";
     }
 
@@ -58,6 +58,9 @@ public class GeminiLoanAiEvaluator : ILoanAiEvaluator
                 {
                     temperature = 0.2,
                     responseMimeType = "application/json",
+                    // 2.5-flash bir "thinking" modeldir; bu yapısal görevde düşünmeyi
+                    // kapatmak yanıtı ~1 sn'ye indirir (timeout/maliyet için kritik).
+                    thinkingConfig = new { thinkingBudget = 0 },
                 },
             };
 
