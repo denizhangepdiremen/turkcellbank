@@ -135,6 +135,8 @@ public class GeminiLoanAiEvaluator : ILoanAiEvaluator
         sb.AppendLine($"- Meslek: {c.Profession}");
         sb.AppendLine($"- Talep edilen tutar: {c.RequestedAmount:N0} TL / {c.TermMonths} ay");
         sb.AppendLine();
+        sb.AppendLine(BuildCohortSummary(c.Peers));
+        sb.AppendLine();
         sb.AppendLine($"Benzer müşteri verileri ({c.Peers.Count} adet) [gelir | gider | yaş | çocuk | konut | verilen kredi | vade | temerrüt]:");
         foreach (var p in c.Peers)
         {
@@ -148,6 +150,34 @@ public class GeminiLoanAiEvaluator : ILoanAiEvaluator
         sb.AppendLine("{\"maxLimit\": <sayı, TL>, \"reason\": \"<Türkçe 1-2 cümle gerekçe>\"}");
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Benzer kohortun toplu istatistiği — modele sayısal çıpa verir:
+    /// temerrüt oranı + (geri ödeyenlerde) ortalama verilen kredi ve kredi/gelir katsayısı.
+    /// </summary>
+    private static string BuildCohortSummary(IReadOnlyList<LoanPeer> peers)
+    {
+        if (peers.Count == 0)
+            return "Kohort özeti: benzer kayıt bulunamadı.";
+
+        var defaulted = peers.Count(p => p.Defaulted);
+        var defaultRate = 100.0 * defaulted / peers.Count;
+
+        var paid = peers.Where(p => !p.Defaulted && p.MonthlyIncome > 0).ToList();
+        var avgMultiple = paid.Count > 0
+            ? paid.Average(p => (double)(p.GrantedAmount / p.MonthlyIncome))
+            : 0;
+        var avgGranted = paid.Count > 0
+            ? paid.Average(p => (double)p.GrantedAmount)
+            : 0;
+
+        return
+            $"Kohort özeti (bu {peers.Count} benzer müşteri): " +
+            $"temerrüt oranı %{defaultRate:N0}; " +
+            $"geri ödeyenlerde ortalama verilen kredi {avgGranted:N0} TL, " +
+            $"ortalama (verilen kredi / aylık gelir) katsayısı {avgMultiple:N1}. " +
+            $"Limit tahminini bu kohortun ödeme davranışıyla tutarlı yap.";
     }
 
     private static decimal ReadDecimal(JsonElement root, string name)
