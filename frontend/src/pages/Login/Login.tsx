@@ -43,7 +43,7 @@ export function Login() {
     try {
       const loggedIn = await login(values.email, values.password)
       // Admin ise admin paneline, değilse dashboard'a
-      navigate(loggedIn.role === 'Admin' ? '/admin' : '/dashboard')
+      navigate(loggedIn.role === 'Admin' ? '/admin' : '/dashboard', { replace: true })
     } catch (err) {
       setServerError(getApiErrorMessage(err, 'Giriş başarısız.'))
     }

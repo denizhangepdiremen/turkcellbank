@@ -19,6 +19,10 @@ public class User
 
     public UserRole Role { get; set; } = UserRole.Customer;
 
+    // TC kimlik no (11 hane). Kredi başvurusunda alınır; bir kez kaydedilip
+    // sonraki başvurularda tekrar kullanılır. Kayıt anında boş olabilir.
+    public string? NationalId { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // İlişki: bir kullanıcının birden çok hesabı olabilir.

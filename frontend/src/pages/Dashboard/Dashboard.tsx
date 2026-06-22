@@ -312,7 +312,7 @@ export function Dashboard() {
 
   function handleLogout() {
     logout()
-    navigate('/login')
+    navigate('/login', { replace: true })
   }
 
   async function copyIban(iban: string) {

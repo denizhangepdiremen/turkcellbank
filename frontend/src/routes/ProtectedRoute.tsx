@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext'
 /**
  * Korumalı sayfaları sarmalar.
  *  - Giriş yapılmamışsa → login'e
- *  - requiredRole verilmiş ve kullanıcının rolü uymuyorsa → dashboard'a
+ *  - requiredRole verilmiş ve kullanıcının rolü uymuyorsa → kendi paneline
+ *  - Admin kullanıcı normal kullanıcı sayfalarına erişemez (sadece admin paneli)
  */
 export function ProtectedRoute({
   children,
@@ -20,6 +21,11 @@ export function ProtectedRoute({
   if (loading) return null
 
   if (!isAuthenticated) return <Navigate to="/login" replace />
+
+  // Admin kullanıcı normal kullanıcı sayfalarına (dashboard vb.) giremez
+  if (!requiredRole && user?.role === 'Admin') {
+    return <Navigate to="/admin" replace />
+  }
 
   // Rol gerekiyorsa ve uymuyorsa, normal kullanıcıyı dashboard'a gönder
   if (requiredRole && user?.role !== requiredRole) {

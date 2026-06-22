@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TurkcellBank.Application.Common.Interfaces;
+using TurkcellBank.Application.Features.Loans;
 using TurkcellBank.Infrastructure.Persistence;
 using TurkcellBank.Infrastructure.Persistence.Repositories;
 using TurkcellBank.Infrastructure.Security;
@@ -32,10 +33,17 @@ public static class DependencyInjection
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<ILoanRepository, LoanRepository>();
+        services.AddScoped<IReferenceCreditRepository, ReferenceCreditRepository>();
+        services.AddScoped<IExternalBankLoanRepository, ExternalBankLoanRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<ICardRepository, CardRepository>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, JwtTokenService>();
+
+        // Kredi değerlendirme motoru. Şimdilik deterministik kural motoru
+        // (offline; API key gerekmez, testler tekrarlanabilir). Aşama 2'de
+        // Gemini:ApiKey yapılandırılınca GeminiLoanAiEvaluator'a geçilecek.
+        services.AddScoped<ILoanAiEvaluator, RuleBasedLoanAiEvaluator>();
 
         return services;
     }

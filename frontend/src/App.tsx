@@ -6,14 +6,15 @@ import { Dashboard } from './pages/Dashboard'
 import { AdminPanel } from './pages/Admin'
 import { NotFound } from './pages/NotFound'
 import { ProtectedRoute } from './routes/ProtectedRoute'
+import { GuestRoute } from './routes/GuestRoute'
 
 function App() {
   // Uygulamanın sayfa yönlendirmeleri.
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+      <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+      <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
       {/* Dashboard korumalı: token yoksa login'e yönlenir */}
       <Route
         path="/dashboard"

@@ -20,6 +20,8 @@ public class AppDbContext : DbContext
     public DbSet<LoanApplication> LoanApplications => Set<LoanApplication>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Card> Cards => Set<Card>();
+    public DbSet<ReferenceCreditRecord> ReferenceCreditRecords => Set<ReferenceCreditRecord>();
+    public DbSet<ExternalBankLoan> ExternalBankLoans => Set<ExternalBankLoan>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -36,6 +38,9 @@ public class AppDbContext : DbContext
             entity.HasIndex(u => u.Email).IsUnique(); // aynı e-posta iki kez olamaz
 
             entity.Property(u => u.PasswordHash).IsRequired();
+
+            // TC kimlik no (opsiyonel; kredi başvurusunda doldurulur)
+            entity.Property(u => u.NationalId).HasMaxLength(11);
 
             // enum'u veritabanında okunabilir metin olarak sakla ("Customer"/"Admin")
             entity.Property(u => u.Role).HasConversion<string>().HasMaxLength(20);
@@ -81,15 +86,53 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<LoanApplication>(entity =>
         {
             entity.HasKey(l => l.Id);
+            entity.Property(l => l.NationalId).IsRequired().HasMaxLength(11);
             entity.Property(l => l.Profession).IsRequired().HasMaxLength(100);
             entity.Property(l => l.Income).HasPrecision(18, 2);
+            entity.Property(l => l.MonthlyExpenses).HasPrecision(18, 2);
             entity.Property(l => l.Amount).HasPrecision(18, 2);
+            entity.Property(l => l.MaxLimit).HasPrecision(18, 2);
+            entity.Property(l => l.ExistingDebt).HasPrecision(18, 2);
+            entity.Property(l => l.NetLimit).HasPrecision(18, 2);
+            entity.Property(l => l.AiReason).HasMaxLength(1000);
+            entity.Property(l => l.DecidedBy).HasMaxLength(40);
+            entity.Property(l => l.MaritalStatus).HasConversion<string>().HasMaxLength(20);
+            entity.Property(l => l.HousingStatus).HasConversion<string>().HasMaxLength(20);
             entity.Property(l => l.Status).HasConversion<string>().HasMaxLength(20);
 
             entity.HasOne(l => l.User)
                 .WithMany()
                 .HasForeignKey(l => l.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- ReferenceCreditRecord (fake referans nüfus) kuralları ---
+        modelBuilder.Entity<ReferenceCreditRecord>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.MonthlyIncome).HasPrecision(18, 2);
+            entity.Property(r => r.MonthlyExpenses).HasPrecision(18, 2);
+            entity.Property(r => r.GrantedAmount).HasPrecision(18, 2);
+            entity.Property(r => r.Profession).HasMaxLength(100);
+            entity.Property(r => r.MaritalStatus).HasConversion<string>().HasMaxLength(20);
+            entity.Property(r => r.HousingStatus).HasConversion<string>().HasMaxLength(20);
+
+            // Gelir bandına göre benzer kayıt sorgusu için index
+            entity.HasIndex(r => r.MonthlyIncome);
+        });
+
+        // --- ExternalBankLoan (fake diğer banka kredileri) kuralları ---
+        modelBuilder.Entity<ExternalBankLoan>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.NationalId).IsRequired().HasMaxLength(11);
+            entity.Property(e => e.BankName).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.OriginalAmount).HasPrecision(18, 2);
+            entity.Property(e => e.RemainingDebt).HasPrecision(18, 2);
+            entity.Property(e => e.MonthlyInstallment).HasPrecision(18, 2);
+
+            // TC ile sorgu için index
+            entity.HasIndex(e => e.NationalId);
         });
 
         // --- Payment tablosu kuralları ---
