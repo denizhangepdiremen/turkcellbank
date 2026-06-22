@@ -84,4 +84,16 @@ dotnet ef migrations add <Name> --project TurkcellBank.Infrastructure --startup-
 dotnet ef database update       --project TurkcellBank.Infrastructure --startup-project TurkcellBank.API
 # Secrets (dev)
 dotnet user-secrets set "Jwt:Key" "<...>" --project TurkcellBank.API
+dotnet user-secrets set "AdminSeed:Password" "<...>" --project TurkcellBank.API
+# (Opsiyonel) Kredi AI değerlendirmesi — yoksa kural motoru kullanılır
+dotnet user-secrets set "Gemini:ApiKey" "<...>" --project TurkcellBank.API
 ```
+
+## Kredi Değerlendirme (AI) Notu
+- Kredi başvurusu **senkron + otomatik** karara bağlanır (admin onayı yok, devre dışı).
+- Değerlendirme motoru `Features/Loans/ILoanAiEvaluator` arkasında:
+  `GeminiLoanAiEvaluator` (Infrastructure/Ai, HTTP) veya `RuleBasedLoanAiEvaluator`
+  (Application, offline fallback). Seçim Infrastructure DI'da `Gemini:ApiKey`'e göre.
+- Benzer profil seçimi: repo gelir bandından aday havuzu çeker, `PeerMatcher`
+  çok-faktörlü benzerlikle en yakın 50'yi seçer. Fake referans nüfus `DbSeeder`'da
+  (30.000 kayıt) seed edilir.

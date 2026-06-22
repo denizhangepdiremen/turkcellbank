@@ -10,7 +10,7 @@ src/
 ├── pages/        # Screens (Login, Dashboard, Admin, ...) — each with its own .css
 ├── api/          # API service layer (axios calls, one file per backend module)
 ├── context/      # AuthContext (session)
-├── routes/       # ProtectedRoute (role-protected routing)
+├── routes/       # ProtectedRoute (role-protected) + GuestRoute (guest-only)
 └── lib/          # apiClient, types, validation (zod), helpers
 ```
 
@@ -49,6 +49,9 @@ src/
   `localStorage`.
 - Protected page: `<ProtectedRoute>`; if a role is required,
   `<ProtectedRoute requiredRole="Admin">`.
+- Auth pages (login/register/forgot) are wrapped in `<GuestRoute>` (logged-in users
+  are redirected to their panel). Auth transitions use
+  `navigate(..., { replace: true })` so back/forward can't reach the wrong page.
 
 ## UX Standards
 - Feedback: **toast** (react-hot-toast). Don't leave success/failure silent.
@@ -59,6 +62,12 @@ src/
 - **Responsive is required:** must work on mobile/narrow screens (account cards max
   2 columns, 1 on mobile; tables scroll horizontally). Test mobile + desktop.
 - Every page calls `usePageTitle('...')`.
+- The dashboard is **tabbed**: one section per tab (Hesaplarım / İşlemler / Krediler /
+  Kartlar / Ödemeler); users can add/remove tabs (pref saved in `localStorage`).
+  New sections go behind a tab — don't append to one long scroll.
+- A global `Footer` (mounted in `App.tsx`) renders on every page.
+- Loan apply flow: a "değerlendiriliyor" waiting modal → result modal (approve/reject
+  + AI reason); the decision is **automatic** (no admin approval step).
 
 ## Commands
 ```bash

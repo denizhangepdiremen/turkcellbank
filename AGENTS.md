@@ -18,12 +18,12 @@ TurkcellBank/
 └── frontend/   # React 19 + TypeScript + Vite
 ```
 
-Modules: Auth/profile, Accounts, Money transfer, Loans, Virtual POS, Bank cards,
-Admin panel (RBAC).
+Modules: Auth/profile, Accounts, Money transfer, **Loans (AI-driven automatic
+decision)**, Virtual POS, Bank cards, Admin panel (RBAC).
 
 ## Tech Stack
 - **Backend:** .NET 8, EF Core 8 + Npgsql (PostgreSQL), JWT + BCrypt,
-  FluentValidation, Swagger
+  FluentValidation, Swagger, Google Gemini (AI Studio) for loan evaluation
 - **Frontend:** React 19, TypeScript, Vite, React Router, TanStack Query, Axios,
   React Hook Form + Zod, Tailwind CSS, Storybook
 
@@ -52,6 +52,17 @@ Admin panel (RBAC).
 - Money: `decimal`, stored as `numeric(18,2)`. On the frontend use
   `Intl.NumberFormat('tr-TR', { currency: 'TRY' })`.
 - Dates are **UTC** (`DateTime.UtcNow`).
+
+### External AI / Integrations
+- External providers (e.g. Gemini) live **behind an Application-layer interface**
+  (`ILoanAiEvaluator`); the HTTP implementation is in Infrastructure. Always keep
+  a **deterministic fallback** (`RuleBasedLoanAiEvaluator`) so the app works
+  offline / without a key, and tests stay reproducible.
+- Provider keys (`Gemini:ApiKey`) are secrets → user-secrets / env, never in code.
+- The loan flow is **synchronous & automatic**: AI estimates a max limit; the
+  service deterministically subtracts existing debt and decides approve/reject.
+  Manual admin loan approve/reject is **kept but disabled** (future tier-based
+  approval hierarchy).
 
 ### Working Method
 - Advance large changes step by step, with user approval.
