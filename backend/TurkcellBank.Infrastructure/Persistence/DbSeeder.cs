@@ -60,15 +60,18 @@ public static class DbSeeder
         await db.SaveChangesAsync();
     }
 
-    /// <summary>Kredi limiti tahmini için ~300 fake referans kaydı (deterministik).</summary>
+    // Referans nüfus büyüklüğü (fazla veri = daha isabetli limit tahmini).
+    private const int ReferenceRecordCount = 30000;
+
+    /// <summary>Kredi limiti tahmini için fake referans kayıtları (deterministik).</summary>
     private static async Task SeedReferenceCreditRecordsAsync(AppDbContext db)
     {
         if (await db.ReferenceCreditRecords.AnyAsync()) return;
 
         var rng = new Random(20260622); // sabit tohum -> deterministik veri
-        var records = new List<ReferenceCreditRecord>(300);
+        var records = new List<ReferenceCreditRecord>(ReferenceRecordCount);
 
-        for (var i = 0; i < 300; i++)
+        for (var i = 0; i < ReferenceRecordCount; i++)
         {
             // Aylık net gelir: ~25.000 - 200.000 TL
             var income = Math.Round(25000m + (decimal)rng.NextDouble() * 175000m, 2);
@@ -106,8 +109,17 @@ public static class DbSeeder
             });
         }
 
-        db.ReferenceCreditRecords.AddRange(records);
-        await db.SaveChangesAsync();
+        // 30k kayıt için değişiklik takibini geçici kapat (toplu insert hızlanır)
+        db.ChangeTracker.AutoDetectChangesEnabled = false;
+        try
+        {
+            db.ReferenceCreditRecords.AddRange(records);
+            await db.SaveChangesAsync();
+        }
+        finally
+        {
+            db.ChangeTracker.AutoDetectChangesEnabled = true;
+        }
     }
 
     /// <summary>
