@@ -7,11 +7,13 @@ import { AdminPanel } from './pages/Admin'
 import { NotFound } from './pages/NotFound'
 import { ProtectedRoute } from './routes/ProtectedRoute'
 import { GuestRoute } from './routes/GuestRoute'
+import { Footer } from './components/Footer'
 
 function App() {
-  // Uygulamanın sayfa yönlendirmeleri.
+  // Uygulamanın sayfa yönlendirmeleri. Footer her sayfanın altında görünür.
   return (
-    <Routes>
+    <div className="app-shell">
+      <Routes>
       <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
       <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
       <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
@@ -37,7 +39,9 @@ function App() {
       <Route path="/" element={<Navigate to="/login" replace />} />
       {/* Tanımsız adresler -> 404 sayfası */}
       <Route path="*" element={<NotFound />} />
-    </Routes>
+      </Routes>
+      <Footer />
+    </div>
   )
 }
 

@@ -6,20 +6,20 @@
   background-color: #f3f4f6; /* gray-100 */
 }
 
-/* Üst bar */
+/* Üst bar — marka rengi (indigo). Sayfanın geri kalanı beyaz/gri kalır. */
 .dashboard-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 1rem 2rem;
-  background-color: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
+  background-color: #4f46e5; /* indigo-600 — marka kimliği */
+  border-bottom: 1px solid #4338ca; /* indigo-700 */
 }
 
 .dashboard-brand {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #4f46e5; /* indigo-600 */
+  color: #ffffff;
 }
 
 .dashboard-user {
@@ -30,7 +30,7 @@
 
 .dashboard-username {
   font-size: 0.9rem;
-  color: #374151;
+  color: #ffffff;
   font-weight: 500;
 }
 
@@ -291,6 +291,69 @@
   margin-bottom: 0.75rem;
   font-size: 0.9rem;
   color: #111827;
+}
+
+/* Bölüm sekmeleri (Garanti benzeri üst menü) */
+.dashboard-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin: 1.25rem 0 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  overflow-x: auto;
+  position: sticky;
+  top: 0;
+  background-color: #f3f4f6; /* sayfa arkaplanı (gray-100) — içerik altından görünmesin */
+  z-index: 5;
+}
+
+.dashboard-tab {
+  padding: 0.65rem 1.1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.dashboard-tab:hover {
+  color: #111827;
+}
+
+.dashboard-tab.active {
+  color: #4f46e5; /* indigo-600 */
+  border-bottom-color: #4f46e5;
+}
+
+/* Sekme düzenle butonu (çubuğun sağ ucunda) */
+.dashboard-tab-edit {
+  margin-left: auto;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dashboard-tab-edit:hover {
+  color: #4f46e5;
+}
+
+/* Sekme düzenleme modalı içeriği */
+.dashboard-tab-edit-hint {
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.dashboard-tab-edit-row {
+  padding: 0.35rem 0;
 }
 
 /* Kredi başvuru formu: 2 sütun (dar ekranda tek sütuna iner) */

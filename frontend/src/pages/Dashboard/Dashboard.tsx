@@ -12,6 +12,7 @@ import { Spinner } from '../../components/Spinner'
 import { Skeleton } from '../../components/Skeleton'
 import { Alert } from '../../components/Alert'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { Checkbox } from '../../components/Checkbox'
 import { useAuth } from '../../context/AuthContext'
 import { getAccounts, createAccount, closeAccount } from '../../api/accountApi'
 import { updateProfile } from '../../api/authApi'
@@ -84,11 +85,59 @@ function ListSkeleton() {
   )
 }
 
+// Garanti gibi: üstte sekmeler, tek seferde tek bölüm görünür (aşağı kaydırma derdi yok)
+const DASHBOARD_TABS = [
+  { id: 'accounts', label: 'Hesaplarım' },
+  { id: 'transactions', label: 'İşlemler' },
+  { id: 'loans', label: 'Krediler' },
+  { id: 'cards', label: 'Kartlar' },
+  { id: 'payments', label: 'Ödemeler' },
+] as const
+type DashboardTab = (typeof DASHBOARD_TABS)[number]['id']
+
+// Kullanıcının görmek istediği sekmeler localStorage'da saklanır (kişiselleştirme)
+const TABS_STORAGE_KEY = 'turkcellbank_dashboard_tabs'
+
 export function Dashboard() {
   usePageTitle('Panel')
   const navigate = useNavigate()
   const { user, logout, updateUser } = useAuth()
   const queryClient = useQueryClient()
+
+  // Aktif sekme — varsayılan: Hesaplarım
+  const [activeTab, setActiveTab] = useState<DashboardTab>('accounts')
+
+  // Görünür sekmeler (kullanıcı ekleyip çıkarabilir; localStorage'da kalıcı)
+  const [visibleTabs, setVisibleTabs] = useState<DashboardTab[]>(() => {
+    try {
+      const raw = localStorage.getItem(TABS_STORAGE_KEY)
+      if (raw) {
+        const arr = JSON.parse(raw) as DashboardTab[]
+        const valid = arr.filter((id) => DASHBOARD_TABS.some((t) => t.id === id))
+        if (valid.length > 0) return valid
+      }
+    } catch {
+      /* bozuk kayıt -> varsayılana dön */
+    }
+    return DASHBOARD_TABS.map((t) => t.id)
+  })
+  const [tabsEditOpen, setTabsEditOpen] = useState(false)
+
+  // Tercihi kaydet; aktif sekme gizlendiyse ilk görünür sekmeye geç
+  useEffect(() => {
+    localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(visibleTabs))
+    if (!visibleTabs.includes(activeTab)) setActiveTab(visibleTabs[0])
+  }, [visibleTabs, activeTab])
+
+  function toggleTab(id: DashboardTab) {
+    setVisibleTabs((prev) => {
+      if (prev.includes(id)) {
+        if (prev.length === 1) return prev // en az bir bölüm görünür kalsın
+        return prev.filter((x) => x !== id)
+      }
+      return [...prev, id]
+    })
+  }
 
   // Profil modalı
   const [profileOpen, setProfileOpen] = useState(false)
@@ -390,10 +439,20 @@ export function Dashboard() {
         <span className="dashboard-brand">TurkcellBank</span>
         <div className="dashboard-user">
           <span className="dashboard-username">{user?.fullName}</span>
-          <Button variant="ghost" size="sm" onClick={openProfile}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-white hover:bg-white/15"
+            onClick={openProfile}
+          >
             Profil
           </Button>
-          <Button variant="outline" size="sm" onClick={handleLogout}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-white/70 text-white hover:bg-white/15"
+            onClick={handleLogout}
+          >
             Çıkış
           </Button>
         </div>
@@ -407,6 +466,56 @@ export function Dashboard() {
           <p className="dashboard-summary-value">{formatTL(totalBalance)}</p>
         </div>
 
+        {/* Bölüm sekmeleri — tıklanınca ilgili bölüm gösterilir (kaydırma yok) */}
+        <nav className="dashboard-tabs">
+          {DASHBOARD_TABS.filter((t) => visibleTabs.includes(t.id)).map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={activeTab === t.id ? 'dashboard-tab active' : 'dashboard-tab'}
+              onClick={() => setActiveTab(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="dashboard-tab-edit"
+            onClick={() => setTabsEditOpen(true)}
+            aria-label="Sekmeleri düzenle"
+            title="Sekmeleri düzenle"
+          >
+            ✎ Düzenle
+          </button>
+        </nav>
+
+        {/* Sekme düzenleme modalı — bölüm ekle/çıkar */}
+        <Modal
+          open={tabsEditOpen}
+          onClose={() => setTabsEditOpen(false)}
+          title="Sekmeleri Düzenle"
+          footer={
+            <Button variant="primary" onClick={() => setTabsEditOpen(false)}>
+              Tamam
+            </Button>
+          }
+        >
+          <p className="dashboard-tab-edit-hint">
+            Panelde görmek istediğin bölümleri seç:
+          </p>
+          {DASHBOARD_TABS.map((t) => (
+            <div key={t.id} className="dashboard-tab-edit-row">
+              <Checkbox
+                label={t.label}
+                checked={visibleTabs.includes(t.id)}
+                onChange={() => toggleTab(t.id)}
+              />
+            </div>
+          ))}
+        </Modal>
+
+        {activeTab === 'accounts' && (
+          <>
         <div className="dashboard-section-head">
           <h2 className="dashboard-section-title">Hesaplarım</h2>
           <Button size="sm" variant="primary" onClick={() => setCreateOpen(true)}>
@@ -477,7 +586,11 @@ export function Dashboard() {
             ))}
           </div>
         )}
+          </>
+        )}
 
+        {activeTab === 'transactions' && (
+          <>
         {/* İşlem geçmişi */}
         <div className="dashboard-history-head">
           <h2 className="dashboard-section-title">Son İşlemler</h2>
@@ -535,7 +648,11 @@ export function Dashboard() {
             )}
           </CardContent>
         </Card>
+          </>
+        )}
 
+        {activeTab === 'loans' && (
+          <>
         {/* Krediler */}
         <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
           <h2 className="dashboard-section-title">Kredilerim</h2>
@@ -587,7 +704,11 @@ export function Dashboard() {
             )}
           </CardContent>
         </Card>
+          </>
+        )}
 
+        {activeTab === 'cards' && (
+          <>
         {/* Kartlarım */}
         <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
           <h2 className="dashboard-section-title">Kartlarım</h2>
@@ -621,7 +742,11 @@ export function Dashboard() {
             )}
           </CardContent>
         </Card>
+          </>
+        )}
 
+        {activeTab === 'payments' && (
+          <>
         {/* Sanal POS — Ödemeler */}
         <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
           <h2 className="dashboard-section-title">Ödemelerim</h2>
@@ -669,6 +794,8 @@ export function Dashboard() {
             )}
           </CardContent>
         </Card>
+          </>
+        )}
       </div>
 
       {/* --- Hesap açma modalı --- */}
