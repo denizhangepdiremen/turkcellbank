@@ -2,7 +2,14 @@ import { apiClient } from '../lib/apiClient'
 import type { ApiResponse, Loan } from '../lib/types'
 
 export interface LoanApplyPayload {
+  nationalId: string
+  age: number
+  maritalStatus: 'Single' | 'Married'
+  childrenCount: number
+  housingStatus: 'Tenant' | 'Owner'
   income: number
+  monthlyExpenses: number
+  employmentMonths: number
   profession: string
   amount: number
   termMonths: number

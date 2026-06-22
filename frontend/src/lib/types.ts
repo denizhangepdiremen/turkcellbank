@@ -80,6 +80,9 @@ export interface PaymentPlan {
   installments: Installment[]
 }
 
+export type MaritalStatus = 'Single' | 'Married'
+export type HousingStatus = 'Tenant' | 'Owner'
+
 export interface Loan {
   id: string
   income: number
@@ -88,6 +91,11 @@ export interface Loan {
   termMonths: number
   status: LoanStatus
   score: number
+  maxLimit: number
+  existingDebt: number
+  netLimit: number
+  aiReason: string
+  decidedBy: string
   createdAt: string
   decidedAt: string | null
   paymentPlan: PaymentPlan | null
@@ -103,6 +111,10 @@ export interface AdminLoan {
   termMonths: number
   status: LoanStatus
   score: number
+  maxLimit: number
+  netLimit: number
+  aiReason: string
+  decidedBy: string
   createdAt: string
   decidedAt: string | null
 }

@@ -25,6 +25,7 @@ import { digitsOnly } from '../../lib/format'
 import type {
   AccountType,
   CardStatus,
+  Loan,
   LoanStatus,
   PaymentStatus,
   Transaction,
@@ -204,33 +205,69 @@ export function Dashboard() {
   const loans = loansData?.data ?? []
 
   const [loanOpen, setLoanOpen] = useState(false)
+  const [loanNationalId, setLoanNationalId] = useState('')
+  const [loanAge, setLoanAge] = useState('')
+  const [loanMarital, setLoanMarital] = useState<'Single' | 'Married'>('Single')
+  const [loanChildren, setLoanChildren] = useState('0')
+  const [loanHousing, setLoanHousing] = useState<'Tenant' | 'Owner'>('Tenant')
   const [loanIncome, setLoanIncome] = useState('')
+  const [loanExpenses, setLoanExpenses] = useState('')
+  const [loanEmployment, setLoanEmployment] = useState('')
   const [loanProfession, setLoanProfession] = useState('')
   const [loanAmount, setLoanAmount] = useState('')
   const [loanTerm, setLoanTerm] = useState('12')
 
+  // Başvuru sonucu (onay/red + gerekçe) modalı. Kredilerim'den de açılır.
+  const [resultLoan, setResultLoan] = useState<Loan | null>(null)
+
   const applyMutation = useMutation({
     mutationFn: () =>
       applyLoan({
+        nationalId: loanNationalId.trim(),
+        age: Number(loanAge),
+        maritalStatus: loanMarital,
+        childrenCount: Number(loanChildren),
+        housingStatus: loanHousing,
         income: Number(loanIncome),
+        monthlyExpenses: Number(loanExpenses),
+        employmentMonths: Number(loanEmployment),
         profession: loanProfession,
         amount: Number(loanAmount),
         termMonths: Number(loanTerm),
       }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['loans'] })
-      setLoanOpen(false)
-      toast.success('Kredi başvurunuz alındı.')
+      if (res.data) setResultLoan(res.data) // sonuç modalını aç
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Başvuru yapılamadı.')),
   })
 
   function openLoanApply() {
+    setLoanNationalId('')
+    setLoanAge('')
+    setLoanMarital('Single')
+    setLoanChildren('0')
+    setLoanHousing('Tenant')
     setLoanIncome('')
+    setLoanExpenses('')
+    setLoanEmployment('')
     setLoanProfession('')
     setLoanAmount('')
     setLoanTerm('12')
     setLoanOpen(true)
+  }
+
+  function submitLoan() {
+    if (!/^\d{11}$/.test(loanNationalId.trim())) {
+      toast.error('TC kimlik numarası 11 haneli olmalı.')
+      return
+    }
+    if (!loanAge || !loanIncome || !loanAmount || !loanProfession.trim()) {
+      toast.error('Lütfen zorunlu alanları doldurun.')
+      return
+    }
+    setLoanOpen(false) // formu kapat -> "değerlendiriliyor" ekranı görünsün
+    applyMutation.mutate()
   }
 
   // Ödeme planı modalı (onaylı kredi detayı)
@@ -528,6 +565,13 @@ export function Dashboard() {
                     <Badge variant={loanBadgeVariant(loan.status)}>
                       {loanLabel(loan.status)}
                     </Badge>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setResultLoan(loan)}
+                    >
+                      Gerekçe
+                    </Button>
                     {loan.status === 'Approved' && (
                       <Button
                         size="sm"
@@ -774,16 +818,63 @@ export function Dashboard() {
             <Button variant="ghost" onClick={() => setLoanOpen(false)}>
               İptal
             </Button>
-            <Button
-              variant="primary"
-              loading={applyMutation.isPending}
-              onClick={() => applyMutation.mutate()}
-            >
+            <Button variant="primary" onClick={submitLoan}>
               Başvur
             </Button>
           </>
         }
       >
+        <div className="dashboard-loan-grid">
+        <div className="dashboard-modal-field">
+          <Input
+            label="TC Kimlik No"
+            inputMode="numeric"
+            maxLength={11}
+            placeholder="11 haneli"
+            value={loanNationalId}
+            onChange={(e) => setLoanNationalId(digitsOnly(e.target.value))}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Input
+            label="Yaş"
+            type="number"
+            placeholder="Örn. 35"
+            value={loanAge}
+            onChange={(e) => setLoanAge(e.target.value)}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Select
+            label="Medeni Hal"
+            value={loanMarital}
+            onChange={(e) => setLoanMarital(e.target.value as 'Single' | 'Married')}
+            options={[
+              { value: 'Single', label: 'Bekar' },
+              { value: 'Married', label: 'Evli' },
+            ]}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Input
+            label="Çocuk Sayısı"
+            type="number"
+            placeholder="0"
+            value={loanChildren}
+            onChange={(e) => setLoanChildren(e.target.value)}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Select
+            label="Konut Durumu"
+            value={loanHousing}
+            onChange={(e) => setLoanHousing(e.target.value as 'Tenant' | 'Owner')}
+            options={[
+              { value: 'Tenant', label: 'Kiracı' },
+              { value: 'Owner', label: 'Ev sahibi' },
+            ]}
+          />
+        </div>
         <div className="dashboard-modal-field">
           <Input
             label="Aylık Gelir (₺)"
@@ -791,6 +882,24 @@ export function Dashboard() {
             placeholder="Örn. 45000"
             value={loanIncome}
             onChange={(e) => setLoanIncome(e.target.value)}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Input
+            label="Aylık Gider (₺)"
+            type="number"
+            placeholder="Örn. 20000"
+            value={loanExpenses}
+            onChange={(e) => setLoanExpenses(e.target.value)}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Input
+            label="Çalışma Kıdemi (ay)"
+            type="number"
+            placeholder="Örn. 36"
+            value={loanEmployment}
+            onChange={(e) => setLoanEmployment(e.target.value)}
           />
         </div>
         <div className="dashboard-modal-field">
@@ -819,6 +928,68 @@ export function Dashboard() {
             onChange={(e) => setLoanTerm(e.target.value)}
           />
         </div>
+        </div>
+      </Modal>
+
+      {/* --- "Değerlendiriliyor" bekleme ekranı --- */}
+      <Modal
+        open={applyMutation.isPending}
+        onClose={() => {}}
+        title="Başvurunuz değerlendiriliyor"
+      >
+        <div className="dashboard-state dashboard-loan-evaluating">
+          <Spinner />
+          <p>Başvurunuz yapay zeka tarafından değerlendiriliyor, lütfen bekleyin…</p>
+        </div>
+      </Modal>
+
+      {/* --- Başvuru sonucu (onay/red + gerekçe) modalı --- */}
+      <Modal
+        open={!!resultLoan}
+        onClose={() => setResultLoan(null)}
+        title={
+          resultLoan?.status === 'Approved'
+            ? 'Başvurunuz Onaylandı'
+            : resultLoan?.status === 'Rejected'
+              ? 'Başvurunuz Reddedildi'
+              : 'Başvuru Sonucu'
+        }
+        footer={
+          <>
+            {resultLoan?.status === 'Approved' && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  const id = resultLoan.id
+                  setResultLoan(null)
+                  setPlanLoanId(id)
+                }}
+              >
+                Ödeme Planı
+              </Button>
+            )}
+            <Button variant="primary" onClick={() => setResultLoan(null)}>
+              Kapat
+            </Button>
+          </>
+        }
+      >
+        {resultLoan && (
+          <>
+            <div className="dashboard-loan-result-badge">
+              <Badge variant={loanBadgeVariant(resultLoan.status)}>
+                {loanLabel(resultLoan.status)}
+              </Badge>
+            </div>
+            <div className="dashboard-plan-summary">
+              Talep: <strong>{formatTL(resultLoan.amount)}</strong>
+              {' · '}Maks. limit: <strong>{formatTL(resultLoan.maxLimit)}</strong>
+              {' · '}Mevcut borç: <strong>{formatTL(resultLoan.existingDebt)}</strong>
+              {' · '}Net limit: <strong>{formatTL(resultLoan.netLimit)}</strong>
+            </div>
+            <p className="dashboard-loan-reason">{resultLoan.aiReason}</p>
+          </>
+        )}
       </Modal>
 
       {/* --- Ödeme planı modalı --- */}

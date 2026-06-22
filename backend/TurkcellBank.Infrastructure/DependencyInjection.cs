@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TurkcellBank.Application.Common.Interfaces;
 using TurkcellBank.Application.Features.Loans;
+using TurkcellBank.Infrastructure.Ai;
 using TurkcellBank.Infrastructure.Persistence;
 using TurkcellBank.Infrastructure.Persistence.Repositories;
 using TurkcellBank.Infrastructure.Security;
@@ -40,10 +41,21 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, JwtTokenService>();
 
-        // Kredi değerlendirme motoru. Şimdilik deterministik kural motoru
-        // (offline; API key gerekmez, testler tekrarlanabilir). Aşama 2'de
-        // Gemini:ApiKey yapılandırılınca GeminiLoanAiEvaluator'a geçilecek.
-        services.AddScoped<ILoanAiEvaluator, RuleBasedLoanAiEvaluator>();
+        // Kredi değerlendirme motoru:
+        //  - Gemini:ApiKey yapılandırılmışsa gerçek LLM (GeminiLoanAiEvaluator),
+        //    hata/zaman aşımında kural motoruna düşer.
+        //  - Key yoksa deterministik kural motoru (offline; testler için).
+        var geminiKey = configuration["Gemini:ApiKey"];
+        if (!string.IsNullOrWhiteSpace(geminiKey))
+        {
+            services.AddScoped<RuleBasedLoanAiEvaluator>(); // Gemini fallback'i
+            services.AddHttpClient<ILoanAiEvaluator, GeminiLoanAiEvaluator>(client =>
+                client.Timeout = TimeSpan.FromSeconds(20));
+        }
+        else
+        {
+            services.AddScoped<ILoanAiEvaluator, RuleBasedLoanAiEvaluator>();
+        }
 
         return services;
     }

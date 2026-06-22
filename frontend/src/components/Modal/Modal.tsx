@@ -56,17 +56,19 @@ export function Modal({
       role="dialog"
       aria-modal="true"
     >
-      {/* Asıl kutu. İçine tıklama overlay'e gitmesin diye stopPropagation. */}
+      {/* Asıl kutu. İçine tıklama overlay'e gitmesin diye stopPropagation.
+          Yüksek formlar için: kutu en fazla %90 ekran yüksekliği; başlık ve
+          footer sabit kalır, sadece gövde (children) dikeyde kaydırılır. */}
       <div
         className={cn(
-          'w-full max-w-md rounded-xl bg-white shadow-xl',
+          'flex max-h-[90vh] w-full max-w-md flex-col rounded-xl bg-white shadow-xl',
           className,
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Başlık satırı + kapatma (X) butonu */}
+        {/* Başlık satırı + kapatma (X) butonu — sabit */}
         {title && (
-          <div className="flex items-center justify-between border-b border-gray-200 p-5">
+          <div className="flex shrink-0 items-center justify-between border-b border-gray-200 p-5">
             <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
             <button
               type="button"
@@ -89,10 +91,12 @@ export function Modal({
           </div>
         )}
 
-        <div className="p-5">{children}</div>
+        {/* Gövde — taşarsa kaydırılır */}
+        <div className="flex-1 overflow-y-auto p-5">{children}</div>
 
+        {/* Footer (aksiyonlar) — sabit, her zaman görünür */}
         {footer && (
-          <div className="flex justify-end gap-2 border-t border-gray-200 p-5">
+          <div className="flex shrink-0 justify-end gap-2 border-t border-gray-200 p-5">
             {footer}
           </div>
         )}

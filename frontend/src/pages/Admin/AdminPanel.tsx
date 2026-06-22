@@ -12,8 +12,6 @@ import { useAuth } from '../../context/AuthContext'
 import {
   getUsers,
   getLoans,
-  approveLoan,
-  rejectLoan,
   getPayments,
   refundPayment,
   getCards,
@@ -60,7 +58,6 @@ export function AdminPanel() {
   const queryClient = useQueryClient()
 
   // Onay diyaloğu durumları
-  const [rejectLoanId, setRejectLoanId] = useState<string | null>(null)
   const [refundPaymentId, setRefundPaymentId] = useState<string | null>(null)
   const [rejectCardId, setRejectCardId] = useState<string | null>(null)
 
@@ -93,26 +90,8 @@ export function AdminPanel() {
   const { data: loansData, isLoading: loansLoading, isError: loansError } =
     useQuery({ queryKey: ['admin-loans'], queryFn: getLoans })
   const loans = loansData?.data ?? []
-  const refreshLoans = () =>
-    queryClient.invalidateQueries({ queryKey: ['admin-loans'] })
-
-  const approveMutation = useMutation({
-    mutationFn: (id: string) => approveLoan(id),
-    onSuccess: () => {
-      refreshLoans()
-      toast.success('Başvuru onaylandı.')
-    },
-    onError: (err) => toast.error(getApiErrorMessage(err, 'İşlem başarısız.')),
-  })
-  const rejectMutation = useMutation({
-    mutationFn: (id: string) => rejectLoan(id),
-    onSuccess: () => {
-      refreshLoans()
-      setRejectLoanId(null)
-      toast.success('Başvuru reddedildi.')
-    },
-    onError: (err) => toast.error(getApiErrorMessage(err, 'İşlem başarısız.')),
-  })
+  // Not: Krediler başvuru anında AI/kural motoruyla otomatik karara bağlanır.
+  // Admin onay/red yetkisi devre dışı; tablo salt-okunur (audit görünümü).
 
   // --- Ödemeler ---
   const { data: paymentsData, isLoading: paymentsLoading, isError: paymentsError } =
@@ -251,8 +230,10 @@ export function AdminPanel() {
                       <th>Vade</th>
                       <th>Gelir</th>
                       <th>Skor</th>
+                      <th>Maks. Limit</th>
+                      <th>Net Limit</th>
                       <th>Durum</th>
-                      <th>İşlem</th>
+                      <th>Karar / Gerekçe</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -269,36 +250,21 @@ export function AdminPanel() {
                         <td>{loan.termMonths} ay</td>
                         <td>{formatTL(loan.income)}</td>
                         <td>{loan.score}</td>
+                        <td>{formatTL(loan.maxLimit)}</td>
+                        <td>{formatTL(loan.netLimit)}</td>
                         <td>
                           <Badge variant={loanBadgeVariant(loan.status)}>
                             {loanLabel(loan.status)}
                           </Badge>
                         </td>
-                        <td>
-                          {loan.status === 'Pending' ? (
-                            <div className="admin-actions">
-                              <Button
-                                size="sm"
-                                variant="primary"
-                                loading={
-                                  approveMutation.isPending &&
-                                  approveMutation.variables === loan.id
-                                }
-                                onClick={() => approveMutation.mutate(loan.id)}
-                              >
-                                Onayla
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => setRejectLoanId(loan.id)}
-                              >
-                                Reddet
-                              </Button>
-                            </div>
-                          ) : (
-                            <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>—</span>
-                          )}
+                        <td style={{ maxWidth: 320 }}>
+                          <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                            {loan.decidedBy || 'AI'}
+                          </span>
+                          <br />
+                          <span style={{ fontSize: '0.8rem', color: '#374151' }}>
+                            {loan.aiReason}
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -406,16 +372,6 @@ export function AdminPanel() {
       </div>
 
       {/* --- Onay diyalogları --- */}
-      <ConfirmDialog
-        open={!!rejectLoanId}
-        title="Başvuruyu Reddet"
-        message="Bu kredi başvurusunu reddetmek istediğinize emin misiniz?"
-        confirmLabel="Reddet"
-        confirmVariant="destructive"
-        loading={rejectMutation.isPending}
-        onConfirm={() => rejectLoanId && rejectMutation.mutate(rejectLoanId)}
-        onClose={() => setRejectLoanId(null)}
-      />
       <ConfirmDialog
         open={!!refundPaymentId}
         title="Ödemeyi İade Et"

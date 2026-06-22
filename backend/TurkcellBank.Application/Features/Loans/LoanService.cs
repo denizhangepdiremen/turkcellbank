@@ -54,8 +54,9 @@ public class LoanService : ILoanService
             await _users.SaveChangesAsync();
         }
 
-        // 1) Referans nüfustan benzer profilleri çek (değerlendirme bağlamı)
-        var peers = await _reference.GetSimilarByIncomeAsync(request.Income, 50);
+        // 1) Referans nüfustan benzer profilleri çek (değerlendirme bağlamı).
+        //    25 ile sınırlı: AI prompt'unu küçük tutar (token/kota tasarrufu).
+        var peers = await _reference.GetSimilarByIncomeAsync(request.Income, 25);
         var peerDtos = peers
             .Select(p => new LoanPeer(
                 p.Age, p.MonthlyIncome, p.MonthlyExpenses, p.MaritalStatus,
