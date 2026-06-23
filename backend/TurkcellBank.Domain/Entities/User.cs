@@ -23,6 +23,17 @@ public class User
     // sonraki başvurularda tekrar kullanılır. Kayıt anında boş olabilir.
     public string? NationalId { get; set; }
 
+    // --- Personel alanları (sadece banka çalışanları için doldurulur) ---
+    // Müşteri ve admin için bunlar boştur. Personel bankacılık ürünü tutmaz.
+
+    // Bağlı şube (ŞubeÇalışanı/ŞubeMüdürü için). İl müdürü/direktör için boştur.
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
+
+    // Personelin görev ili (ŞubeÇalışanı/ŞubeMüdürü/İlMüdürü için doldurulur).
+    // İl müdürü görünürlüğü ve raporlamada bu alan kullanılır.
+    public string? City { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // İlişki: bir kullanıcının birden çok hesabı olabilir.

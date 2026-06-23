@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     }
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<Branch> Branches => Set<Branch>();
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<LoanApplication> LoanApplications => Set<LoanApplication>();
@@ -42,8 +43,31 @@ public class AppDbContext : DbContext
             // TC kimlik no (opsiyonel; kredi başvurusunda doldurulur)
             entity.Property(u => u.NationalId).HasMaxLength(11);
 
-            // enum'u veritabanında okunabilir metin olarak sakla ("Customer"/"Admin")
-            entity.Property(u => u.Role).HasConversion<string>().HasMaxLength(20);
+            // enum'u veritabanında okunabilir metin olarak sakla ("Customer", "BranchManager"...)
+            entity.Property(u => u.Role).HasConversion<string>().HasMaxLength(30);
+
+            // Personel görev ili (opsiyonel; sadece personelde dolu)
+            entity.Property(u => u.City).HasMaxLength(80);
+
+            // Personelin bağlı olduğu şube (opsiyonel). Şube silinince personel
+            // silinmesin (Restrict) — personel verisi şubeden bağımsız korunur.
+            entity.HasOne(u => u.Branch)
+                .WithMany(b => b.Staff)
+                .HasForeignKey(u => u.BranchId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // --- Branch (şube) tablosu kuralları ---
+        modelBuilder.Entity<Branch>(entity =>
+        {
+            entity.HasKey(b => b.Id);
+            entity.Property(b => b.Code).IsRequired().HasMaxLength(20);
+            entity.HasIndex(b => b.Code).IsUnique(); // şube kodu benzersiz
+            entity.Property(b => b.Name).IsRequired().HasMaxLength(150);
+            entity.Property(b => b.City).IsRequired().HasMaxLength(80);
+
+            // İl bazlı sorgu (il müdürü kapsamı) için index
+            entity.HasIndex(b => b.City);
         });
 
         // --- Account tablosu kuralları ---

@@ -17,7 +17,7 @@ public class AdminService : IAdminService
         var users = await _users.GetAllAsync();
         // Hassas alanlar (PasswordHash) dışarı verilmez — güvenli DTO
         return users
-            .Select(u => new UserDto(u.Id, u.FullName, u.Email, u.Role.ToString()))
+            .Select(u => new UserDto(u.Id, u.FullName, u.Email, u.Role.ToString(), u.City))
             .ToList();
     }
 }

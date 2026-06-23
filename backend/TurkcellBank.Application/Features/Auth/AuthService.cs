@@ -74,7 +74,7 @@ public class AuthService : IAuthService
         await _users.AddAsync(user);
 
         // 5) Güvenli DTO dön (hash vb. hassas veri dışarı çıkmaz)
-        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString());
+        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City);
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request)
@@ -99,7 +99,7 @@ public class AuthService : IAuthService
 
         // 3) Token üret ve cevabı oluştur
         var (token, expiresAt) = _tokenService.GenerateToken(user);
-        var userDto = new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString());
+        var userDto = new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City);
 
         return new AuthResponse(token, expiresAt, userDto);
     }
@@ -108,7 +108,7 @@ public class AuthService : IAuthService
     {
         var user = await _users.GetByIdAsync(_currentUser.UserId)
             ?? throw new NotFoundException("Kullanıcı bulunamadı.");
-        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString());
+        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City);
     }
 
     public async Task<UserDto> UpdateProfileAsync(UpdateProfileRequest request)
@@ -126,6 +126,6 @@ public class AuthService : IAuthService
         user.FullName = request.FullName.Trim();
         await _users.SaveChangesAsync();
 
-        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString());
+        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City);
     }
 }

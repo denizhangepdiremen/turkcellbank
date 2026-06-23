@@ -28,6 +28,7 @@ public static class DbSeeder
         IConfiguration configuration)
     {
         await SeedAdminAsync(db, passwordHasher, configuration);
+        await SeedBranchesAndStaffAsync(db, passwordHasher, configuration);
         await SeedReferenceCreditRecordsAsync(db);
         await SeedExternalBankLoansAsync(db);
     }
@@ -57,6 +58,110 @@ public static class DbSeeder
         };
 
         db.Users.Add(admin);
+        await db.SaveChangesAsync();
+    }
+
+    // Demo organizasyon: 3 il, her ilde 3 ilçe/şube = toplam 9 şube.
+    // (citySlug ile email-dostu, Türkçe karaktersiz adresler üretilir.)
+    private static readonly (string City, string CitySlug, (string District, string Slug)[] Districts)[] Org =
+    {
+        ("İstanbul", "istanbul", new[] { ("Kadıköy", "kadikoy"), ("Şişli", "sisli"), ("Beşiktaş", "besiktas") }),
+        ("Ankara", "ankara", new[] { ("Çankaya", "cankaya"), ("Keçiören", "kecioren"), ("Yenimahalle", "yenimahalle") }),
+        ("İzmir", "izmir", new[] { ("Konak", "konak"), ("Bornova", "bornova"), ("Karşıyaka", "karsiyaka") }),
+    };
+
+    /// <summary>
+    /// Banka organizasyonunu seed'ler: 9 şube + personel hiyerarşisi
+    /// (her şubede 1 şube müdürü + 1-3 çalışan, her ilde 1 il müdürü, 1 direktör).
+    /// Personel şifresi config'den (StaffSeed:Password) okunur; yoksa sessizce atlanır
+    /// (admin seed'i gibi — sır repoya girmez). Şubeler zaten varsa hiçbir şey yapmaz.
+    /// </summary>
+    private static async Task SeedBranchesAndStaffAsync(
+        AppDbContext db, IPasswordHasher passwordHasher, IConfiguration configuration)
+    {
+        if (await db.Branches.AnyAsync()) return;
+
+        var staffPassword = configuration["StaffSeed:Password"];
+        if (string.IsNullOrWhiteSpace(staffPassword)) return; // şifre yoksa personel seed'i yapma
+
+        var passwordHash = passwordHasher.Hash(staffPassword);
+        var rng = new Random(20260623); // sabit tohum -> deterministik personel sayısı
+        var branches = new List<Branch>();
+        var staff = new List<User>();
+
+        var branchNo = 0;
+        foreach (var (city, citySlug, districts) in Org)
+        {
+            foreach (var (district, slug) in districts)
+            {
+                branchNo++;
+                var branch = new Branch
+                {
+                    Id = Guid.NewGuid(),
+                    Code = $"SB{branchNo:D3}",
+                    Name = $"{city} {district} Şubesi",
+                    City = city,
+                    CreatedAt = DateTime.UtcNow,
+                };
+                branches.Add(branch);
+
+                // Şube müdürü (her şubede 1)
+                staff.Add(new User
+                {
+                    Id = Guid.NewGuid(),
+                    FullName = $"{district} Şube Müdürü",
+                    Email = $"mudur.{slug}@turkcellbank.com",
+                    PasswordHash = passwordHash,
+                    Role = UserRole.BranchManager,
+                    BranchId = branch.Id,
+                    City = city,
+                    CreatedAt = DateTime.UtcNow,
+                });
+
+                // Şube çalışanları (1-3 arası)
+                var employeeCount = rng.Next(1, 4);
+                for (var n = 1; n <= employeeCount; n++)
+                {
+                    staff.Add(new User
+                    {
+                        Id = Guid.NewGuid(),
+                        FullName = $"{district} Çalışan {n}",
+                        Email = $"calisan{n}.{slug}@turkcellbank.com",
+                        PasswordHash = passwordHash,
+                        Role = UserRole.BranchEmployee,
+                        BranchId = branch.Id,
+                        City = city,
+                        CreatedAt = DateTime.UtcNow,
+                    });
+                }
+            }
+
+            // İl müdürü (her ilde 1) — belirli bir şubeye bağlı değil, ile bağlı
+            staff.Add(new User
+            {
+                Id = Guid.NewGuid(),
+                FullName = $"{city} İl Müdürü",
+                Email = $"ilmudur.{citySlug}@turkcellbank.com",
+                PasswordHash = passwordHash,
+                Role = UserRole.ProvincialManager,
+                City = city,
+                CreatedAt = DateTime.UtcNow,
+            });
+        }
+
+        // Direktör (tüm banka) — il/şube bağı yok
+        staff.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            FullName = "Genel Direktör",
+            Email = "direktor@turkcellbank.com",
+            PasswordHash = passwordHash,
+            Role = UserRole.Director,
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        db.Branches.AddRange(branches);
+        db.Users.AddRange(staff);
         await db.SaveChangesAsync();
     }
 
