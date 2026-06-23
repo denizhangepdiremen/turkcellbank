@@ -1,21 +1,25 @@
 import { usePageTitle } from '../../lib/usePageTitle'
 import { StaffShell, ComingSoon } from '../staff/StaffShell'
+import { LoanApprovalQueue } from '../staff/LoanApprovalQueue'
 
 /**
- * Direktör paneli. Tüm bankayı görür; 100M TL üstü krediler onayına gelir
- * (Sprint 2 ve 4). Audit log ve genel raporlar Sprint 5'te.
+ * Direktör paneli. 100M TL üstü krediler onayına gelir; tüm bantları görüntüler.
+ * Global görünüm, raporlar ve audit log sonraki aşamalarda.
  */
 export function DirectorPanel() {
   usePageTitle('Direktör')
   return (
     <StaffShell
       title="Direktör Paneli"
-      subtitle="Tüm bankayı görüntüleyin ve en yüksek tutarlı kredileri onaylayın."
+      subtitle="100M TL üstü kredileri onaylayın; tüm bankayı görüntüleyin."
     >
+      <h2 className="staff-section-title">Kredi Onay Kuyruğu</h2>
+      <LoanApprovalQueue />
+
+      <h2 className="staff-section-title">Yakında</h2>
       <ComingSoon
-        lead="Bu panelden tüm bankayı denetleyecek ve en büyük kredileri onaylayacaksınız."
+        lead="Onay kuyruğunun yanında şu yetenekler eklenecek:"
         upcoming={[
-          'Kredi onay kuyruğu (100M TL üstü)',
           'İl müdürleri ve tüm banka görünümü',
           'Genel kredi ve performans raporları',
           'Denetim kaydı (audit log)',

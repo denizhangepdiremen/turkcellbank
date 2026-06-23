@@ -44,7 +44,13 @@ const PAGE_SIZE = 5
 const loanBadgeVariant = (s: LoanStatus) =>
   s === 'Approved' ? 'success' : s === 'Rejected' ? 'error' : 'warning'
 const loanLabel = (s: LoanStatus) =>
-  s === 'Approved' ? 'Onaylandı' : s === 'Rejected' ? 'Reddedildi' : 'Bekliyor'
+  s === 'Approved'
+    ? 'Onaylandı'
+    : s === 'Rejected'
+      ? 'Reddedildi'
+      : s === 'PendingApproval'
+        ? 'Onay bekliyor'
+        : 'Bekliyor'
 
 // Ödeme durumu -> rozet rengi / Türkçe etiket
 const paymentBadgeVariant = (s: PaymentStatus) =>
@@ -1079,7 +1085,9 @@ export function Dashboard() {
             ? 'Başvurunuz Onaylandı'
             : resultLoan?.status === 'Rejected'
               ? 'Başvurunuz Reddedildi'
-              : 'Başvuru Sonucu'
+              : resultLoan?.status === 'PendingApproval'
+                ? 'Başvurunuz Onaya Gönderildi'
+                : 'Başvuru Sonucu'
         }
         footer={
           <>
@@ -1115,6 +1123,11 @@ export function Dashboard() {
               {' · '}Net limit: <strong>{formatTL(resultLoan.netLimit)}</strong>
             </div>
             <p className="dashboard-loan-reason">{resultLoan.aiReason}</p>
+            {resultLoan.decisionNote && (
+              <p className="dashboard-loan-note">
+                <strong>Yetkili notu:</strong> {resultLoan.decisionNote}
+              </p>
+            )}
           </>
         )}
       </Modal>

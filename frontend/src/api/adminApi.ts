@@ -5,7 +5,6 @@ import type {
   AdminPayment,
   ApiResponse,
   Card,
-  Loan,
   Payment,
   User,
 } from '../lib/types'
@@ -16,26 +15,10 @@ export async function getUsers() {
   return data
 }
 
-// Tüm kredi başvuruları (başvuranla)
+// Tüm kredi başvuruları (başvuranla) — admin için salt-okunur teknik görünüm.
+// Kredi onay/red yetkisi admin'de değildir; banka hiyerarşisindedir (approvalApi).
 export async function getLoans() {
   const { data } = await apiClient.get<ApiResponse<AdminLoan[]>>('/api/admin/loans')
-  return data
-}
-
-// Krediyi onayla / reddet
-export async function approveLoan(id: string) {
-  const { data } = await apiClient.post<ApiResponse<Loan>>(
-    `/api/admin/loans/${id}/approve`,
-    {},
-  )
-  return data
-}
-
-export async function rejectLoan(id: string) {
-  const { data } = await apiClient.post<ApiResponse<Loan>>(
-    `/api/admin/loans/${id}/reject`,
-    {},
-  )
   return data
 }
 

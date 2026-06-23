@@ -1,0 +1,171 @@
+/* Yetkili kredi onay kuyruğu stilleri */
+
+.approval-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.approval-skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.approval-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: #64748b;
+}
+
+.approval-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.approval-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.approval-applicant {
+  margin: 0;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.approval-applicant-sub {
+  margin: 0.1rem 0 0;
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.approval-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.approval-amount-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #4f46e5;
+}
+
+.approval-amount-term {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.approval-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.approval-score {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.approval-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem 1rem;
+  padding: 0.75rem;
+  background-color: #f8fafc;
+  border-radius: 0.5rem;
+}
+
+.approval-grid > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.approval-grid span {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.approval-grid strong {
+  font-size: 0.88rem;
+  color: #334155;
+}
+
+.approval-reason {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.approval-date {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.approval-actions {
+  display: flex;
+  gap: 0.6rem;
+  padding-top: 0.25rem;
+}
+
+.approval-readonly {
+  margin: 0;
+  padding-top: 0.25rem;
+  font-size: 0.83rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Karar modalı */
+.approval-decision {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.approval-decision-info {
+  margin: 0;
+  color: #334155;
+}
+
+.approval-override-warn {
+  color: #d97706;
+  font-weight: 600;
+}
+
+.approval-note-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.approval-note {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  font: inherit;
+  resize: vertical;
+}
+
+.approval-note:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+@media (max-width: 640px) {
+  .approval-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

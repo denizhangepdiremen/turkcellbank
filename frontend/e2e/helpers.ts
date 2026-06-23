@@ -111,6 +111,8 @@ export async function applyForLoan(
     housing?: 'Tenant' | 'Owner'
     expenses?: string
     employment?: string
+    // Beklenen sonuç başlığı (varsayılan otomatik karar; büyük tutarda onaya gönderilir)
+    expectHeading?: RegExp
   },
 ) {
   await openTab(page, 'Krediler')
@@ -130,9 +132,12 @@ export async function applyForLoan(
   await dialog.getByLabel('Vade (ay)').fill(opts.term ?? '12')
   await dialog.getByRole('button', { name: 'Başvur', exact: true }).click()
 
-  // Otomatik karar: sonuç modalı (onay veya red). AI çağrısı için geniş timeout.
+  // Sonuç modalı: otomatik karar (onay/red) ya da onaya gönderildi. AI çağrısı
+  // için geniş timeout.
   await expect(
-    page.getByRole('heading', { name: /Başvurunuz (Onaylandı|Reddedildi)/ }),
+    page.getByRole('heading', {
+      name: opts.expectHeading ?? /Başvurunuz (Onaylandı|Reddedildi)/,
+    }),
   ).toBeVisible({ timeout: 50_000 })
 
   // Sonuç modalını kapat. Modalda iki "Kapat" var (başlıktaki X + footer butonu);

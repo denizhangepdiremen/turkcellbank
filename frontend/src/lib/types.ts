@@ -66,7 +66,7 @@ export interface AdminCard {
   decidedAt: string | null
 }
 
-export type LoanStatus = 'Pending' | 'Approved' | 'Rejected'
+export type LoanStatus = 'Pending' | 'PendingApproval' | 'Approved' | 'Rejected'
 
 export interface Installment {
   no: number
@@ -97,9 +97,36 @@ export interface Loan {
   netLimit: number
   aiReason: string
   decidedBy: string
+  decisionNote: string // yetkili karar notu (otomatik kredilerde boş)
   createdAt: string
   decidedAt: string | null
   paymentPlan: PaymentPlan | null
+}
+
+// Yetkili onay kuyruğundaki kredi (şube/il müdürü/direktör panelleri).
+export interface PendingLoan {
+  id: string
+  applicantName: string
+  applicantEmail: string
+  age: number
+  maritalStatus: MaritalStatus
+  childrenCount: number
+  housingStatus: HousingStatus
+  income: number
+  monthlyExpenses: number
+  employmentMonths: number
+  profession: string
+  amount: number
+  termMonths: number
+  score: number
+  maxLimit: number
+  existingDebt: number
+  netLimit: number
+  aiReason: string
+  recommendedStatus: LoanStatus
+  requiredApproverRole: string
+  createdAt: string
+  canApprove: boolean
 }
 
 export interface AdminLoan {
