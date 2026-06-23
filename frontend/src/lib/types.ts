@@ -40,6 +40,7 @@ export interface Transaction {
   amount: number
   counterpartyIban: string | null
   description: string | null
+  channel: 'Internet' | 'Branch' // şube çalışanı adına yaptıysa "Branch"
   createdAt: string
 }
 

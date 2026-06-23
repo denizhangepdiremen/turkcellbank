@@ -1,0 +1,88 @@
+/* Şube çalışanı paneli stilleri */
+
+.branch-search {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.branch-search > :first-child {
+  flex: 1;
+}
+
+.branch-customer {
+  margin-top: 1rem;
+}
+
+.branch-customer-head {
+  margin-bottom: 0.75rem;
+}
+
+.branch-customer-name {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.branch-customer-sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.branch-accounts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.branch-account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background-color: #f8fafc;
+  border-radius: 0.5rem;
+}
+
+.branch-account-iban {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.branch-account-bal {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.branch-empty {
+  margin: 0 0 1rem;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.branch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+/* Kredi formu — 2 sütun */
+.branch-loan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .branch-search {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .branch-loan-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -629,6 +629,7 @@ export function Dashboard() {
                       <p className="dashboard-tx-sub">
                         {trDate(tx.createdAt)}
                         {tx.description ? ` · ${tx.description}` : ''}
+                        {tx.channel === 'Branch' ? ' · Şube' : ''}
                       </p>
                     </div>
                     <span
