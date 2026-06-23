@@ -19,6 +19,8 @@ public class LoanService : ILoanService
     private readonly IOperationContext _ctx;
     private readonly IValidator<LoanApplicationRequest> _validator;
     private readonly LoanApprovalOptions _options;
+    private readonly IAuditLogger _audit;
+    private readonly Notifications.INotificationService _notifications;
 
     public LoanService(
         ILoanRepository loans,
@@ -29,7 +31,9 @@ public class LoanService : ILoanService
         ICurrentUserService currentUser,
         IOperationContext ctx,
         IValidator<LoanApplicationRequest> validator,
-        LoanApprovalOptions options)
+        LoanApprovalOptions options,
+        IAuditLogger audit,
+        Notifications.INotificationService notifications)
     {
         _loans = loans;
         _users = users;
@@ -40,6 +44,8 @@ public class LoanService : ILoanService
         _ctx = ctx;
         _validator = validator;
         _options = options;
+        _audit = audit;
+        _notifications = notifications;
     }
 
     public async Task<LoanDto> ApplyAsync(LoanApplicationRequest request)
@@ -255,6 +261,17 @@ public class LoanService : ILoanService
         loan.DecidedByUserId = _currentUser.UserId;
         loan.DecidedAt = DateTime.UtcNow;
         await _loans.SaveChangesAsync();
+
+        // Denetim kaydı + müşteri bildirimi
+        var verdict = approve ? "onaylandı" : "reddedildi";
+        await _audit.LogAsync(
+            $"Kredi {verdict}",
+            $"{loan.Amount:N0} TL kredi başvurusu {verdict}.");
+        await _notifications.NotifyAsync(
+            loan.UserId,
+            $"Krediniz {verdict}",
+            $"{loan.Amount:N0} TL kredi başvurunuz {verdict}." +
+            (string.IsNullOrWhiteSpace(loan.DecisionNote) ? "" : $" Not: {loan.DecisionNote}"));
 
         return MapLoan(loan, includePlan: approve);
     }

@@ -14,17 +14,23 @@ public class CardService : ICardService
     private readonly IAccountRepository _accounts;
     private readonly IOperationContext _ctx;
     private readonly IValidator<CreateCardRequest> _validator;
+    private readonly IAuditLogger _audit;
+    private readonly Notifications.INotificationService _notifications;
 
     public CardService(
         ICardRepository cards,
         IAccountRepository accounts,
         IOperationContext ctx,
-        IValidator<CreateCardRequest> validator)
+        IValidator<CreateCardRequest> validator,
+        IAuditLogger audit,
+        Notifications.INotificationService notifications)
     {
         _cards = cards;
         _accounts = accounts;
         _ctx = ctx;
         _validator = validator;
+        _audit = audit;
+        _notifications = notifications;
     }
 
     public async Task<CardDto> CreateAsync(CreateCardRequest request)
@@ -120,6 +126,12 @@ public class CardService : ICardService
         card.Status = decision;
         card.DecidedAt = DateTime.UtcNow;
         await _cards.SaveChangesAsync();
+
+        var verdict = decision == CardStatus.Approved ? "onaylandı" : "reddedildi";
+        var masked = CardHelper.Mask(card.CardNumber);
+        await _audit.LogAsync($"Kart {verdict}", $"{masked} numaralı kart başvurusu {verdict}.");
+        await _notifications.NotifyAsync(card.UserId, $"Kartınız {verdict}",
+            $"{masked} numaralı kart başvurunuz {verdict}.");
 
         return MapCard(card, card.Account?.Iban ?? "—");
     }

@@ -13,19 +13,25 @@ public class TransferApprovalService : ITransferApprovalService
     private readonly ITransactionService _transactionService;
     private readonly ICurrentUserService _currentUser;
     private readonly IOperationContext _ctx;
+    private readonly IAuditLogger _audit;
+    private readonly Notifications.INotificationService _notifications;
 
     public TransferApprovalService(
         IPendingTransferRepository pending,
         IAccountRepository accounts,
         ITransactionService transactionService,
         ICurrentUserService currentUser,
-        IOperationContext ctx)
+        IOperationContext ctx,
+        IAuditLogger audit,
+        Notifications.INotificationService notifications)
     {
         _pending = pending;
         _accounts = accounts;
         _transactionService = transactionService;
         _currentUser = currentUser;
         _ctx = ctx;
+        _audit = audit;
+        _notifications = notifications;
     }
 
     // Şube çalışanı tarafından (impersonate edilmiş bağlamda) çağrılır.
@@ -77,6 +83,10 @@ public class TransferApprovalService : ITransferApprovalService
 
         Decide(pt, TransferStatus.Approved, note);
         await _pending.SaveChangesAsync();
+
+        await _audit.LogAsync("Havale onayı", $"{pt.Amount:N0} TL havale onaylandı ve gerçekleştirildi.");
+        await _notifications.NotifyAsync(pt.CustomerUserId, "Havaleniz onaylandı",
+            $"{pt.Amount:N0} TL tutarındaki havaleniz onaylanıp gerçekleştirildi.");
         return tx;
     }
 
@@ -85,6 +95,11 @@ public class TransferApprovalService : ITransferApprovalService
         var pt = await LoadPendingForDecision(id);
         Decide(pt, TransferStatus.Rejected, note);
         await _pending.SaveChangesAsync();
+
+        await _audit.LogAsync("Havale reddi", $"{pt.Amount:N0} TL havale reddedildi.");
+        await _notifications.NotifyAsync(pt.CustomerUserId, "Havaleniz reddedildi",
+            $"{pt.Amount:N0} TL tutarındaki havaleniz reddedildi." +
+            (string.IsNullOrWhiteSpace(pt.DecisionNote) ? "" : $" Not: {pt.DecisionNote}"));
     }
 
     // Onay/red ortak: havaleyi getir + durum/rol kontrolü.

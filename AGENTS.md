@@ -18,8 +18,23 @@ TurkcellBank/
 └── frontend/   # React 19 + TypeScript + Vite
 ```
 
-Modules: Auth/profile, Accounts, Money transfer, **Loans (AI-driven automatic
-decision)**, Virtual POS, Bank cards, Admin panel (RBAC).
+Modules: Auth/profile, Accounts, Money transfer, **Loans (AI-driven, amount-tiered
+approval)**, Virtual POS, Bank cards, **Branch on-behalf operations**, **approval
+queues**, **org view / audit / notifications**, Admin panel (RBAC).
+
+### Roles & approval hierarchy
+Roles: `Customer`, `Admin` (technical only — no banking approvals), and the branch
+hierarchy `BranchEmployee` → `BranchManager` → `ProvincialManager` → `Director`.
+- **On-behalf:** a branch employee acts for a customer via `IOperationContext`
+  (`ActOnBehalfOf`); existing services are reused and stamp `Channel` +
+  `PerformedByEmployeeId`. Never duplicate business logic for branch flows.
+- **Amount-tiered loan approval:** ≤10M auto; 10–50M BranchManager; 50–100M
+  ProvincialManager; >100M Director. Thresholds in config (`Loan`/`Transfer`).
+  AI is advisory above the auto band; the approver decides (separation of duties:
+  initiator ≠ approver). Approval endpoints live in `ApprovalsController`.
+- **Cross-cutting:** `IAuditLogger` (log approvals, on-behalf ops, high transfers)
+  and `INotificationService.NotifyAsync` (notify the affected customer) are called
+  from decision services.
 
 ## Tech Stack
 - **Backend:** .NET 8, EF Core 8 + Npgsql (PostgreSQL), JWT + BCrypt,

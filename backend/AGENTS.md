@@ -90,10 +90,28 @@ dotnet user-secrets set "Gemini:ApiKey" "<...>" --project TurkcellBank.API
 ```
 
 ## Kredi Değerlendirme (AI) Notu
-- Kredi başvurusu **senkron + otomatik** karara bağlanır (admin onayı yok, devre dışı).
+- Kredi başvurusu **senkron** değerlendirilir: `≤10M` AI/kural motoruyla **otomatik**;
+  üstü tutar bandına göre **yetkili onayına** düşer (aşağıya bakın).
 - Değerlendirme motoru `Features/Loans/ILoanAiEvaluator` arkasında:
   `GeminiLoanAiEvaluator` (Infrastructure/Ai, HTTP) veya `RuleBasedLoanAiEvaluator`
   (Application, offline fallback). Seçim Infrastructure DI'da `Gemini:ApiKey`'e göre.
 - Benzer profil seçimi: repo gelir bandından aday havuzu çeker, `PeerMatcher`
   çok-faktörlü benzerlikle en yakın 50'yi seçer. Fake referans nüfus `DbSeeder`'da
   (30.000 kayıt) seed edilir.
+
+## Onay Hiyerarşisi, Şube İşlemleri ve Kesişen Servisler
+- **Roller:** `Customer`, `Admin` (yalnız teknik), `BranchEmployee`,
+  `BranchManager`, `ProvincialManager`, `Director` (`UserRole` enum, string saklanır).
+- **Adına işlem (`IOperationContext`):** İşlem sahibini `ActingUserId`'den oku,
+  kayıtlara `Channel` + `PerformedByEmployeeId` damgası yaz. Şube akışları
+  `BranchService`'te `ActOnBehalfOf(customer, employee)` çağırıp **mevcut servisleri
+  yeniden kullanır** — şube için iş mantığını KOPYALAMA.
+- **Tutar bazlı onay:** Eşikler `LoanApprovalOptions`/`TransferOptions` (config'den
+  singleton bind). Onay/red `ApprovalsController` + ilgili servislerde; bant guard +
+  görev ayrılığı (`initiator ≠ approver`) + AI override uygula. Onaya düşen kayıt
+  `PendingApproval`/`PendingTransfer` durumunda bekler.
+- **Kesişen servisler:** Karar veren her serviste `IAuditLogger.LogAsync(...)` ile
+  denetim kaydı yaz ve `INotificationService.NotifyAsync(customerId, ...)` ile
+  müşteriyi bilgilendir. Denetim okuma `Admin`/`Director`'a açıktır.
+- Yeni personel hesapları **register'dan açılamaz** (register sadece `Customer`
+  açar); seed + ileride yönetici/admin oluşturur.

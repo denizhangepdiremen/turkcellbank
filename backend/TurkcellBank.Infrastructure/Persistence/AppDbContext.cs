@@ -24,6 +24,8 @@ public class AppDbContext : DbContext
     public DbSet<ReferenceCreditRecord> ReferenceCreditRecords => Set<ReferenceCreditRecord>();
     public DbSet<ExternalBankLoan> ExternalBankLoans => Set<ExternalBankLoan>();
     public DbSet<PendingTransfer> PendingTransfers => Set<PendingTransfer>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -228,6 +230,30 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(t => t.CustomerUserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- AuditLog tablosu kuralları ---
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.HasKey(a => a.Id);
+            entity.Property(a => a.ActorRole).HasMaxLength(30);
+            entity.Property(a => a.Action).HasMaxLength(60);
+            entity.Property(a => a.Detail).HasMaxLength(500);
+            entity.HasIndex(a => a.CreatedAt);
+
+            entity.HasOne(a => a.Actor)
+                .WithMany()
+                .HasForeignKey(a => a.ActorUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- Notification tablosu kuralları ---
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasKey(n => n.Id);
+            entity.Property(n => n.Title).IsRequired().HasMaxLength(120);
+            entity.Property(n => n.Body).HasMaxLength(500);
+            entity.HasIndex(n => n.UserId);
         });
     }
 }

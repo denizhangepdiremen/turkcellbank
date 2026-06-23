@@ -13,13 +13,17 @@ yapabilir; adminler ise başvuruları yönetip işlemleri denetleyebilir.
 ## ✨ Özellikler
 
 - **Kimlik Doğrulama:** Kayıt, giriş, JWT tabanlı oturum, profil güncelleme
-- **Rol Bazlı Yetkilendirme (RBAC):** Müşteri / Admin rolleri
+- **Rol Bazlı Yetkilendirme (RBAC):** Müşteri, Admin (teknik) + banka hiyerarşisi: **Şube Çalışanı, Şube Müdürü, İl Müdürü, Direktör**
+- **Banka Organizasyonu & Onay Hiyerarşisi:** Gerçek şube yapısı (il/şube/personel); krediler tutar bandına göre otomatik veya yetkili onayına düşer; her yönetici bir alt kademeyi görür (detay aşağıda)
+- **Şube İşlemleri (adına işlem):** Şube çalışanı, masaya gelen müşteriyi TC/e-posta ile bulup **onun adına** hesap açar, para yatırır, havale/kredi/kart başvurusu yapar; her kayıt **Şube kanalı + çalışan damgası** taşır
 - **Hesap Yönetimi:** Hesap açma (otomatik **geçerli IBAN** — ISO 13616 mod-97), listeleme, kapatma
-- **Para Transferi:** Para yatırma, banka içi havale (bakiye kontrolü, atomik), işlem geçmişi
-- **AI Destekli Kredi:** Genişletilmiş başvuru (TC kimlik, demografi, gelir/gider); başvuran 30.000 kişilik referans nüfusla karşılaştırılır, yapay zeka (Gemini) maksimum limiti tahmin eder, diğer banka + bizim banka borçları düşülerek **otomatik onay/red** + ödeme planı üretilir (detay aşağıda)
-- **Sanal POS:** Kartla ödeme, 3D Secure simülasyonu, ödeme geçmişi, iade (admin), fraud kontrolü
-- **Kişiselleştirilebilir Panel:** Sekmeli arayüz (Hesap / İşlem / Kredi / Kart / Ödeme); kullanıcı görmek istediği sekmeleri ekleyip çıkarabilir (tercih tarayıcıda kalıcı)
-- **Admin Paneli:** Kullanıcı listesi, kart başvuru onay/red, ödeme iade; kredi tablosu salt-okunur (otomatik karar)
+- **Para Transferi:** Para yatırma, banka içi havale (bakiye kontrolü, atomik), işlem geçmişi. Güvenlik: **250k₺ üstü internette bloklu** (şubeye yönlendirilir), **1M₺ üstü şube müdürü onayı** (maker-checker)
+- **AI Destekli Kredi:** Genişletilmiş başvuru (TC kimlik, demografi, gelir/gider); başvuran 30.000 kişilik referans nüfusla karşılaştırılır, yapay zeka (Gemini) maksimum limiti tahmin eder, diğer banka + bizim banka borçları düşülerek karar üretilir. **10M₺ altı otomatik**, üstü tutar bandına göre yetkili onayına düşer (detay aşağıda)
+- **Sanal POS:** Kartla ödeme, 3D Secure simülasyonu, ödeme geçmişi, iade (admin), fraud kontrolü. Kart başvuruları **şube müdürü** tarafından onaylanır
+- **Bildirimler:** Yetkili bir kredi/havale/kart kararı verince müşteriye panel içi bildirim düşer
+- **Denetim Kaydı (Audit Log):** Onay/red kararları, şube adına işlemler ve yüksek havaleler kaydedilir; admin/direktör görüntüler
+- **Kişiselleştirilebilir Panel:** Sekmeli arayüz (Hesap / İşlem / Kredi / Kart / Ödeme); kullanıcı görmek istediği sekmeleri ekleyip çıkarabilir (tercih tarayıcıda kalıcı). Her rol kendi paneline yönlenir
+- **Admin Paneli (teknik):** Kullanıcı listesi, ödeme iade, denetim kaydı; kredi ve kart tabloları salt-okunur (onay yetkisi banka hiyerarşisindedir)
 - **Tutarlı API:** Tek tip response wrapper + global exception middleware + Swagger (JWT'li)
 
 ---
@@ -73,7 +77,47 @@ Kredi başvurusu, manuel admin onayı yerine **başvuru anında otomatik** karar
 
 **Sağlayıcı bağımsız:** Değerlendirme `ILoanAiEvaluator` arayüzünün arkasındadır. `Gemini:ApiKey` yapılandırılmışsa **Gemini** (`gemini-2.5-flash`) kullanılır; key yoksa veya hata/zaman aşımı olursa **deterministik kural motoruna** (offline; testler için) düşülür. Böylece uygulama AI olmadan da tam çalışır.
 
-> Manuel admin kredi onay/red altyapısı (endpoint + servis) korunur ama **devre dışıdır** — ileride tutar bazlı onay hiyerarşisi (ör. >1M TL şube müdürü) için.
+---
+
+## 🏢 Banka Organizasyonu ve Onay Hiyerarşisi
+
+Sisteme gerçek bir banka organizasyonu eklenmiştir: **3 il × 3 şube = 9 şube**, her
+şubede çalışan + şube müdürü, her ilde il müdürü, tepede direktör. Admin yalnızca
+**teknik** roldür (kullanıcı/denetim yönetimi), bankacılık onaylarında yeri yoktur.
+
+### Roller
+| Rol | Yetki |
+|-----|-------|
+| **Müşteri** | Kendi hesap/kredi/kart/ödeme işlemleri |
+| **Şube Çalışanı** | Müşteri **adına** işlem (hesap/havale/kredi/kart) — kendisi onay veremez |
+| **Şube Müdürü** | 10M–50M kredi, >1M havale, kart onayları; şubesini görür |
+| **İl Müdürü** | 50M–100M kredi onayı; ilindeki şube müdürlerini görür |
+| **Direktör** | 100M üstü kredi onayı; tüm bankayı görür |
+| **Admin** | Teknik: kullanıcı listesi, ödeme iade, denetim kaydı |
+
+### Tutar bazlı kredi onayı (tek onaycı)
+`≤10M` → AI/kural motoru **otomatik** · `10–50M` → **şube müdürü** · `50–100M` →
+**il müdürü** · `>100M` → **direktör**. Eşikler `appsettings.json > Loan`'dan okunur.
+AI raporu üst bantlarda **danışma** niteliğindedir; yetkili kararı verir (gerekçe
+notuyla, AI önerisini ezebilir). Görev ayrılığı: işlemi başlatan onaylayamaz.
+
+### Adına işlem + kanal
+Şube çalışanı müşteriyi bulup onun adına işlem yapar; mevcut servisler bir **işlem
+bağlamı** (`IOperationContext`) ile yeniden kullanılır. Her kayıt **kanal**
+(İnternet/Şube) + **çalışan damgası** taşır; müşteri geçmişinde "Şube" etiketiyle görünür.
+
+### Havale güvenliği
+`>250k₺` internette bloklu → şubeye yönlendirilir. `>1M₺` (şubeden) → **şube müdürü
+onayı** (maker-checker): havale hemen gerçekleşmez, onaylanınca para taşınır.
+Eşikler `appsettings.json > Transfer`'dan okunur.
+
+### Bildirim & denetim
+Bir yetkili kredi/havale/kart kararı verince ilgili müşteriye **bildirim** düşer
+(panelde zil). Tüm önemli aksiyonlar (onaylar, adına işlemler, yüksek havaleler)
+**denetim kaydına** yazılır; admin/direktör görüntüler.
+
+> Demo personel girişleri seed'lenir; şifre `appsettings`/secrets'taki
+> `StaffSeed:Password` ile belirlenir (yoksa personel seed'i atlanır).
 
 ---
 
@@ -130,8 +174,11 @@ Storybook (komponent kütüphanesi): `npm run storybook`
 | `Jwt:Key` | user-secrets (dev) / env var (prod) | JWT imzalama anahtarı (≥32 karakter) |
 | `AdminSeed:Password` | user-secrets (dev) / env var (prod) | İlk admin şifresi |
 | `AdminSeed:Email` | `appsettings.json` | İlk admin e-postası (varsayılan `admin@turkcellbank.com`) |
+| `StaffSeed:Password` | user-secrets (dev) / env var (prod) | Personel (şube/il müdürü/direktör) seed şifresi; yoksa personel seed'i atlanır |
 | `Gemini:ApiKey` | user-secrets (dev) / env var (prod) | **Opsiyonel** Google AI Studio API key; yoksa kural motoru devreye girer |
 | `Gemini:Model` | `appsettings.json` (ops.) | Gemini modeli (varsayılan `gemini-2.5-flash`) |
+| `Loan:*` | `appsettings.json` | Kredi onay eşikleri (AutoDecisionLimit 10M, BranchManagerLimit 50M, ProvincialManagerLimit 100M) |
+| `Transfer:*` | `appsettings.json` | Havale eşikleri (InternetLimit 250k, BranchManagerApprovalLimit 1M) |
 | `ConnectionStrings:DefaultConnection` | `appsettings.json` | PostgreSQL bağlantısı |
 
 Uygulama ilk açılışta, sistemde admin yoksa yukarıdaki bilgilerle bir **admin
@@ -151,9 +198,14 @@ kullanıcısı** oluşturur. Production'da değerler **environment variable** il
 | GET/PUT | `/api/auth/me` · `/profile` | Profil |
 | GET/POST | `/api/accounts` | Hesaplar (aç/listele) |
 | POST | `/api/transactions/deposit` · `/transfer` | Para yatırma / transfer |
-| POST/GET | `/api/loans` | Kredi başvurusu (AI ile **otomatik karar**) / kredilerim |
+| POST/GET | `/api/loans` | Kredi başvurusu (≤10M otomatik, üstü onaya) / kredilerim |
 | POST/GET | `/api/payments` | Sanal POS ödeme / geçmiş |
-| GET/POST | `/api/admin/*` | Admin: kullanıcı listesi, kart onay/red, ödeme iade (Admin rolü) |
+| GET/POST | `/api/branch/*` | Şube çalışanı: müşteri arama + adına işlem (ŞubeÇalışanı rolü) |
+| GET/POST | `/api/approvals/*` | Yetkili onay kuyrukları: kredi/havale/kart (müdür rolleri) |
+| GET | `/api/org/team` | Yönetici organizasyon görünümü (müdür rolleri) |
+| GET | `/api/audit` | Denetim kaydı (Admin/Direktör) |
+| GET/POST | `/api/notifications` | Müşteri bildirimleri / okundu işaretle |
+| GET/POST | `/api/admin/*` | Admin (teknik): kullanıcı listesi, ödeme iade (Admin rolü) |
 
 Tüm uç noktalar Swagger'da belgelidir.
 
