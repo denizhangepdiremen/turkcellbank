@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TurkcellBank.Application.Common;
 using TurkcellBank.Application.Features.Auth;
 using TurkcellBank.Application.Features.Auth.Dtos;
@@ -22,6 +23,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>Yeni kullanıcı kaydı. POST /api/auth/register</summary>
+    [EnableRateLimiting("register")]
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest request)
     {
@@ -30,6 +32,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>Giriş yap, JWT token al. POST /api/auth/login</summary>
+    [EnableRateLimiting("auth")]
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest request)
     {

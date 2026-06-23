@@ -24,6 +24,7 @@ yapabilir; adminler ise başvuruları yönetip işlemleri denetleyebilir.
 - **Denetim Kaydı (Audit Log):** Onay/red kararları, şube adına işlemler ve yüksek havaleler kaydedilir; admin/direktör görüntüler
 - **Kişiselleştirilebilir Panel:** Sekmeli arayüz (Hesap / İşlem / Kredi / Kart / Ödeme); kullanıcı görmek istediği sekmeleri ekleyip çıkarabilir (tercih tarayıcıda kalıcı). Her rol kendi paneline yönlenir
 - **Admin Paneli (teknik):** Kullanıcı listesi, ödeme iade, denetim kaydı; kredi ve kart tabloları salt-okunur (onay yetkisi banka hiyerarşisindedir)
+- **Hız Sınırlama (Rate Limiting):** Brute-force koruması — `login`/`register` IP başına sıkı, tüm uçlar için gevşek global limit; aşımda `429` + `Retry-After`
 - **Tutarlı API:** Tek tip response wrapper + global exception middleware + Swagger (JWT'li)
 
 ---
@@ -179,6 +180,7 @@ Storybook (komponent kütüphanesi): `npm run storybook`
 | `Gemini:Model` | `appsettings.json` (ops.) | Gemini modeli (varsayılan `gemini-2.5-flash`) |
 | `Loan:*` | `appsettings.json` | Kredi onay eşikleri (AutoDecisionLimit 10M, BranchManagerLimit 50M, ProvincialManagerLimit 100M) |
 | `Transfer:*` | `appsettings.json` | Havale eşikleri (InternetLimit 250k, BranchManagerApprovalLimit 1M) |
+| `RateLimit:*` | `appsettings.json` | Hız sınırlama (prod: login 5/dk, register 3/dk, global 100/dk · IP) — Development'ta gevşek |
 | `ConnectionStrings:DefaultConnection` | `appsettings.json` | PostgreSQL bağlantısı |
 
 Uygulama ilk açılışta, sistemde admin yoksa yukarıdaki bilgilerle bir **admin
@@ -187,6 +189,17 @@ kullanıcısı** oluşturur. Production'da değerler **environment variable** il
 
 > ⚠️ Repo geçmişindeki eski örnek değerler yalnızca **geliştirme amaçlıdır** ve
 > production'da kullanılmaz.
+
+### Hız sınırlamayı (429) denemek
+Development'ta limitler bilerek gevşektir (E2E suite'i tetiklemesin). Sıkı davranışı
+görmek için backend'i düşük bir limitle başlatıp ardışık istek atın:
+```bash
+RateLimit__Auth__PermitLimit=5 dotnet run --project TurkcellBank.API --urls "http://localhost:5099"
+# başka terminalde:
+for i in $(seq 1 7); do curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+  localhost:5099/api/auth/login -H "Content-Type: application/json" \
+  -d '{"email":"x@x.com","password":"y"}'; done   # 6. istekten itibaren 429
+```
 
 ---
 

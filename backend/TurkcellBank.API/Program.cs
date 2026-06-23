@@ -1,10 +1,14 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using TurkcellBank.API.Middleware;
+using TurkcellBank.API.RateLimiting;
 using TurkcellBank.API.Services;
 using TurkcellBank.Application;
+using TurkcellBank.Application.Common;
 using TurkcellBank.Application.Common.Interfaces;
 using TurkcellBank.Application.Features.Loans;
 using TurkcellBank.Infrastructure;
@@ -73,6 +77,62 @@ builder.Services.AddSingleton(
     builder.Configuration.GetSection("Transfer").Get<TurkcellBank.Application.Features.Transactions.TransferOptions>()
         ?? new TurkcellBank.Application.Features.Transactions.TransferOptions());
 
+// --- Hız sınırlama (rate limiting) ---
+// Sabit pencere, IP başına. "auth"/"register" politikaları ilgili endpoint'lerde
+// (brute-force koruması); ayrıca tüm istekler için gevşek global limiter.
+// Limitler config "RateLimit"ten gelir (prod sıkı, dev gevşek -> appsettings.Development).
+var rateLimit = builder.Configuration.GetSection("RateLimit").Get<RateLimitOptions>()
+    ?? new RateLimitOptions();
+
+static string ClientIp(HttpContext ctx) =>
+    ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+static PartitionedRateLimiter<HttpContext> FixedByIp(RateLimitRule rule) =>
+    PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientIp(ctx), _ =>
+            new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rule.PermitLimit,
+                Window = TimeSpan.FromSeconds(rule.WindowSeconds),
+                QueueLimit = 0,
+            }));
+
+builder.Services.AddRateLimiter(options =>
+{
+    // Tüm istekler için gevşek global limiter (savunma derinliği)
+    options.GlobalLimiter = FixedByIp(rateLimit.Global);
+
+    // Sıkı politikalar (auth endpoint'lerinde [EnableRateLimiting] ile)
+    options.AddPolicy("auth", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientIp(ctx), _ =>
+            new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimit.Auth.PermitLimit,
+                Window = TimeSpan.FromSeconds(rateLimit.Auth.WindowSeconds),
+                QueueLimit = 0,
+            }));
+    options.AddPolicy("register", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientIp(ctx), _ =>
+            new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimit.Register.PermitLimit,
+                Window = TimeSpan.FromSeconds(rateLimit.Register.WindowSeconds),
+                QueueLimit = 0,
+            }));
+
+    // Limit aşımında tutarlı 429 + Retry-After (ApiResponse formatı)
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)retryAfter.TotalSeconds).ToString();
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            ApiResponse<string>.Fail("Çok fazla istek gönderildi. Lütfen biraz sonra tekrar deneyin."),
+            token);
+    };
+});
+
 // Infrastructure katmanı: veritabanı (PostgreSQL + EF Core) bağlantısı
 // Tek satırla; detaylar Infrastructure/DependencyInjection.cs içinde.
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -136,6 +196,9 @@ app.UseCors(FrontendCors);
 // Sıra önemli: önce kimlik doğrulama (kim?), sonra yetkilendirme (izinli mi?)
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Hız sınırlama: yetkilendirmeden sonra, endpoint'lerden önce
+app.UseRateLimiter();
 
 app.MapControllers();
 

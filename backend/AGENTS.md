@@ -115,3 +115,12 @@ dotnet user-secrets set "Gemini:ApiKey" "<...>" --project TurkcellBank.API
   müşteriyi bilgilendir. Denetim okuma `Admin`/`Director`'a açıktır.
 - Yeni personel hesapları **register'dan açılamaz** (register sadece `Customer`
   açar); seed + ileride yönetici/admin oluşturur.
+
+## Hız Sınırlama (Rate Limiting)
+- .NET 8 yerleşik `Microsoft.AspNetCore.RateLimiting` (sabit pencere, IP başına).
+  Program.cs'te `AddRateLimiter` + `UseRateLimiter`; `login`/`register` için
+  `[EnableRateLimiting("auth"|"register")]`, ayrıca gevşek global limiter.
+- Limitler config `RateLimit`'ten (`RateLimitOptions`, API katmanı). **Production
+  sıkı** (`appsettings.json`), **Development gevşek** (`appsettings.Development.json`)
+  ki E2E suite tetiklenmesin. 429'u denemek: `RateLimit__Auth__PermitLimit=5` env'i.
+- Aşımda `OnRejected` → `429` + `Retry-After` + `ApiResponse.Fail(...)` (tutarlı format).
