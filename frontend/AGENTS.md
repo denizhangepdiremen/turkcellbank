@@ -66,8 +66,16 @@ src/
   Kartlar / Ödemeler); users can add/remove tabs (pref saved in `localStorage`).
   New sections go behind a tab — don't append to one long scroll.
 - A global `Footer` (mounted in `App.tsx`) renders on every page.
-- Loan apply flow: a "değerlendiriliyor" waiting modal → result modal (approve/reject
-  + AI reason); the decision is **automatic** (no admin approval step).
+- Loan apply flow: a "değerlendiriliyor" waiting modal → result modal. ≤10M is
+  **automatic**; above that the result is "Onaya Gönderildi" and a manager decides.
+- **Role-based panels:** each role lands on its own panel (`roleHomePath` in
+  `lib/roles.ts`). Staff panels share `StaffShell`. Manager panels compose reusable
+  pieces from `pages/staff/`: `LoanApprovalQueue`, `TransferApprovalQueue`,
+  `CardApprovalQueue` (şube müdürü), `OrgTeamView` (Şubem/İlim/Tüm Banka).
+- **Branch employee** (`BranchEmployeePanel`): search a customer (TC/e-posta) then
+  act on their behalf via modals (hesap/para/havale/kart/kredi) → `branchApi`.
+- **Notifications:** a header bell (unread badge) opens the notifications modal;
+  opening marks all read (`notificationApi`).
 
 ## Commands
 ```bash

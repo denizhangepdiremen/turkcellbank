@@ -16,6 +16,7 @@ import { Checkbox } from '../../components/Checkbox'
 import { useAuth } from '../../context/AuthContext'
 import { getAccounts, createAccount, closeAccount } from '../../api/accountApi'
 import { updateProfile } from '../../api/authApi'
+import { getNotifications, markAllNotificationsRead } from '../../api/notificationApi'
 import { deposit, transfer, getHistory } from '../../api/transactionApi'
 import { applyLoan, getMyLoans, getLoanDetail } from '../../api/loanApi'
 import { pay, getMyPayments } from '../../api/paymentApi'
@@ -161,6 +162,23 @@ export function Dashboard() {
   function openProfile() {
     setProfileName(user?.fullName ?? '')
     setProfileOpen(true)
+  }
+
+  // --- Bildirimler ---
+  const [notifOpen, setNotifOpen] = useState(false)
+  const { data: notifData } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: getNotifications,
+  })
+  const notifications = notifData?.data ?? []
+  const unreadCount = notifications.filter((n) => !n.isRead).length
+  const markReadMutation = useMutation({
+    mutationFn: markAllNotificationsRead,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  })
+  function openNotifications() {
+    setNotifOpen(true)
+    if (unreadCount > 0) markReadMutation.mutate() // açınca okundu işaretle
   }
 
   // --- Hesaplar ---
@@ -445,6 +463,17 @@ export function Dashboard() {
         <span className="dashboard-brand">TurkcellBank</span>
         <div className="dashboard-user">
           <span className="dashboard-username">{user?.fullName}</span>
+          <button
+            type="button"
+            className="dashboard-bell"
+            onClick={openNotifications}
+            aria-label="Bildirimler"
+          >
+            🔔
+            {unreadCount > 0 && (
+              <span className="dashboard-bell-badge">{unreadCount}</span>
+            )}
+          </button>
           <Button
             variant="ghost"
             size="sm"
@@ -910,6 +939,30 @@ export function Dashboard() {
             onChange={(e) => setTransferDesc(e.target.value)}
           />
         </div>
+      </Modal>
+
+      {/* --- Bildirimler modalı --- */}
+      <Modal
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        title="Bildirimler"
+        footer={
+          <Button variant="primary" onClick={() => setNotifOpen(false)}>
+            Kapat
+          </Button>
+        }
+      >
+        {notifications.length === 0 ? (
+          <div className="dashboard-state">Henüz bildiriminiz yok.</div>
+        ) : (
+          notifications.map((n) => (
+            <div key={n.id} className="dashboard-notif">
+              <p className="dashboard-notif-title">{n.title}</p>
+              <p className="dashboard-notif-body">{n.body}</p>
+              <p className="dashboard-notif-date">{trDate(n.createdAt)}</p>
+            </div>
+          ))
+        )}
       </Modal>
 
       {/* --- Profil modalı --- */}

@@ -104,6 +104,25 @@ export interface Loan {
   paymentPlan: PaymentPlan | null
 }
 
+// Denetim kaydı (admin/direktör görünümü).
+export interface AuditLog {
+  id: string
+  actorName: string
+  actorRole: string
+  action: string
+  detail: string
+  createdAt: string
+}
+
+// Müşteri bildirimi.
+export interface AppNotification {
+  id: string
+  title: string
+  body: string
+  isRead: boolean
+  createdAt: string
+}
+
 // Şube müdürü onay kuyruğundaki yüksek tutarlı havale.
 export interface PendingTransfer {
   id: string

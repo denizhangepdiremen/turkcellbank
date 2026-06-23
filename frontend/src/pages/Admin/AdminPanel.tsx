@@ -16,8 +16,10 @@ import {
   refundPayment,
   getCards,
 } from '../../api/adminApi'
+import { getAudit } from '../../api/auditApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
+import { roleLabel } from '../../lib/roles'
 import type { CardStatus, LoanStatus, PaymentStatus } from '../../lib/types'
 import './AdminPanel.css'
 
@@ -89,6 +91,11 @@ export function AdminPanel() {
   const { data: usersData, isLoading: usersLoading, isError: usersError } =
     useQuery({ queryKey: ['admin-users'], queryFn: getUsers })
   const users = usersData?.data ?? []
+
+  // --- Denetim Kaydı ---
+  const { data: auditData, isLoading: auditLoading, isError: auditError } =
+    useQuery({ queryKey: ['admin-audit'], queryFn: getAudit })
+  const auditLogs = auditData?.data ?? []
 
   function handleLogout() {
     logout()
@@ -308,9 +315,51 @@ export function AdminPanel() {
                         <td>{u.email}</td>
                         <td>
                           <Badge variant={u.role === 'Admin' ? 'info' : 'neutral'}>
-                            {u.role}
+                            {roleLabel(u.role)}
                           </Badge>
                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Denetim Kaydı */}
+        <h2 className="admin-section-title admin-section">Denetim Kaydı</h2>
+        <Card>
+          <CardContent>
+            {auditLoading && <TableSkeleton />}
+            {auditError && <Alert variant="error">Denetim kaydı yüklenemedi.</Alert>}
+            {!auditLoading && !auditError && auditLogs.length === 0 && (
+              <div className="admin-state">Henüz denetim kaydı yok.</div>
+            )}
+            {!auditLoading && !auditError && auditLogs.length > 0 && (
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Zaman</th>
+                      <th>Aktör</th>
+                      <th>İşlem</th>
+                      <th>Detay</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.map((a) => (
+                      <tr key={a.id}>
+                        <td>{new Date(a.createdAt).toLocaleString('tr-TR')}</td>
+                        <td>
+                          {a.actorName}
+                          <br />
+                          <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>
+                            {roleLabel(a.actorRole)}
+                          </span>
+                        </td>
+                        <td>{a.action}</td>
+                        <td>{a.detail}</td>
                       </tr>
                     ))}
                   </tbody>
