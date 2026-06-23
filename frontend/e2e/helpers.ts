@@ -23,6 +23,16 @@ export const ADMIN = {
   password: 'Admin123!',
 }
 
+// Rol hiyerarşisi testleri için backend'in seed ettiği personel.
+// Şifre StaffSeed:Password ile (dev/test ortamında) seed edilir.
+export const STAFF_PASSWORD = 'Personel123!'
+export const STAFF = {
+  branchEmployee: { email: 'calisan1.kadikoy@turkcellbank.com', home: /\/sube$/, heading: 'Şube Çalışanı Paneli' },
+  branchManager: { email: 'mudur.kadikoy@turkcellbank.com', home: /\/sube-muduru$/, heading: 'Şube Müdürü Paneli' },
+  provincialManager: { email: 'ilmudur.istanbul@turkcellbank.com', home: /\/il-muduru$/, heading: 'İl Müdürü Paneli' },
+  director: { email: 'direktor@turkcellbank.com', home: /\/direktor$/, heading: 'Direktör Paneli' },
+} as const
+
 /**
  * Dummy kullanıcıyı (yoksa) oluşturur. Zaten kayıtlıysa backend 400 döner;
  * bu beklenen bir durumdur (testler tekrar tekrar çalışabilsin diye yok sayılır).

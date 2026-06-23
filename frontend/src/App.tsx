@@ -4,6 +4,10 @@ import { Register } from './pages/Register'
 import { ForgotPassword } from './pages/ForgotPassword'
 import { Dashboard } from './pages/Dashboard'
 import { AdminPanel } from './pages/Admin'
+import { BranchEmployeePanel } from './pages/BranchEmployee'
+import { BranchManagerPanel } from './pages/BranchManager'
+import { ProvincialManagerPanel } from './pages/ProvincialManager'
+import { DirectorPanel } from './pages/Director'
 import { NotFound } from './pages/NotFound'
 import { ProtectedRoute } from './routes/ProtectedRoute'
 import { GuestRoute } from './routes/GuestRoute'
@@ -17,21 +21,54 @@ function App() {
       <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
       <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
       <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
-      {/* Dashboard korumalı: token yoksa login'e yönlenir */}
+      {/* Müşteri panosu: sadece Customer rolü */}
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredRole="Customer">
             <Dashboard />
           </ProtectedRoute>
         }
       />
-      {/* Admin paneli: sadece Admin rolü */}
+      {/* Admin paneli: sadece Admin rolü (teknik admin) */}
       <Route
         path="/admin"
         element={
           <ProtectedRoute requiredRole="Admin">
             <AdminPanel />
+          </ProtectedRoute>
+        }
+      />
+      {/* Personel panelleri: banka organizasyon hiyerarşisi */}
+      <Route
+        path="/sube"
+        element={
+          <ProtectedRoute requiredRole="BranchEmployee">
+            <BranchEmployeePanel />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/sube-muduru"
+        element={
+          <ProtectedRoute requiredRole="BranchManager">
+            <BranchManagerPanel />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/il-muduru"
+        element={
+          <ProtectedRoute requiredRole="ProvincialManager">
+            <ProvincialManagerPanel />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/direktor"
+        element={
+          <ProtectedRoute requiredRole="Director">
+            <DirectorPanel />
           </ProtectedRoute>
         }
       />

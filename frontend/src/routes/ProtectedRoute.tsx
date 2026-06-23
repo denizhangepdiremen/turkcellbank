@@ -1,12 +1,14 @@
 import { Navigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { roleHomePath } from '../lib/roles'
 
 /**
  * Korumalı sayfaları sarmalar.
  *  - Giriş yapılmamışsa → login'e
- *  - requiredRole verilmiş ve kullanıcının rolü uymuyorsa → kendi paneline
- *  - Admin kullanıcı normal kullanıcı sayfalarına erişemez (sadece admin paneli)
+ *  - requiredRole verilmiş ve kullanıcının rolü uymuyorsa → kendi rolünün ana paneline
+ * Her korumalı route kendi requiredRole'ünü belirtir; rol uymazsa kullanıcı
+ * yanlış panelde takılmaz, doğrudan kendi paneline yönlenir.
  */
 export function ProtectedRoute({
   children,
@@ -22,14 +24,9 @@ export function ProtectedRoute({
 
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
-  // Admin kullanıcı normal kullanıcı sayfalarına (dashboard vb.) giremez
-  if (!requiredRole && user?.role === 'Admin') {
-    return <Navigate to="/admin" replace />
-  }
-
-  // Rol gerekiyorsa ve uymuyorsa, normal kullanıcıyı dashboard'a gönder
+  // Rol gerekiyorsa ve uymuyorsa, kullanıcıyı kendi rolünün ana paneline gönder
   if (requiredRole && user?.role !== requiredRole) {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to={roleHomePath(user?.role)} replace />
   }
 
   return <>{children}</>

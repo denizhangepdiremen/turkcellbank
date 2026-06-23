@@ -1,0 +1,145 @@
+/* Personel panelleri ortak stilleri — marka renkli üst bar, beyaz sayfa. */
+
+.staff-page {
+  min-height: 100vh;
+  background-color: #f8fafc;
+}
+
+/* Üst bar: marka rengi (indigo), beyaz yazı */
+.staff-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.5rem;
+  background-color: #4f46e5;
+  color: #ffffff;
+}
+
+.staff-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.staff-brand {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.staff-role-badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.18);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.staff-header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.staff-user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+
+.staff-user-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.staff-user-city {
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+
+.staff-logout {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.staff-logout:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* İçerik alanı */
+.staff-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.staff-titlebar {
+  margin-bottom: 1.5rem;
+}
+
+.staff-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.staff-subtitle {
+  margin: 0.35rem 0 0;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+/* Placeholder kutusu */
+.staff-placeholder {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+}
+
+.staff-placeholder-lead {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  color: #334155;
+}
+
+.staff-placeholder-list {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.staff-placeholder-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Dar ekran uyumu */
+@media (max-width: 640px) {
+  .staff-header {
+    flex-direction: column;
+    gap: 0.6rem;
+    align-items: flex-start;
+  }
+  .staff-header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .staff-user {
+    align-items: flex-start;
+  }
+}

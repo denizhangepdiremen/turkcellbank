@@ -13,6 +13,7 @@ export interface User {
   fullName: string
   email: string
   role: string
+  city?: string | null // sadece personelde dolu (müşteri/admin için null)
 }
 
 export interface AuthResponse {

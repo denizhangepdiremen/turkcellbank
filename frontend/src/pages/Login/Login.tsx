@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext'
 import { loginSchema, type LoginFormValues } from '../../lib/validation'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
+import { roleHomePath } from '../../lib/roles'
 import './Login.css'
 
 /**
@@ -42,8 +43,8 @@ export function Login() {
     setServerError(null)
     try {
       const loggedIn = await login(values.email, values.password)
-      // Admin ise admin paneline, değilse dashboard'a
-      navigate(loggedIn.role === 'Admin' ? '/admin' : '/dashboard', { replace: true })
+      // Her rol kendi ana paneline yönlenir (müşteri/personel/admin)
+      navigate(roleHomePath(loggedIn.role), { replace: true })
     } catch (err) {
       setServerError(getApiErrorMessage(err, 'Giriş başarısız.'))
     }
