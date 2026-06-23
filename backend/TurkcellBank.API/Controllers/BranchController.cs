@@ -55,8 +55,11 @@ public class BranchController : ControllerBase
     [HttpPost("customers/{customerId:guid}/transfer")]
     public async Task<IActionResult> Transfer(Guid customerId, TransferRequest request)
     {
-        var tx = await _branch.TransferAsync(customerId, request);
-        return Ok(ApiResponse<TransactionDto>.SuccessResponse(tx, "Transfer tamamlandı."));
+        var result = await _branch.TransferAsync(customerId, request);
+        var message = result.Status == "PendingApproval"
+            ? "Yüksek tutarlı havale şube müdürü onayına gönderildi."
+            : "Transfer tamamlandı.";
+        return Ok(ApiResponse<BranchTransferResultDto>.SuccessResponse(result, message));
     }
 
     /// <summary>Müşteri adına kart başvurusu. POST /api/branch/customers/{customerId}/cards</summary>

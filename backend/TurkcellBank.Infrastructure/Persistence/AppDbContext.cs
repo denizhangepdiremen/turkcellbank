@@ -23,6 +23,7 @@ public class AppDbContext : DbContext
     public DbSet<Card> Cards => Set<Card>();
     public DbSet<ReferenceCreditRecord> ReferenceCreditRecords => Set<ReferenceCreditRecord>();
     public DbSet<ExternalBankLoan> ExternalBankLoans => Set<ExternalBankLoan>();
+    public DbSet<PendingTransfer> PendingTransfers => Set<PendingTransfer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -208,6 +209,25 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(c => c.AccountId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // --- PendingTransfer tablosu kuralları ---
+        modelBuilder.Entity<PendingTransfer>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.Amount).HasPrecision(18, 2);
+            entity.Property(t => t.FromIban).IsRequired().HasMaxLength(34);
+            entity.Property(t => t.ToIban).IsRequired().HasMaxLength(34);
+            entity.Property(t => t.Description).HasMaxLength(200);
+            entity.Property(t => t.DecisionNote).HasMaxLength(1000);
+            entity.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
+            entity.HasIndex(t => t.Status); // onay kuyruğu sorgusu
+
+            // Müşteri: silinince bekleyen havaleleri de silinsin
+            entity.HasOne(t => t.Customer)
+                .WithMany()
+                .HasForeignKey(t => t.CustomerUserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

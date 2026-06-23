@@ -68,6 +68,11 @@ builder.Services.AddSingleton(
     builder.Configuration.GetSection("Loan").Get<LoanApprovalOptions>()
         ?? new LoanApprovalOptions());
 
+// Havale güvenlik eşikleri (config "Transfer" bölümü; yoksa varsayılanlar)
+builder.Services.AddSingleton(
+    builder.Configuration.GetSection("Transfer").Get<TurkcellBank.Application.Features.Transactions.TransferOptions>()
+        ?? new TurkcellBank.Application.Features.Transactions.TransferOptions());
+
 // Infrastructure katmanı: veritabanı (PostgreSQL + EF Core) bağlantısı
 // Tek satırla; detaylar Infrastructure/DependencyInjection.cs içinde.
 builder.Services.AddInfrastructure(builder.Configuration);

@@ -74,27 +74,15 @@ public class AdminController : ControllerBase
         return Ok(ApiResponse<PaymentDto>.SuccessResponse(payment, "Ödeme iade edildi."));
     }
 
-    /// <summary>Tüm kart başvuruları (sahip + hesapla). GET /api/admin/cards</summary>
+    /// <summary>
+    /// Tüm kart başvuruları (sahip + hesapla) — admin için SALT-OKUNUR.
+    /// Kart onay/red yetkisi şube müdüründedir (bkz. ApprovalsController).
+    /// GET /api/admin/cards
+    /// </summary>
     [HttpGet("cards")]
     public async Task<IActionResult> GetCards()
     {
         var cards = await _cardService.GetAllCardsAsync();
         return Ok(ApiResponse<List<AdminCardDto>>.SuccessResponse(cards));
-    }
-
-    /// <summary>Kartı onayla. POST /api/admin/cards/{id}/approve</summary>
-    [HttpPost("cards/{id:guid}/approve")]
-    public async Task<IActionResult> ApproveCard(Guid id)
-    {
-        var card = await _cardService.ApproveAsync(id);
-        return Ok(ApiResponse<CardDto>.SuccessResponse(card, "Kart onaylandı."));
-    }
-
-    /// <summary>Kartı reddet. POST /api/admin/cards/{id}/reject</summary>
-    [HttpPost("cards/{id:guid}/reject")]
-    public async Task<IActionResult> RejectCard(Guid id)
-    {
-        var card = await _cardService.RejectAsync(id);
-        return Ok(ApiResponse<CardDto>.SuccessResponse(card, "Kart reddedildi."));
     }
 }

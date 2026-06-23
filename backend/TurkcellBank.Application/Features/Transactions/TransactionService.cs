@@ -16,6 +16,7 @@ public class TransactionService : ITransactionService
     private readonly IAccountRepository _accounts;
     private readonly ITransactionRepository _transactions;
     private readonly IOperationContext _ctx;
+    private readonly TransferOptions _transferOptions;
     private readonly IValidator<DepositRequest> _depositValidator;
     private readonly IValidator<TransferRequest> _transferValidator;
 
@@ -23,12 +24,14 @@ public class TransactionService : ITransactionService
         IAccountRepository accounts,
         ITransactionRepository transactions,
         IOperationContext ctx,
+        TransferOptions transferOptions,
         IValidator<DepositRequest> depositValidator,
         IValidator<TransferRequest> transferValidator)
     {
         _accounts = accounts;
         _transactions = transactions;
         _ctx = ctx;
+        _transferOptions = transferOptions;
         _depositValidator = depositValidator;
         _transferValidator = transferValidator;
     }
@@ -63,6 +66,14 @@ public class TransactionService : ITransactionService
     public async Task<TransactionDto> TransferAsync(TransferRequest request)
     {
         await ValidateAsync(_transferValidator, request);
+
+        // Fraud önlemi: belirli tutarın üzeri havaleler internet bankacılığında
+        // yapılamaz; müşteri şubeye yönlendirilir. (Şube kanalında bu limit geçerli
+        // değildir; çok yüksek tutarlar şube müdürü onayına BranchService'te düşer.)
+        if (_ctx.Channel == Channel.Internet && request.Amount > _transferOptions.InternetLimit)
+            throw new BusinessException(
+                $"{_transferOptions.InternetLimit:N0} TL üzeri havaleler güvenlik nedeniyle " +
+                "internetten yapılamaz; lütfen en yakın şubemize başvurun.");
 
         var from = await _accounts.GetByIdAsync(request.FromAccountId);
         EnsureOwnedAndActive(from);

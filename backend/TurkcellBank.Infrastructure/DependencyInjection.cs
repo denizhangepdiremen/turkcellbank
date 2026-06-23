@@ -38,6 +38,8 @@ public static class DependencyInjection
         services.AddScoped<IExternalBankLoanRepository, ExternalBankLoanRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<ICardRepository, CardRepository>();
+        services.AddScoped<IPendingTransferRepository, PendingTransferRepository>();
+        services.AddScoped<IBranchRepository, BranchRepository>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, JwtTokenService>();
 

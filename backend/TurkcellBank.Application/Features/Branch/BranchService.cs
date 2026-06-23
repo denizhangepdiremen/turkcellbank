@@ -26,8 +26,10 @@ public class BranchService : IBranchService
     private readonly IOperationContext _ctx;
     private readonly IAccountService _accountService;
     private readonly ITransactionService _transactionService;
+    private readonly ITransferApprovalService _transferApproval;
     private readonly ICardService _cardService;
     private readonly ILoanService _loanService;
+    private readonly TransferOptions _transferOptions;
 
     public BranchService(
         IUserRepository users,
@@ -35,16 +37,20 @@ public class BranchService : IBranchService
         IOperationContext ctx,
         IAccountService accountService,
         ITransactionService transactionService,
+        ITransferApprovalService transferApproval,
         ICardService cardService,
-        ILoanService loanService)
+        ILoanService loanService,
+        TransferOptions transferOptions)
     {
         _users = users;
         _currentUser = currentUser;
         _ctx = ctx;
         _accountService = accountService;
         _transactionService = transactionService;
+        _transferApproval = transferApproval;
         _cardService = cardService;
         _loanService = loanService;
+        _transferOptions = transferOptions;
     }
 
     public async Task<CustomerLookupDto> SearchCustomerAsync(string query)
@@ -80,10 +86,19 @@ public class BranchService : IBranchService
         return await _transactionService.DepositAsync(request);
     }
 
-    public async Task<TransactionDto> TransferAsync(Guid customerId, TransferRequest request)
+    public async Task<BranchTransferResultDto> TransferAsync(Guid customerId, TransferRequest request)
     {
         await ImpersonateAsync(customerId);
-        return await _transactionService.TransferAsync(request);
+
+        // Yüksek tutar (eşik üstü) hemen gerçekleşmez; şube müdürü onayına gider.
+        if (request.Amount > _transferOptions.BranchManagerApprovalLimit)
+        {
+            await _transferApproval.CreatePendingAsync(request);
+            return new BranchTransferResultDto("PendingApproval", request.Amount);
+        }
+
+        await _transactionService.TransferAsync(request);
+        return new BranchTransferResultDto("Completed", request.Amount);
     }
 
     public async Task<CardDto> ApplyCardAsync(Guid customerId, CreateCardRequest request)
