@@ -51,8 +51,14 @@ export interface BranchTransferPayload {
   description?: string
 }
 
+// Eşik üstü havale hemen gerçekleşmez, şube müdürü onayına gider (status).
+export interface BranchTransferResult {
+  status: 'Completed' | 'PendingApproval'
+  amount: number
+}
+
 export async function transfer(customerId: string, payload: BranchTransferPayload) {
-  const { data } = await apiClient.post<ApiResponse<Transaction>>(
+  const { data } = await apiClient.post<ApiResponse<BranchTransferResult>>(
     `/api/branch/customers/${customerId}/transfer`,
     payload,
   )

@@ -104,6 +104,36 @@ export interface Loan {
   paymentPlan: PaymentPlan | null
 }
 
+// Şube müdürü onay kuyruğundaki yüksek tutarlı havale.
+export interface PendingTransfer {
+  id: string
+  customerName: string
+  fromIban: string
+  toIban: string
+  amount: number
+  description: string | null
+  createdAt: string
+}
+
+// Organizasyon görünümü (yönetici panelleri).
+export interface OrgMember {
+  fullName: string
+  email: string
+  role: string
+  branchName: string | null
+  city: string | null
+}
+export interface OrgStat {
+  label: string
+  value: number
+}
+export interface OrgView {
+  title: string
+  subtitle: string
+  members: OrgMember[]
+  stats: OrgStat[]
+}
+
 // Yetkili onay kuyruğundaki kredi (şube/il müdürü/direktör panelleri).
 export interface PendingLoan {
   id: string

@@ -169,7 +169,13 @@ export function BranchEmployeePanel() {
             onClose={() => setModal(null)}
             customerId={customer.id}
             accountOptions={accountOptions}
-            onDone={() => afterAction('Transfer tamamlandı.')}
+            onDone={(status) =>
+              afterAction(
+                status === 'PendingApproval'
+                  ? 'Yüksek tutarlı havale şube müdürü onayına gönderildi.'
+                  : 'Transfer tamamlandı.',
+              )
+            }
           />
           <CardModal
             open={modal === 'card'}
@@ -260,7 +266,7 @@ function DepositModal({ open, onClose, customerId, accountOptions, onDone }: {
 }
 
 function TransferModal({ open, onClose, customerId, accountOptions, onDone }: {
-  open: boolean; onClose: () => void; customerId: string; accountOptions: AccountOption[]; onDone: () => void
+  open: boolean; onClose: () => void; customerId: string; accountOptions: AccountOption[]; onDone: (status: string) => void
 }) {
   const [fromAccountId, setFromAccountId] = useState('')
   const [toIban, setToIban] = useState('')
@@ -274,7 +280,7 @@ function TransferModal({ open, onClose, customerId, accountOptions, onDone }: {
         amount: Number(amount),
         description: description.trim() || undefined,
       }),
-    onSuccess: onDone,
+    onSuccess: (res) => res.data && onDone(res.data.status),
     onError: (err) => toast.error(getApiErrorMessage(err, 'Transfer yapılamadı.')),
   })
   return (

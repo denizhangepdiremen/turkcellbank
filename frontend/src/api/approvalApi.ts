@@ -1,5 +1,12 @@
 import { apiClient } from '../lib/apiClient'
-import type { ApiResponse, Loan, PendingLoan } from '../lib/types'
+import type {
+  AdminCard,
+  ApiResponse,
+  Card,
+  Loan,
+  PendingLoan,
+  PendingTransfer,
+} from '../lib/types'
 
 // Yetkili kredi onay işlemleri (şube/il müdürü/direktör).
 
@@ -24,6 +31,48 @@ export async function rejectLoan(id: string, note?: string) {
   const { data } = await apiClient.post<ApiResponse<Loan>>(
     `/api/approvals/loans/${id}/reject`,
     { note },
+  )
+  return data
+}
+
+// --- Yüksek tutarlı havale onayı (şube müdürü) ---
+export async function getPendingTransfers() {
+  const { data } =
+    await apiClient.get<ApiResponse<PendingTransfer[]>>('/api/approvals/transfers')
+  return data
+}
+export async function approveTransfer(id: string, note?: string) {
+  const { data } = await apiClient.post<ApiResponse<unknown>>(
+    `/api/approvals/transfers/${id}/approve`,
+    { note },
+  )
+  return data
+}
+export async function rejectTransfer(id: string, note?: string) {
+  const { data } = await apiClient.post<ApiResponse<unknown>>(
+    `/api/approvals/transfers/${id}/reject`,
+    { note },
+  )
+  return data
+}
+
+// --- Kart başvuru onayı (şube müdürü) ---
+export async function getPendingCards() {
+  const { data } =
+    await apiClient.get<ApiResponse<AdminCard[]>>('/api/approvals/cards')
+  return data
+}
+export async function approveCard(id: string) {
+  const { data } = await apiClient.post<ApiResponse<Card>>(
+    `/api/approvals/cards/${id}/approve`,
+    {},
+  )
+  return data
+}
+export async function rejectCard(id: string) {
+  const { data } = await apiClient.post<ApiResponse<Card>>(
+    `/api/approvals/cards/${id}/reject`,
+    {},
   )
   return data
 }

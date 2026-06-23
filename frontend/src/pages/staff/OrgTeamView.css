@@ -1,0 +1,76 @@
+/* Organizasyon görünümü (yönetici ekibim) */
+
+.org-head {
+  margin-bottom: 1rem;
+}
+.org-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+.org-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.org-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+.org-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.75rem;
+  background-color: #eef2ff;
+  border-radius: 0.5rem;
+}
+.org-stat-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #4f46e5;
+}
+.org-stat-label {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.org-members {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.org-member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.75rem;
+  background-color: #f8fafc;
+  border-radius: 0.5rem;
+}
+.org-member-name {
+  margin: 0;
+  font-weight: 600;
+  color: #1e293b;
+}
+.org-member-sub {
+  margin: 0.1rem 0 0;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+.org-member-role {
+  font-size: 0.82rem;
+  color: #475569;
+  text-align: right;
+}
+
+.org-empty {
+  padding: 1rem;
+  text-align: center;
+  color: #94a3b8;
+}

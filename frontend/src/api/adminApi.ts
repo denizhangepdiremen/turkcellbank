@@ -4,7 +4,6 @@ import type {
   AdminLoan,
   AdminPayment,
   ApiResponse,
-  Card,
   Payment,
   User,
 } from '../lib/types'
@@ -45,19 +44,4 @@ export async function getCards() {
   return data
 }
 
-// Kartı onayla / reddet
-export async function approveCard(id: string) {
-  const { data } = await apiClient.post<ApiResponse<Card>>(
-    `/api/admin/cards/${id}/approve`,
-    {},
-  )
-  return data
-}
-
-export async function rejectCard(id: string) {
-  const { data } = await apiClient.post<ApiResponse<Card>>(
-    `/api/admin/cards/${id}/reject`,
-    {},
-  )
-  return data
-}
+// Kart onay/red yetkisi admin'de değildir; şube müdüründedir (approvalApi).

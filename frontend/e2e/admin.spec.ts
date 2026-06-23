@@ -5,9 +5,7 @@ import {
   ensureRegistered,
   loginViaUi,
   loginAsAdmin,
-  openAccount,
   applyForLoan,
-  applyForCard,
 } from './helpers'
 
 // Admin paneli akışları — backend gerektirir.
@@ -53,68 +51,17 @@ test.describe('Admin: Kredi görünümü (salt-okunur)', () => {
   })
 })
 
-test.describe('Admin: Kart yönetimi', () => {
-  test.beforeAll(async () => {
-    await ensureRegistered(DUMMY)
-  })
+test.describe('Admin: Kart görünümü (salt-okunur)', () => {
+  test('kart tablosu salt-okunurdur (Onayla/Reddet yok)', async ({ page }) => {
+    // Kart onay/red yetkisi artık şube müdüründedir (bkz. sprint4.spec.ts).
+    await loginAsAdmin(page)
 
-  test('admin kart başvurusunu onaylar', async ({ browser }) => {
-    // 1. Kullanıcı olarak kart başvurusu yap
-    const userCtx = await browser.newContext()
-    const userPage = await userCtx.newPage()
-    await loginViaUi(userPage, DUMMY.email, DUMMY.password)
-    await expect(userPage).toHaveURL(/\/dashboard$/)
-
-    // Hesap aç ve kart başvurusu yap
-    await openAccount(userPage)
-    await applyForCard(userPage)
-    await userPage.close()
-    await userCtx.close()
-
-    // 2. Admin olarak giriş yap ve kart onayla
-    const adminCtx = await browser.newContext()
-    const adminPage = await adminCtx.newPage()
-    await loginAsAdmin(adminPage)
-
-    // Kart tablosunu hedefle (Sahip sütunu yalnızca kart tablosunda var)
-    const cardTable = adminPage.locator('table.admin-table', {
-      has: adminPage.getByRole('columnheader', { name: 'Sahip' }),
+    const cardTable = page.locator('table.admin-table', {
+      has: page.getByRole('columnheader', { name: 'Sahip' }),
     })
-    await cardTable.getByRole('button', { name: 'Onayla' }).first().click()
-    await expect(adminPage.getByText('Kart onaylandı.')).toBeVisible()
-
-    await adminPage.close()
-    await adminCtx.close()
-  })
-
-  test('admin kart başvurusunu reddeder', async ({ browser }) => {
-    // 1. Kullanıcı olarak kart başvurusu yap
-    const userCtx = await browser.newContext()
-    const userPage = await userCtx.newPage()
-    await loginViaUi(userPage, DUMMY.email, DUMMY.password)
-    await expect(userPage).toHaveURL(/\/dashboard$/)
-
-    await openAccount(userPage)
-    await applyForCard(userPage)
-    await userPage.close()
-    await userCtx.close()
-
-    // 2. Admin olarak giriş yap ve reddet
-    const adminCtx = await browser.newContext()
-    const adminPage = await adminCtx.newPage()
-    await loginAsAdmin(adminPage)
-
-    // Kart tablosundaki en yeni başvuruyu reddet
-    const cardTable = adminPage.locator('table.admin-table', {
-      has: adminPage.getByRole('columnheader', { name: 'Sahip' }),
-    })
-    await cardTable.getByRole('button', { name: 'Reddet' }).first().click()
-    // ConfirmDialog onayı
-    await adminPage.getByRole('dialog').getByRole('button', { name: 'Reddet' }).click()
-    await expect(adminPage.getByText('Kart reddedildi.')).toBeVisible()
-
-    await adminPage.close()
-    await adminCtx.close()
+    await expect(cardTable).toBeVisible()
+    await expect(cardTable.getByRole('button', { name: 'Onayla' })).toHaveCount(0)
+    await expect(cardTable.getByRole('button', { name: 'Reddet' })).toHaveCount(0)
   })
 })
 
