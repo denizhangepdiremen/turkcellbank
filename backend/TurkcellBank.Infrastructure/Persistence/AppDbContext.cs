@@ -82,6 +82,8 @@ public class AppDbContext : DbContext
 
             entity.Property(a => a.Balance).HasPrecision(18, 2); // para hassasiyeti
 
+            entity.Property(a => a.Channel).HasConversion<string>().HasMaxLength(10);
+
             // İlişki: Account -> User (çok hesap, tek kullanıcı).
             // Kullanıcı silinirse hesapları da silinir (Cascade).
             entity.HasOne(a => a.User)
@@ -100,6 +102,7 @@ public class AppDbContext : DbContext
             entity.Property(t => t.Description).HasMaxLength(20);
             entity.Property(t => t.FromIban).HasMaxLength(34);
             entity.Property(t => t.ToIban).HasMaxLength(34);
+            entity.Property(t => t.Channel).HasConversion<string>().HasMaxLength(10);
 
             // Geçmiş sorguları FromAccountId/ToAccountId üzerinden yapılır
             entity.HasIndex(t => t.FromAccountId);
@@ -126,6 +129,7 @@ public class AppDbContext : DbContext
             entity.Property(l => l.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(l => l.RecommendedStatus).HasConversion<string>().HasMaxLength(20);
             entity.Property(l => l.RequiredApproverRole).HasConversion<string>().HasMaxLength(30);
+            entity.Property(l => l.Channel).HasConversion<string>().HasMaxLength(10);
 
             // Onay kuyruğu sorgusu (PendingApproval) için index
             entity.HasIndex(l => l.Status);
@@ -173,6 +177,7 @@ public class AppDbContext : DbContext
             entity.Property(p => p.Amount).HasPrecision(18, 2);
             entity.Property(p => p.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(p => p.Description).HasMaxLength(200);
+            entity.Property(p => p.Channel).HasConversion<string>().HasMaxLength(10);
 
             entity.HasIndex(p => p.UserId);
 
@@ -190,6 +195,7 @@ public class AppDbContext : DbContext
             entity.HasIndex(c => c.CardNumber).IsUnique();
             entity.Property(c => c.Cvv).IsRequired().HasMaxLength(4);
             entity.Property(c => c.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(c => c.Channel).HasConversion<string>().HasMaxLength(10);
 
             // Sahibi: kullanıcı silinince kartları da silinsin
             entity.HasOne(c => c.User)

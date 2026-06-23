@@ -25,6 +25,10 @@ public class Account
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // İşlem kanalı + adına işlemde şube çalışanı (denetim/izlenebilirlik için)
+    public Channel Channel { get; set; } = Channel.Internet;
+    public Guid? PerformedByEmployeeId { get; set; }
+
     // İlişki: bu hesabın sahibi olan kullanıcı.
     public User? User { get; set; }
 }

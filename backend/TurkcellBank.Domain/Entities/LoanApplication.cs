@@ -58,4 +58,8 @@ public class LoanApplication
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? DecidedAt { get; set; }  // karar verildiği an
+
+    // İşlem kanalı + adına başvuruda şube çalışanı (denetim/izlenebilirlik için)
+    public Channel Channel { get; set; } = Channel.Internet;
+    public Guid? PerformedByEmployeeId { get; set; }
 }

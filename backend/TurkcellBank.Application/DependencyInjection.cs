@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<ITransactionService, TransactionService>();
         services.AddScoped<Features.Admin.IAdminService, Features.Admin.AdminService>();
         services.AddScoped<Features.Loans.ILoanService, Features.Loans.LoanService>();
+        services.AddScoped<Features.Branch.IBranchService, Features.Branch.BranchService>();
         services.AddScoped<Features.Payments.IPaymentService, Features.Payments.PaymentService>();
         services.AddScoped<Features.Cards.ICardService, Features.Cards.CardService>();
 

@@ -15,7 +15,7 @@ public class PaymentService : IPaymentService
     private readonly ICardRepository _cards;
     private readonly IAccountRepository _accounts;
     private readonly ITransactionRepository _transactions;
-    private readonly ICurrentUserService _currentUser;
+    private readonly IOperationContext _ctx;
     private readonly IValidator<PaymentRequest> _validator;
 
     public PaymentService(
@@ -23,14 +23,14 @@ public class PaymentService : IPaymentService
         ICardRepository cards,
         IAccountRepository accounts,
         ITransactionRepository transactions,
-        ICurrentUserService currentUser,
+        IOperationContext ctx,
         IValidator<PaymentRequest> validator)
     {
         _payments = payments;
         _cards = cards;
         _accounts = accounts;
         _transactions = transactions;
-        _currentUser = currentUser;
+        _ctx = ctx;
         _validator = validator;
     }
 
@@ -41,9 +41,9 @@ public class PaymentService : IPaymentService
             throw new Common.Exceptions.ValidationException(
                 validation.Errors.Select(e => e.ErrorMessage).ToList());
 
-        // 1) Kart bu kullanıcıya mı ait?
+        // 1) Kart işlemin sahibine mi ait?
         var card = await _cards.GetByIdAsync(request.CardId);
-        if (card is null || card.UserId != _currentUser.UserId)
+        if (card is null || card.UserId != _ctx.ActingUserId)
             throw new NotFoundException("Kart bulunamadı.");
 
         // 2) Kart onaylı mı?
@@ -65,7 +65,7 @@ public class PaymentService : IPaymentService
             await _payments.AddAsync(new Payment
             {
                 Id = Guid.NewGuid(),
-                UserId = _currentUser.UserId,
+                UserId = _ctx.ActingUserId,
                 CardId = card.Id,
                 AccountId = account.Id,
                 MaskedCardNumber = masked,
@@ -73,6 +73,8 @@ public class PaymentService : IPaymentService
                 Status = PaymentStatus.Failed,
                 Description = request.Description,
                 CreatedAt = DateTime.UtcNow,
+                Channel = _ctx.Channel,
+                PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
             });
             throw new BusinessException("3D Secure kodu hatalı.");
         }
@@ -87,7 +89,7 @@ public class PaymentService : IPaymentService
         var payment = new Payment
         {
             Id = Guid.NewGuid(),
-            UserId = _currentUser.UserId,
+            UserId = _ctx.ActingUserId,
             CardId = card.Id,
             AccountId = account.Id,
             MaskedCardNumber = masked,
@@ -95,6 +97,8 @@ public class PaymentService : IPaymentService
             Status = PaymentStatus.Success,
             Description = request.Description,
             CreatedAt = DateTime.UtcNow,
+            Channel = _ctx.Channel,
+            PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
         };
         _payments.Add(payment); // kaydetmez
 
@@ -107,6 +111,8 @@ public class PaymentService : IPaymentService
             Amount = request.Amount,
             Description = request.Description ?? "POS ödemesi",
             CreatedAt = DateTime.UtcNow,
+            Channel = _ctx.Channel,
+            PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
         };
         // Tek SaveChanges: bakiye + ödeme + işlem birlikte
         await _transactions.AddAsync(tx);
@@ -116,7 +122,7 @@ public class PaymentService : IPaymentService
 
     public async Task<List<PaymentDto>> GetMyPaymentsAsync()
     {
-        var payments = await _payments.GetByUserIdAsync(_currentUser.UserId);
+        var payments = await _payments.GetByUserIdAsync(_ctx.ActingUserId);
         return payments.Select(Map).ToList();
     }
 

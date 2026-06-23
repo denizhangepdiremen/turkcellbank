@@ -16,6 +16,7 @@ public class LoanService : ILoanService
     private readonly IExternalBankLoanRepository _external;
     private readonly ILoanAiEvaluator _evaluator;
     private readonly ICurrentUserService _currentUser;
+    private readonly IOperationContext _ctx;
     private readonly IValidator<LoanApplicationRequest> _validator;
     private readonly LoanApprovalOptions _options;
 
@@ -26,6 +27,7 @@ public class LoanService : ILoanService
         IExternalBankLoanRepository external,
         ILoanAiEvaluator evaluator,
         ICurrentUserService currentUser,
+        IOperationContext ctx,
         IValidator<LoanApplicationRequest> validator,
         LoanApprovalOptions options)
     {
@@ -35,6 +37,7 @@ public class LoanService : ILoanService
         _external = external;
         _evaluator = evaluator;
         _currentUser = currentUser;
+        _ctx = ctx;
         _validator = validator;
         _options = options;
     }
@@ -49,8 +52,8 @@ public class LoanService : ILoanService
         var nationalId = request.NationalId.Trim();
         var profession = request.Profession.Trim();
 
-        // TC kimlik no'yu kullanıcıya bir kez kaydet (sonraki başvurularda kullanılır)
-        var user = await _users.GetByIdAsync(_currentUser.UserId);
+        // TC kimlik no'yu (işlem sahibi) müşteriye bir kez kaydet
+        var user = await _users.GetByIdAsync(_ctx.ActingUserId);
         if (user is not null && string.IsNullOrWhiteSpace(user.NationalId))
         {
             user.NationalId = nationalId;
@@ -80,7 +83,7 @@ public class LoanService : ILoanService
         var externalLoans = await _external.GetByNationalIdAsync(nationalId);
         var externalDebt = externalLoans.Sum(e => e.RemainingDebt);
 
-        var myLoans = await _loans.GetByUserIdAsync(_currentUser.UserId);
+        var myLoans = await _loans.GetByUserIdAsync(_ctx.ActingUserId);
         var ourDebt = myLoans.Where(l => l.Status == LoanStatus.Approved).Sum(l => l.Amount);
 
         var existingDebt = externalDebt + ourDebt;
@@ -120,7 +123,7 @@ public class LoanService : ILoanService
         var loan = new LoanApplication
         {
             Id = Guid.NewGuid(),
-            UserId = _currentUser.UserId,
+            UserId = _ctx.ActingUserId,
             NationalId = nationalId,
             Age = request.Age,
             MaritalStatus = request.MaritalStatus,
@@ -144,6 +147,8 @@ public class LoanService : ILoanService
             DecisionNote = string.Empty,
             CreatedAt = DateTime.UtcNow,
             DecidedAt = decidedAt,
+            Channel = _ctx.Channel,
+            PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
         };
 
         await _loans.AddAsync(loan);

@@ -22,6 +22,8 @@ builder.Services.AddControllers()
 // Şu anki kullanıcıyı token'dan okuyabilmek için
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+// İşlem bağlamı (kimin adına + hangi kanal) — şube "adına işlem" için scoped
+builder.Services.AddScoped<IOperationContext, OperationContext>();
 
 // Swagger / OpenAPI + JWT "Authorize" butonu
 builder.Services.AddEndpointsApiExplorer();

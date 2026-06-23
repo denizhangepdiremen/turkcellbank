@@ -12,4 +12,5 @@ public record TransactionDto(
     decimal Amount,
     string? CounterpartyIban,
     string? Description,
+    string Channel, // "Internet" / "Branch" — şube adına işlemde "Branch"
     DateTime CreatedAt);

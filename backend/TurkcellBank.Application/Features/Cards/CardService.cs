@@ -12,18 +12,18 @@ public class CardService : ICardService
 {
     private readonly ICardRepository _cards;
     private readonly IAccountRepository _accounts;
-    private readonly ICurrentUserService _currentUser;
+    private readonly IOperationContext _ctx;
     private readonly IValidator<CreateCardRequest> _validator;
 
     public CardService(
         ICardRepository cards,
         IAccountRepository accounts,
-        ICurrentUserService currentUser,
+        IOperationContext ctx,
         IValidator<CreateCardRequest> validator)
     {
         _cards = cards;
         _accounts = accounts;
-        _currentUser = currentUser;
+        _ctx = ctx;
         _validator = validator;
     }
 
@@ -34,9 +34,9 @@ public class CardService : ICardService
             throw new Common.Exceptions.ValidationException(
                 validation.Errors.Select(e => e.ErrorMessage).ToList());
 
-        // Hesap bu kullanıcıya mı ait ve aktif mi?
+        // Hesap işlemin sahibine mi ait ve aktif mi?
         var account = await _accounts.GetByIdAsync(request.AccountId);
-        if (account is null || account.UserId != _currentUser.UserId)
+        if (account is null || account.UserId != _ctx.ActingUserId)
             throw new NotFoundException("Hesap bulunamadı.");
         if (!account.IsActive)
             throw new BusinessException("Kapalı hesaba kart açılamaz.");
@@ -53,14 +53,16 @@ public class CardService : ICardService
         var card = new Card
         {
             Id = Guid.NewGuid(),
-            UserId = _currentUser.UserId,
+            UserId = _ctx.ActingUserId,
             AccountId = account.Id,
             CardNumber = number,
             ExpiryMonth = now.Month,
             ExpiryYear = now.Year + 4,
             Cvv = CardHelper.GenerateCvv(),
-            Status = CardStatus.Pending, // admin onayı bekler
+            Status = CardStatus.Pending, // yetkili onayı bekler
             CreatedAt = now,
+            Channel = _ctx.Channel,
+            PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
         };
 
         await _cards.AddAsync(card);
@@ -69,7 +71,7 @@ public class CardService : ICardService
 
     public async Task<List<CardDto>> GetMyCardsAsync()
     {
-        var cards = await _cards.GetByUserIdAsync(_currentUser.UserId);
+        var cards = await _cards.GetByUserIdAsync(_ctx.ActingUserId);
         return cards.Select(c => MapCard(c, c.Account?.Iban ?? "—")).ToList();
     }
 

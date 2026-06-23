@@ -13,16 +13,16 @@ namespace TurkcellBank.Application.Features.Accounts;
 public class AccountService : IAccountService
 {
     private readonly IAccountRepository _accounts;
-    private readonly ICurrentUserService _currentUser;
+    private readonly IOperationContext _ctx;
     private readonly IValidator<CreateAccountRequest> _createValidator;
 
     public AccountService(
         IAccountRepository accounts,
-        ICurrentUserService currentUser,
+        IOperationContext ctx,
         IValidator<CreateAccountRequest> createValidator)
     {
         _accounts = accounts;
-        _currentUser = currentUser;
+        _ctx = ctx;
         _createValidator = createValidator;
     }
 
@@ -46,12 +46,14 @@ public class AccountService : IAccountService
         var account = new Account
         {
             Id = Guid.NewGuid(),
-            UserId = _currentUser.UserId, // hesap, giriş yapan kullanıcıya ait
+            UserId = _ctx.ActingUserId, // hesap, işlemin sahibine ait (müşteri)
             Iban = iban,
             AccountType = request.AccountType,
             Balance = 0m, // yeni hesap sıfır bakiyeyle açılır
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
+            Channel = _ctx.Channel,
+            PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
         };
 
         await _accounts.AddAsync(account);
@@ -60,7 +62,7 @@ public class AccountService : IAccountService
 
     public async Task<List<AccountDto>> GetMyAccountsAsync()
     {
-        var accounts = await _accounts.GetByUserIdAsync(_currentUser.UserId);
+        var accounts = await _accounts.GetByUserIdAsync(_ctx.ActingUserId);
         return accounts.Select(Map).ToList();
     }
 
@@ -70,7 +72,7 @@ public class AccountService : IAccountService
 
         // Güvenlik: hesap yoksa VEYA başkasının hesabıysa "bulunamadı" de
         // (başkasının hesabının varlığını sızdırma).
-        if (account is null || account.UserId != _currentUser.UserId)
+        if (account is null || account.UserId != _ctx.ActingUserId)
         {
             throw new NotFoundException("Hesap bulunamadı.");
         }

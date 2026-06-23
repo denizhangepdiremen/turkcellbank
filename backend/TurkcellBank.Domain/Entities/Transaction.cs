@@ -30,4 +30,8 @@ public class Transaction
     public string? Description { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    // İşlem kanalı + adına işlemde şube çalışanı (denetim/izlenebilirlik için)
+    public Channel Channel { get; set; } = Channel.Internet;
+    public Guid? PerformedByEmployeeId { get; set; }
 }

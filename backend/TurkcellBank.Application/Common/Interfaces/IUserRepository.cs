@@ -15,6 +15,9 @@ public interface IUserRepository
     // E-postaya göre kullanıcıyı getir (giriş için). Yoksa null döner.
     Task<User?> GetByEmailAsync(string email);
 
+    // TC kimlik no'ya göre kullanıcıyı getir (şube müşteri arama). Yoksa null.
+    Task<User?> GetByNationalIdAsync(string nationalId);
+
     // Id ile kullanıcıyı getir (profil için). Yoksa null döner.
     Task<User?> GetByIdAsync(Guid id);
 

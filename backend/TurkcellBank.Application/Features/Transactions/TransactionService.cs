@@ -15,20 +15,20 @@ public class TransactionService : ITransactionService
 {
     private readonly IAccountRepository _accounts;
     private readonly ITransactionRepository _transactions;
-    private readonly ICurrentUserService _currentUser;
+    private readonly IOperationContext _ctx;
     private readonly IValidator<DepositRequest> _depositValidator;
     private readonly IValidator<TransferRequest> _transferValidator;
 
     public TransactionService(
         IAccountRepository accounts,
         ITransactionRepository transactions,
-        ICurrentUserService currentUser,
+        IOperationContext ctx,
         IValidator<DepositRequest> depositValidator,
         IValidator<TransferRequest> transferValidator)
     {
         _accounts = accounts;
         _transactions = transactions;
-        _currentUser = currentUser;
+        _ctx = ctx;
         _depositValidator = depositValidator;
         _transferValidator = transferValidator;
     }
@@ -52,10 +52,12 @@ public class TransactionService : ITransactionService
             Amount = request.Amount,
             Description = "Para yatırma",
             CreatedAt = DateTime.UtcNow,
+            Channel = _ctx.Channel,
+            PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
         };
         await _transactions.AddAsync(tx); // hesabın yeni bakiyesini de kaydeder
 
-        return new TransactionDto(tx.Id, tx.Type.ToString(), "In", tx.Amount, null, tx.Description, tx.CreatedAt);
+        return new TransactionDto(tx.Id, tx.Type.ToString(), "In", tx.Amount, null, tx.Description, tx.Channel.ToString(), tx.CreatedAt);
     }
 
     public async Task<TransactionDto> TransferAsync(TransferRequest request)
@@ -92,11 +94,13 @@ public class TransactionService : ITransactionService
             Amount = request.Amount,
             Description = request.Description,
             CreatedAt = DateTime.UtcNow,
+            Channel = _ctx.Channel,
+            PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
         };
         // Tek SaveChanges: iki bakiye + işlem birlikte (atomik)
         await _transactions.AddAsync(tx);
 
-        return new TransactionDto(tx.Id, tx.Type.ToString(), "Out", tx.Amount, to.Iban, tx.Description, tx.CreatedAt);
+        return new TransactionDto(tx.Id, tx.Type.ToString(), "Out", tx.Amount, to.Iban, tx.Description, tx.Channel.ToString(), tx.CreatedAt);
     }
 
     public async Task<List<TransactionDto>> GetHistoryAsync(Guid accountId)
@@ -113,7 +117,7 @@ public class TransactionService : ITransactionService
             var direction = isOutgoing ? "Out" : "In";
             var counterparty = isOutgoing ? t.ToIban : t.FromIban; // deposit'te FromIban null
             return new TransactionDto(
-                t.Id, t.Type.ToString(), direction, t.Amount, counterparty, t.Description, t.CreatedAt);
+                t.Id, t.Type.ToString(), direction, t.Amount, counterparty, t.Description, t.Channel.ToString(), t.CreatedAt);
         }).ToList();
     }
 
@@ -132,7 +136,7 @@ public class TransactionService : ITransactionService
     // Hesap var mı, bu kullanıcıya mı ait, (gerekiyorsa) aktif mi?
     private void EnsureOwnedAndActive(Account? account, bool requireActive = true)
     {
-        if (account is null || account.UserId != _currentUser.UserId)
+        if (account is null || account.UserId != _ctx.ActingUserId)
             throw new NotFoundException("Hesap bulunamadı.");
         if (requireActive && !account.IsActive)
             throw new BusinessException("Hesap kapalı.");
