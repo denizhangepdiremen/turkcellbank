@@ -1,4 +1,5 @@
 using TurkcellBank.Domain.Entities;
+using TurkcellBank.Domain.Enums;
 
 namespace TurkcellBank.Application.Common.Interfaces;
 
@@ -15,6 +16,9 @@ public interface ILoanRepository
 
     // Tüm başvurular, başvuran bilgisiyle (admin için)
     Task<List<LoanApplication>> GetAllWithUserAsync();
+
+    // Belirli durumdaki başvurular, başvuranla (yetkili onay kuyruğu için)
+    Task<List<LoanApplication>> GetByStatusWithUserAsync(LoanStatus status);
 
     // Karar (onay/red) sonrası kaydet
     Task SaveChangesAsync();

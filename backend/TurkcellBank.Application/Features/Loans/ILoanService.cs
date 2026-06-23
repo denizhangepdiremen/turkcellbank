@@ -9,8 +9,11 @@ public interface ILoanService
     Task<List<LoanDto>> GetMyLoansAsync();
     Task<LoanDto> GetMyLoanDetailAsync(Guid id); // onaylıysa ödeme planıyla
 
-    // --- Admin ---
+    // --- Admin (teknik, salt-okunur) ---
     Task<List<AdminLoanDto>> GetAllLoansAsync();
-    Task<LoanDto> ApproveAsync(Guid id);
-    Task<LoanDto> RejectAsync(Guid id);
+
+    // --- Yetkili onay (şube/il müdürü/direktör) ---
+    Task<List<PendingLoanDto>> GetPendingApprovalsAsync();
+    Task<LoanDto> ApproveAsync(Guid id, string? note);
+    Task<LoanDto> RejectAsync(Guid id, string? note);
 }

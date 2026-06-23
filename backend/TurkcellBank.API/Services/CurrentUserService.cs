@@ -25,4 +25,7 @@ public class CurrentUserService : ICurrentUserService
             return Guid.Parse(id!); // [Authorize]'lı endpoint'lerde her zaman dolu
         }
     }
+
+    public string? Role =>
+        _httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.Role);
 }

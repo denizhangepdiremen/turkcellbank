@@ -8,4 +8,7 @@ namespace TurkcellBank.Application.Common.Interfaces;
 public interface ICurrentUserService
 {
     Guid UserId { get; }
+
+    // Token'daki rol claim'i (yetki kontrolü için). Yoksa null.
+    string? Role { get; }
 }

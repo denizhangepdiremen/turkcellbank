@@ -46,28 +46,16 @@ public class AdminController : ControllerBase
         return Ok(ApiResponse<List<UserDto>>.SuccessResponse(users));
     }
 
-    /// <summary>Tüm kredi başvuruları (başvuranla). GET /api/admin/loans</summary>
+    /// <summary>
+    /// Tüm kredi başvuruları (başvuranla) — admin için SALT-OKUNUR teknik görünüm.
+    /// Kredi onay/red yetkisi admin'de değildir; banka hiyerarşisindedir
+    /// (bkz. ApprovalsController). GET /api/admin/loans
+    /// </summary>
     [HttpGet("loans")]
     public async Task<IActionResult> GetLoans()
     {
         var loans = await _loanService.GetAllLoansAsync();
         return Ok(ApiResponse<List<AdminLoanDto>>.SuccessResponse(loans));
-    }
-
-    /// <summary>Krediyi onayla. POST /api/admin/loans/{id}/approve</summary>
-    [HttpPost("loans/{id:guid}/approve")]
-    public async Task<IActionResult> ApproveLoan(Guid id)
-    {
-        var loan = await _loanService.ApproveAsync(id);
-        return Ok(ApiResponse<LoanDto>.SuccessResponse(loan, "Başvuru onaylandı."));
-    }
-
-    /// <summary>Krediyi reddet. POST /api/admin/loans/{id}/reject</summary>
-    [HttpPost("loans/{id:guid}/reject")]
-    public async Task<IActionResult> RejectLoan(Guid id)
-    {
-        var loan = await _loanService.RejectAsync(id);
-        return Ok(ApiResponse<LoanDto>.SuccessResponse(loan, "Başvuru reddedildi."));
     }
 
     /// <summary>Tüm ödemeler (ödeyenle). GET /api/admin/payments</summary>

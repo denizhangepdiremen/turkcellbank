@@ -6,6 +6,7 @@ using TurkcellBank.API.Middleware;
 using TurkcellBank.API.Services;
 using TurkcellBank.Application;
 using TurkcellBank.Application.Common.Interfaces;
+using TurkcellBank.Application.Features.Loans;
 using TurkcellBank.Infrastructure;
 using TurkcellBank.Infrastructure.Persistence;
 
@@ -59,6 +60,11 @@ builder.Services.AddCors(options =>
 
 // Application katmanı: iş mantığı servisleri + validator'lar
 builder.Services.AddApplication();
+
+// Tutar bazlı kredi onay eşikleri (config "Loan" bölümü; yoksa varsayılanlar)
+builder.Services.AddSingleton(
+    builder.Configuration.GetSection("Loan").Get<LoanApprovalOptions>()
+        ?? new LoanApprovalOptions());
 
 // Infrastructure katmanı: veritabanı (PostgreSQL + EF Core) bağlantısı
 // Tek satırla; detaylar Infrastructure/DependencyInjection.cs içinde.

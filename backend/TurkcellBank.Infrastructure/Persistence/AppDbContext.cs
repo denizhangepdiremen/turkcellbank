@@ -120,9 +120,15 @@ public class AppDbContext : DbContext
             entity.Property(l => l.NetLimit).HasPrecision(18, 2);
             entity.Property(l => l.AiReason).HasMaxLength(1000);
             entity.Property(l => l.DecidedBy).HasMaxLength(40);
+            entity.Property(l => l.DecisionNote).HasMaxLength(1000);
             entity.Property(l => l.MaritalStatus).HasConversion<string>().HasMaxLength(20);
             entity.Property(l => l.HousingStatus).HasConversion<string>().HasMaxLength(20);
             entity.Property(l => l.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(l => l.RecommendedStatus).HasConversion<string>().HasMaxLength(20);
+            entity.Property(l => l.RequiredApproverRole).HasConversion<string>().HasMaxLength(30);
+
+            // Onay kuyruğu sorgusu (PendingApproval) için index
+            entity.HasIndex(l => l.Status);
 
             entity.HasOne(l => l.User)
                 .WithMany()

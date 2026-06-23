@@ -18,6 +18,7 @@ public record LoanDto(
     decimal NetLimit,
     string AiReason,
     string DecidedBy,
+    string DecisionNote, // yetkili karar notu (otomatik kredilerde boş)
     DateTime CreatedAt,
     DateTime? DecidedAt,
     PaymentPlanDto? PaymentPlan);

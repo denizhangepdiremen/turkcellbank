@@ -17,6 +17,7 @@ public class LoanService : ILoanService
     private readonly ILoanAiEvaluator _evaluator;
     private readonly ICurrentUserService _currentUser;
     private readonly IValidator<LoanApplicationRequest> _validator;
+    private readonly LoanApprovalOptions _options;
 
     public LoanService(
         ILoanRepository loans,
@@ -25,7 +26,8 @@ public class LoanService : ILoanService
         IExternalBankLoanRepository external,
         ILoanAiEvaluator evaluator,
         ICurrentUserService currentUser,
-        IValidator<LoanApplicationRequest> validator)
+        IValidator<LoanApplicationRequest> validator,
+        LoanApprovalOptions options)
     {
         _loans = loans;
         _users = users;
@@ -34,6 +36,7 @@ public class LoanService : ILoanService
         _evaluator = evaluator;
         _currentUser = currentUser;
         _validator = validator;
+        _options = options;
     }
 
     public async Task<LoanDto> ApplyAsync(LoanApplicationRequest request)
@@ -82,12 +85,37 @@ public class LoanService : ILoanService
 
         var existingDebt = externalDebt + ourDebt;
 
-        // 4) Net limit + otomatik karar
+        // 4) Net limit + motorun tavsiyesi (deterministik)
         var netLimit = Math.Max(0, ai.MaxLimit - existingDebt);
-        var approved = request.Amount <= netLimit;
+        var recommended = request.Amount <= netLimit ? LoanStatus.Approved : LoanStatus.Rejected;
 
-        var reason = BuildReason(
-            ai.Reason, externalDebt, ourDebt, netLimit, request.Amount, approved);
+        // 5) Tutar bandı: otomatik mi (≤10M) yoksa yetkili onayına mı?
+        var approverRole = DetermineApproverRole(request.Amount);
+        var analysis = BuildAnalysis(ai.Reason, externalDebt, ourDebt, netLimit);
+
+        LoanStatus status;
+        string aiReason;
+        string decidedBy;
+        DateTime? decidedAt;
+
+        if (approverRole is null)
+        {
+            // Otomatik karar (AI/kural motoru sonucu kesinleşir)
+            status = recommended;
+            aiReason = analysis + BuildVerdict(recommended, request.Amount, netLimit);
+            decidedBy = "AI";
+            decidedAt = DateTime.UtcNow;
+        }
+        else
+        {
+            // Yüksek tutar: karar yetkiliye bırakılır; AI raporu tavsiye olur
+            status = LoanStatus.PendingApproval;
+            aiReason = analysis +
+                $"Talep ettiğiniz {request.Amount:N0} TL, tutarı nedeniyle " +
+                $"{ApproverLabel(approverRole.Value)} onayına gönderilmiştir.";
+            decidedBy = string.Empty;
+            decidedAt = null;
+        }
 
         var loan = new LoanApplication
         {
@@ -104,19 +132,22 @@ public class LoanService : ILoanService
             Profession = profession,
             Amount = request.Amount,
             TermMonths = request.TermMonths,
-            Status = approved ? LoanStatus.Approved : LoanStatus.Rejected,
+            Status = status,
+            RecommendedStatus = recommended,
+            RequiredApproverRole = approverRole,
             Score = LoanScoring.Calculate(request.Income, request.Amount, request.TermMonths),
             MaxLimit = ai.MaxLimit,
             ExistingDebt = existingDebt,
             NetLimit = netLimit,
-            AiReason = reason,
-            DecidedBy = "AI",
+            AiReason = aiReason,
+            DecidedBy = decidedBy,
+            DecisionNote = string.Empty,
             CreatedAt = DateTime.UtcNow,
-            DecidedAt = DateTime.UtcNow,
+            DecidedAt = decidedAt,
         };
 
         await _loans.AddAsync(loan);
-        return MapLoan(loan, includePlan: approved);
+        return MapLoan(loan, includePlan: status == LoanStatus.Approved);
     }
 
     public async Task<List<LoanDto>> GetMyLoansAsync()
@@ -156,22 +187,106 @@ public class LoanService : ILoanService
             l.DecidedAt)).ToList();
     }
 
-    // --- Manuel admin onay/red ŞİMDİLİK DEVRE DIŞI ---
-    // Krediler başvuru anında AI/kural motoruyla otomatik karara bağlanır.
-    // Endpoint'ler ve arayüz korunur; ileride tutar bazlı onay hiyerarşisi
-    // (ör. >1M TL şube müdürü, >10M TL ilçe müdürü) burada devreye alınacaktır.
-    public Task<LoanDto> ApproveAsync(Guid id) =>
-        throw new BusinessException(
-            "Krediler otomatik değerlendiriliyor; manuel onay şu an devre dışı.");
+    // --- Yetkili onay kuyruğu ---
+    // Tüm yetkililer (şube/il müdürü/direktör) onay bekleyen kredilerin tamamını
+    // GÖRÜR; ancak sadece kendi bandındaki krediyi ONAYLAYABİLİR (CanApprove).
+    // (Alt kademe üst bandı görüntüler ama onaylayamaz.)
+    public async Task<List<PendingLoanDto>> GetPendingApprovalsAsync()
+    {
+        var loans = await _loans.GetByStatusWithUserAsync(LoanStatus.PendingApproval);
+        var role = ParseRole(_currentUser.Role);
 
-    public Task<LoanDto> RejectAsync(Guid id) =>
-        throw new BusinessException(
-            "Krediler otomatik değerlendiriliyor; manuel red şu an devre dışı.");
+        return loans.Select(l => new PendingLoanDto(
+            l.Id,
+            l.User?.FullName ?? "—",
+            l.User?.Email ?? "—",
+            l.Age,
+            l.MaritalStatus,
+            l.ChildrenCount,
+            l.HousingStatus,
+            l.Income,
+            l.MonthlyExpenses,
+            l.EmploymentMonths,
+            l.Profession,
+            l.Amount,
+            l.TermMonths,
+            l.Score,
+            l.MaxLimit,
+            l.ExistingDebt,
+            l.NetLimit,
+            l.AiReason,
+            l.RecommendedStatus.ToString(),
+            l.RequiredApproverRole?.ToString() ?? "—",
+            l.CreatedAt,
+            CanApprove: role is not null && l.RequiredApproverRole == role)).ToList();
+    }
 
-    // Onay/red gerekçesini (motor + borç + karar) tek metinde birleştirir.
-    private static string BuildReason(
-        string aiReason, decimal externalDebt, decimal ourDebt,
-        decimal netLimit, decimal requested, bool approved)
+    public Task<LoanDto> ApproveAsync(Guid id, string? note) => DecideAsync(id, note, approve: true);
+    public Task<LoanDto> RejectAsync(Guid id, string? note) => DecideAsync(id, note, approve: false);
+
+    // Yetkilinin onay/red kararı. Gemini tavsiyesi danışma niteliğindedir; yetkili
+    // ezebilir (override). Bant ve görev ayrılığı kontrolleri burada uygulanır.
+    private async Task<LoanDto> DecideAsync(Guid id, string? note, bool approve)
+    {
+        var loan = await _loans.GetByIdAsync(id)
+            ?? throw new NotFoundException("Kredi başvurusu bulunamadı.");
+
+        if (loan.Status != LoanStatus.PendingApproval)
+            throw new BusinessException("Bu başvuru onay beklemiyor.");
+
+        // Bant kontrolü: yalnızca krediye atanan rol karar verebilir
+        var role = ParseRole(_currentUser.Role);
+        if (role is null || loan.RequiredApproverRole != role)
+            throw new BusinessException("Bu kredi sizin onay yetki bandınızda değil.");
+
+        // Görev ayrılığı: kişi kendi başvurusunu onaylayamaz. Personel müşteri
+        // olmadığından pratikte oluşmaz; yine de savunma amaçlı korunur.
+        if (loan.UserId == _currentUser.UserId)
+            throw new BusinessException("Kendi başvurunuzu onaylayamazsınız.");
+
+        loan.Status = approve ? LoanStatus.Approved : LoanStatus.Rejected;
+        loan.DecisionNote = note?.Trim() ?? string.Empty;
+        loan.DecidedBy = DecidedByLabel(role.Value);
+        loan.DecidedByUserId = _currentUser.UserId;
+        loan.DecidedAt = DateTime.UtcNow;
+        await _loans.SaveChangesAsync();
+
+        return MapLoan(loan, includePlan: approve);
+    }
+
+    // Tutar -> onaylayacak rol (null => otomatik karar bandı)
+    private UserRole? DetermineApproverRole(decimal amount)
+    {
+        if (amount <= _options.AutoDecisionLimit) return null;
+        if (amount <= _options.BranchManagerLimit) return UserRole.BranchManager;
+        if (amount <= _options.ProvincialManagerLimit) return UserRole.ProvincialManager;
+        return UserRole.Director;
+    }
+
+    private static UserRole? ParseRole(string? role) =>
+        Enum.TryParse<UserRole>(role, out var r) ? r : null;
+
+    // Onay bandı metni (gerekçe cümlesinde, küçük harf)
+    private static string ApproverLabel(UserRole role) => role switch
+    {
+        UserRole.BranchManager => "şube müdürü",
+        UserRole.ProvincialManager => "il müdürü",
+        UserRole.Director => "direktör",
+        _ => "yetkili",
+    };
+
+    // Kararı veren rol etiketi (DecidedBy alanında saklanır; ekranda gösterilir)
+    private static string DecidedByLabel(UserRole role) => role switch
+    {
+        UserRole.BranchManager => "Şube Müdürü",
+        UserRole.ProvincialManager => "İl Müdürü",
+        UserRole.Director => "Direktör",
+        _ => "Yetkili",
+    };
+
+    // Değerlendirme/analiz metni (motor + borçlar + net limit), karar cümlesi hariç.
+    private static string BuildAnalysis(
+        string aiReason, decimal externalDebt, decimal ourDebt, decimal netLimit)
     {
         var sb = new StringBuilder();
         sb.Append(aiReason).Append(' ');
@@ -182,14 +297,15 @@ public class LoanService : ILoanService
             sb.Append($"Bankamızdaki mevcut kredi borcunuz {ourDebt:N0} TL. ");
 
         sb.Append($"Bankamızdan kullanabileceğiniz net limit {netLimit:N0} TL. ");
-
-        sb.Append(approved
-            ? $"Talep ettiğiniz {requested:N0} TL onaylanmıştır."
-            : $"Talep ettiğiniz {requested:N0} TL net limitinizi aştığı için reddedilmiştir. " +
-              $"En fazla {netLimit:N0} TL kullanabilirsiniz.");
-
         return sb.ToString();
     }
+
+    // Otomatik kredilerde karar cümlesi.
+    private static string BuildVerdict(LoanStatus status, decimal requested, decimal netLimit) =>
+        status == LoanStatus.Approved
+            ? $"Talep ettiğiniz {requested:N0} TL onaylanmıştır."
+            : $"Talep ettiğiniz {requested:N0} TL net limitinizi aştığı için reddedilmiştir. " +
+              $"En fazla {netLimit:N0} TL kullanabilirsiniz.";
 
     // Entity -> DTO (onaylıysa ve isteniyorsa ödeme planıyla)
     private static LoanDto MapLoan(LoanApplication l, bool includePlan)
@@ -204,6 +320,6 @@ public class LoanService : ILoanService
         return new LoanDto(
             l.Id, l.Income, l.Profession, l.Amount, l.TermMonths,
             l.Status.ToString(), l.Score, l.MaxLimit, l.ExistingDebt, l.NetLimit,
-            l.AiReason, l.DecidedBy, l.CreatedAt, l.DecidedAt, plan);
+            l.AiReason, l.DecidedBy, l.DecisionNote, l.CreatedAt, l.DecidedAt, plan);
     }
 }

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using TurkcellBank.Application.Common.Interfaces;
 using TurkcellBank.Domain.Entities;
+using TurkcellBank.Domain.Enums;
 
 namespace TurkcellBank.Infrastructure.Persistence.Repositories;
 
@@ -32,6 +33,13 @@ public class LoanRepository : ILoanRepository
         => _db.LoanApplications
             .Include(l => l.User) // başvuran bilgisi (admin listesi)
             .OrderByDescending(l => l.CreatedAt)
+            .ToListAsync();
+
+    public Task<List<LoanApplication>> GetByStatusWithUserAsync(LoanStatus status)
+        => _db.LoanApplications
+            .Include(l => l.User)
+            .Where(l => l.Status == status)
+            .OrderBy(l => l.CreatedAt) // en eski başvuru önce (kuyruk mantığı)
             .ToListAsync();
 
     public Task SaveChangesAsync()

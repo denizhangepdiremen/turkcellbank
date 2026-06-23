@@ -39,8 +39,22 @@ public class LoanApplication
     public decimal MaxLimit { get; set; }     // hesaplanan maksimum kredi limiti
     public decimal ExistingDebt { get; set; } // diğer banka + bizim banka mevcut borç
     public decimal NetLimit { get; set; }     // MaxLimit - ExistingDebt (kullanılabilir)
-    public string AiReason { get; set; } = string.Empty; // onay/red gerekçesi
-    public string DecidedBy { get; set; } = string.Empty; // "AI" / ileride "ŞubeMüdürü" vb.
+    public string AiReason { get; set; } = string.Empty; // değerlendirme/analiz metni
+    public string DecidedBy { get; set; } = string.Empty; // "AI" / "Şube Müdürü" / "İl Müdürü" / "Direktör"
+
+    // --- Tutar bazlı onay (10M üstü krediler) ---
+    // Motorun otomatik kararı (tavsiye). Otomatik kredilerde Status ile aynıdır;
+    // onaya düşen kredilerde yetkili bunu görür ve onaylar/ezer (override).
+    public LoanStatus RecommendedStatus { get; set; }
+
+    // Bu krediyi onaylaması gereken rol (otomatik kredilerde null).
+    public UserRole? RequiredApproverRole { get; set; }
+
+    // Yetkilinin karar notu (müşteriye gösterilir; otomatik kredilerde boş).
+    public string DecisionNote { get; set; } = string.Empty;
+
+    // Kararı veren yetkilinin kullanıcı id'si (görev ayrılığı + denetim için).
+    public Guid? DecidedByUserId { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? DecidedAt { get; set; }  // karar verildiği an
