@@ -74,6 +74,24 @@ test.describe('Hesap kapatma işlemleri', () => {
     await expect(card).toHaveCount(0);
   })
 
+  test('bakiyesi olan hesap, bakiye başka hesaba aktarılarak kapatılır', async ({ page }) => {
+    await openAccount(page) // bakiyenin aktarılacağı hedef olsun
+    const kapananIban = await openAccount(page)
+    const card = page.locator('.rounded-xl.border.border-gray-200.bg-white.shadow-sm').filter({ hasText: kapananIban })
+
+    // Kapatılacak hesaba para yatır
+    await card.getByRole('button', { name: 'Para Yatır' }).click()
+    await page.getByRole('dialog').getByLabel('Tutar (₺)').fill('1000')
+    await page.getByRole('dialog').getByRole('button', { name: 'Yatır' }).click()
+    await expect(page.getByText('Para yatırıldı.')).toBeVisible()
+
+    // Kapat → modalda hedef hesap seçili gelir → onayla (hata olmamalı)
+    await card.getByRole('button', { name: 'Hesabı Kapat' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Hesabı Kapat' }).click()
+    await expect(page.getByText('Hesap kapatıldı.')).toBeVisible()
+    await expect(card).toHaveCount(0)
+  })
+
   test('hesap dondurulur ve yeniden aktifleştirilir', async ({ page }) => {
     const yeniIban = await openAccount(page);
     const card = page.locator('.rounded-xl.border.border-gray-200.bg-white.shadow-sm').filter({ hasText: yeniIban });

@@ -724,11 +724,18 @@ export function Dashboard() {
                           <Button size="sm" variant="secondary" onClick={() => openTransfer(acc.id)}>
                             Gönder
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setFreezeTarget(acc)}>
+                        </div>
+                        {/* Dondurma ve kapatma "tehlikeli" aksiyonlardır; diğer
+                            tuşlardan ayrı, kırmızı tonlu olarak birlikte dururlar */}
+                        <div className="dashboard-account-close">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-rose-300 text-rose-700 hover:bg-rose-50 focus-visible:ring-rose-400"
+                            onClick={() => setFreezeTarget(acc)}
+                          >
                             Dondur
                           </Button>
-                        </div>
-                        <div className="dashboard-account-close">
                           <Button
                             size="sm"
                             variant="destructive"

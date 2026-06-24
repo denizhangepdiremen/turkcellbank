@@ -108,7 +108,7 @@ public class AccountService : IAccountService
                 ToAccountId = target.Id,
                 ToIban = target.Iban,
                 Amount = amount,
-                Description = "Hesap kapatma bakiye aktarımı",
+                Description = "Hesap kapanışı", // Transaction.Description max 20 karakter
                 CreatedAt = DateTime.UtcNow,
                 Channel = _ctx.Channel,
                 PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
