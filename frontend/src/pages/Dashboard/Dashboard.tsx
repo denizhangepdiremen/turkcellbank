@@ -427,6 +427,13 @@ export function Dashboard() {
   })
   const cards = cardsData?.data ?? []
   const approvedCards = cards.filter((c) => c.status === 'Approved')
+  // Kartın bağlı olduğu hesabın bakiyesi (ödeme o hesaptan çekilir)
+  const cardBalance = (accountIban: string) =>
+    accounts.find((a) => a.iban === accountIban)?.balance ?? 0
+  // Ödeme kartları: parası olan kartlar önce, bakiyeye göre azalan sırada
+  const sortedPayCards = [...approvedCards].sort(
+    (a, b) => cardBalance(b.accountIban) - cardBalance(a.accountIban),
+  )
   // Kart açılabilir hesaplar: aktif ve dondurulmamış (dondurulmuş hesaba kart açılamaz)
   const activeAccounts = accounts.filter((a) => a.isActive && !a.isFrozen)
 
@@ -482,7 +489,9 @@ export function Dashboard() {
 
   function openPay() {
     setPayStep('form')
-    setPayCardId(approvedCards[0]?.id ?? '')
+    // Varsayılan: bakiyesi olan kartlardan en yükseği (yoksa ilk onaylı kart)
+    const funded = sortedPayCards.find((c) => cardBalance(c.accountIban) > 0)
+    setPayCardId(funded?.id ?? sortedPayCards[0]?.id ?? '')
     setPayAmount('')
     setPayDesc('')
     setThreeDS('')
@@ -1405,14 +1414,17 @@ export function Dashboard() {
               <div className="dashboard-modal-field">
                 <Select
                   label="Kart"
-                  options={approvedCards.map((c) => {
+                  options={sortedPayCards.map((c) => {
                     // Müşteri hesabı numarasından değil bakiyesinden tanır:
-                    // karta bağlı hesabın bakiyesini de göster
-                    const acc = accounts.find((a) => a.iban === c.accountIban)
-                    const balanceText = acc ? ` · ${formatTL(acc.balance)}` : ''
+                    // karta bağlı hesabın bakiyesini göster, boşsa işaretle
+                    const balance = cardBalance(c.accountIban)
+                    const suffix =
+                      balance > 0
+                        ? ` · ${formatTL(balance)}`
+                        : ` · ${formatTL(0)} · bakiye yetersiz`
                     return {
                       value: c.id,
-                      label: `${c.maskedCardNumber} · Hesap ...${c.accountIban.slice(-4)}${balanceText}`,
+                      label: `${c.maskedCardNumber} · Hesap ...${c.accountIban.slice(-4)}${suffix}`,
                     }
                   })}
                   value={payCardId}
