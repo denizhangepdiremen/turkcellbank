@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Card, CardContent, CardFooter } from '../../components/Card'
 import { Badge } from '../../components/Badge'
@@ -40,6 +40,9 @@ const accountTypeOptions = [
 ]
 
 const PAGE_SIZE = 5
+
+// İşlem geçmişinde "tüm hesaplar" seçeneğinin özel değeri
+const ALL_ACCOUNTS = '__all__'
 
 // Kredi durumu -> rozet rengi / Türkçe etiket
 const loanBadgeVariant = (s: LoanStatus) =>
@@ -254,21 +257,51 @@ export function Dashboard() {
     onError: (err) => toast.error(getApiErrorMessage(err, 'Transfer başarısız.')),
   })
 
-  // --- İşlem geçmişi (seçili hesap) ---
+  // --- İşlem geçmişi (seçili hesap ya da tüm hesaplar) ---
   const [historyAccountId, setHistoryAccountId] = useState('')
   const [txVisible, setTxVisible] = useState(PAGE_SIZE)
   useEffect(() => {
+    // Varsayılan: tüm hesapların işlemleri birlikte görünsün
     if (!historyAccountId && accounts.length > 0) {
-      setHistoryAccountId(accounts[0].id)
+      setHistoryAccountId(ALL_ACCOUNTS)
     }
   }, [accounts, historyAccountId])
 
+  const isAllAccounts = historyAccountId === ALL_ACCOUNTS
+
+  // Tek hesap görünümü
   const { data: historyData, isLoading: historyLoading } = useQuery({
     queryKey: ['transactions', historyAccountId],
     queryFn: () => getHistory(historyAccountId),
-    enabled: !!historyAccountId,
+    enabled: !!historyAccountId && !isAllAccounts,
   })
-  const history = historyData?.data ?? []
+
+  // Tüm hesaplar görünümü — her hesabın geçmişini paralel çek, sonra birleştir
+  const allHistories = useQueries({
+    queries: accounts.map((a) => ({
+      queryKey: ['transactions', a.id],
+      queryFn: () => getHistory(a.id),
+      enabled: isAllAccounts,
+    })),
+  })
+
+  // Birleşik liste: her işlemi ait olduğu hesabın IBAN'ı ile etiketle, tarihe göre sırala
+  type HistoryRow = Transaction & { accountIban?: string }
+  const mergedHistory: HistoryRow[] = isAllAccounts
+    ? accounts
+        .flatMap((a, i) =>
+          (allHistories[i]?.data?.data ?? []).map((tx) => ({
+            ...tx,
+            accountIban: a.iban,
+          })),
+        )
+        .sort((x, y) => +new Date(y.createdAt) - +new Date(x.createdAt))
+    : []
+
+  const history: HistoryRow[] = isAllAccounts ? mergedHistory : (historyData?.data ?? [])
+  const historyBusy = isAllAccounts
+    ? allHistories.some((q) => q.isLoading)
+    : historyLoading
 
   // --- Krediler ---
   const { data: loansData, isLoading: loansLoading } = useQuery({
@@ -439,10 +472,13 @@ export function Dashboard() {
     .reduce((sum, a) => sum + a.balance, 0)
   const firstName = user?.fullName?.split(' ')[0] ?? ''
 
-  const accountOptions = accounts.map((a) => ({
-    value: a.id,
-    label: `${a.accountType} · ...${a.iban.slice(-4)}`,
-  }))
+  const accountOptions = [
+    { value: ALL_ACCOUNTS, label: 'Tüm Hesaplar' },
+    ...accounts.map((a) => ({
+      value: a.id,
+      label: `${a.accountType} · ...${a.iban.slice(-4)}`,
+    })),
+  ]
 
   function openDeposit(accountId: string) {
     setDepositAccountId(accountId)
@@ -645,16 +681,25 @@ export function Dashboard() {
 
         <Card>
           <CardContent>
-            {historyLoading ? (
+            {historyBusy ? (
               <ListSkeleton />
             ) : history.length === 0 ? (
-              <div className="dashboard-state">Bu hesapta henüz işlem yok.</div>
+              <div className="dashboard-state">
+                {isAllAccounts ? 'Henüz işlem yok.' : 'Bu hesapta henüz işlem yok.'}
+              </div>
             ) : (
               <>
                 {history.slice(0, txVisible).map((tx) => (
                   <div key={tx.id} className="dashboard-tx-row">
                     <div>
-                      <p className="dashboard-tx-desc">{txTitle(tx)}</p>
+                      <p className="dashboard-tx-desc">
+                        {txTitle(tx)}
+                        {isAllAccounts && tx.accountIban && (
+                          <span className="dashboard-tx-account">
+                            ...{tx.accountIban.slice(-4)}
+                          </span>
+                        )}
+                      </p>
                       <p className="dashboard-tx-sub">
                         {trDate(tx.createdAt)}
                         {tx.description ? ` · ${tx.description}` : ''}

@@ -277,6 +277,19 @@
   margin: 0.15rem 0 0;
 }
 
+/* "Tüm hesaplar" görünümünde işlemin ait olduğu hesabı gösteren rozet */
+.dashboard-tx-account {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #4f46e5; /* indigo-600 */
+  background: #eef2ff; /* indigo-50 */
+  border-radius: 0.375rem;
+  vertical-align: middle;
+}
+
 .dashboard-tx-amount {
   font-size: 0.95rem;
   font-weight: 600;
