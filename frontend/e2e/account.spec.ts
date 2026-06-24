@@ -21,10 +21,14 @@ test.describe('Genel hesap işlemleri', () => {
 
     // Varsayılan sekme: Hesaplarım bölümü görünür
     await expect(page.getByRole('heading', { name: 'Hesaplarım' })).toBeVisible()
+    await expect(page.getByRole('img', { name: /Son 7 gün bakiye eğilimi/ })).toBeVisible()
+    await expect(page.getByLabel('Gelir gider özeti')).not.toBeVisible()
 
     // Sekmelere tıklayınca ilgili bölüm açılır
     await openTab(page, 'İşlemler')
     await expect(page.getByRole('heading', { name: 'Son İşlemler' })).toBeVisible()
+    await expect(page.getByRole('img', { name: /Son 7 gün bakiye eğilimi/ })).not.toBeVisible()
+    await expect(page.getByLabel('Gelir gider özeti')).toBeVisible()
 
     await openTab(page, 'Krediler')
     await expect(page.getByRole('heading', { name: 'Kredilerim' })).toBeVisible()

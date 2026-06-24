@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
@@ -28,7 +28,7 @@ import { pay, getMyPayments } from '../../api/paymentApi'
 import { createCard, getMyCards } from '../../api/cardApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
-import { digitsOnly, formatIban } from '../../lib/format'
+import { digitsOnly, formatIban, formatIbanInput, normalizeIban } from '../../lib/format'
 import type {
   Account,
   AccountType,
@@ -100,6 +100,257 @@ const formatTL = (n: number) =>
 const trDate = (iso: string) =>
   new Date(iso).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function useAnimatedNumber(value: number, durationMs = 650) {
+  const [displayValue, setDisplayValue] = useState(value)
+  const displayRef = useRef(value)
+  const frameRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (frameRef.current) cancelAnimationFrame(frameRef.current)
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const from = displayRef.current
+    const diff = value - from
+
+    if (reduceMotion || diff === 0) {
+      displayRef.current = value
+      setDisplayValue(value)
+      return
+    }
+
+    const start = performance.now()
+    const animate = (now: number) => {
+      const progress = Math.min((now - start) / durationMs, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      const next = from + diff * eased
+      displayRef.current = next
+      setDisplayValue(next)
+
+      if (progress < 1) {
+        frameRef.current = requestAnimationFrame(animate)
+      } else {
+        displayRef.current = value
+        setDisplayValue(value)
+      }
+    }
+
+    frameRef.current = requestAnimationFrame(animate)
+
+    return () => {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current)
+    }
+  }, [durationMs, value])
+
+  return displayValue
+}
+
+function AnimatedMoney({ value, hidden }: { value: number; hidden: boolean }) {
+  const animatedValue = useAnimatedNumber(value)
+  return <>{hidden ? '₺*****,**' : formatTL(animatedValue)}</>
+}
+
+const accountCardVariant = (acc: Account) => {
+  if (acc.isFrozen) return 'dashboard-account-card--frozen'
+  return acc.accountType === 'Isletme'
+    ? 'dashboard-account-card--business'
+    : 'dashboard-account-card--personal'
+}
+
+function AccountVisualIcon({ type }: { type: AccountType }) {
+  if (type === 'Isletme') {
+    return (
+      <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 21V8.5L12 4l8 4.5V21" />
+        <path d="M8 21v-6h8v6" />
+        <path d="M8 11h.01M12 11h.01M16 11h.01" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 10.5 12 5l9 5.5" />
+      <path d="M5 10.5V19h14v-8.5" />
+      <path d="M9 19v-5h6v5" />
+      <path d="M8 12h.01M16 12h.01" />
+    </svg>
+  )
+}
+
+const txBalanceEffect = (tx: Transaction) =>
+  tx.direction === 'In' ? tx.amount : -tx.amount
+
+type BalanceTrendPoint = {
+  at: number
+  value: number
+}
+
+function buildBalanceTrend(currentBalance: number, transactions: Transaction[]) {
+  const now = Date.now()
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const periodStart = todayStart.getTime() - 6 * DAY_MS
+  const recentTransactions = transactions
+    .map((tx) => ({ tx, at: new Date(tx.createdAt).getTime() }))
+    .filter(({ at }) => at >= periodStart && at <= now)
+    .sort((a, b) => a.at - b.at)
+
+  const periodEffect = recentTransactions.reduce(
+    (sum, { tx }) => sum + txBalanceEffect(tx),
+    0,
+  )
+  let runningBalance = currentBalance - periodEffect
+  const points: BalanceTrendPoint[] = [{ at: periodStart, value: runningBalance }]
+  const dayAnchors = Array.from(
+    { length: 6 },
+    (_, index) => periodStart + (index + 1) * DAY_MS,
+  ).filter((at) => at <= now)
+  const events: Array<{ at: number; tx?: Transaction }> = [
+    ...recentTransactions.map(({ tx, at }) => ({ at, tx })),
+    ...dayAnchors.map((at) => ({ at })),
+    { at: now },
+  ].sort((a, b) => {
+    if (a.at !== b.at) return a.at - b.at
+    return 'tx' in a ? -1 : 1
+  })
+
+  events.forEach((event) => {
+    if (event.tx) runningBalance += txBalanceEffect(event.tx)
+    points.push({ at: event.at, value: runningBalance })
+  })
+
+  return points
+}
+
+function BalanceSparkline({
+  values,
+  hidden,
+  loading,
+}: {
+  values: BalanceTrendPoint[]
+  hidden: boolean
+  loading: boolean
+}) {
+  const chartValues = hidden
+    ? values.map((point) => ({ ...point, value: 0 }))
+    : values
+  const min = Math.min(...chartValues.map((point) => point.value))
+  const max = Math.max(...chartValues.map((point) => point.value))
+  const range = max - min || 1
+  const startAt = chartValues[0]?.at ?? 0
+  const endAt = chartValues[chartValues.length - 1]?.at ?? startAt + 1
+  const timeRange = endAt - startAt || 1
+  const width = 220
+  const height = 54
+  const padding = 5
+  const points = chartValues
+    .map((point) => {
+      const x = padding + ((point.at - startAt) / timeRange) * (width - padding * 2)
+      const y = height - padding - ((point.value - min) / range) * (height - padding * 2)
+      return `${x},${y}`
+    })
+    .join(' ')
+  const first = values[0]?.value ?? 0
+  const last = values[values.length - 1]?.value ?? 0
+  const change = last - first
+
+  return (
+    <div
+      className={`dashboard-sparkline ${loading ? 'is-loading' : ''}`}
+      role="img"
+      aria-label={hidden ? 'Son 7 gün bakiye eğilimi gizli' : 'Son 7 gün bakiye eğilimi'}
+    >
+      <div className="dashboard-sparkline-head">
+        <span>Son 7 gün</span>
+        <strong className={change >= 0 ? 'positive' : 'negative'}>
+          {hidden ? 'Gizli' : `${change >= 0 ? '+' : ''}${formatTL(change)}`}
+        </strong>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+        <polyline className="dashboard-sparkline-area" points={`${padding},${height - padding} ${points} ${width - padding},${height - padding}`} />
+        <polyline className="dashboard-sparkline-line" points={points} />
+      </svg>
+    </div>
+  )
+}
+
+function getCashFlowSummary(transactions: Transaction[]) {
+  const income = transactions
+    .filter((tx) => tx.direction === 'In')
+    .reduce((sum, tx) => sum + tx.amount, 0)
+  const expense = transactions
+    .filter((tx) => tx.direction === 'Out')
+    .reduce((sum, tx) => sum + tx.amount, 0)
+  const total = income + expense
+  const incomePercent = total > 0 ? Math.round((income / total) * 100) : 50
+  const expensePercent = total > 0 ? 100 - incomePercent : 50
+
+  return { income, expense, total, incomePercent, expensePercent }
+}
+
+function CashFlowSummary({
+  income,
+  expense,
+  total,
+  incomePercent,
+  expensePercent,
+}: ReturnType<typeof getCashFlowSummary>) {
+  return (
+    <div className="dashboard-cashflow" aria-label="Gelir gider özeti">
+      <span className="dashboard-cashflow-badge">
+        {total > 0 ? `%${incomePercent} gelen` : 'Hareket yok'}
+      </span>
+
+      <div className="dashboard-cashflow-bar" aria-hidden="true">
+        <span
+          className="dashboard-cashflow-in"
+          style={{ width: `${incomePercent}%` }}
+        />
+        <span
+          className="dashboard-cashflow-out"
+          style={{ width: `${expensePercent}%` }}
+        />
+      </div>
+
+      <div className="dashboard-cashflow-stats">
+        <div>
+          <span className="dashboard-cashflow-dot in" />
+          <p>Gelen</p>
+          <strong>{formatTL(income)}</strong>
+        </div>
+        <div>
+          <span className="dashboard-cashflow-dot out" />
+          <p>Giden</p>
+          <strong>{formatTL(expense)}</strong>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LoanResultMark({ status }: { status: LoanStatus }) {
+  const markClass =
+    status === 'Approved'
+      ? 'success'
+      : status === 'Rejected'
+        ? 'error'
+        : 'pending'
+  const symbol =
+    status === 'Approved'
+      ? '✓'
+      : status === 'Rejected'
+        ? '×'
+        : '↗'
+
+  return (
+    <div className={`dashboard-loan-result-mark ${markClass}`} aria-hidden="true">
+      {symbol}
+    </div>
+  )
+}
+
 // Saate göre selamlama mesajı (gerçek banka uygulamalarındaki gibi)
 function getGreeting(name: string) {
   const hour = new Date().getHours()
@@ -161,20 +412,20 @@ export function Dashboard() {
   })
   const [tabsEditOpen, setTabsEditOpen] = useState(false)
 
-  // Tercihi kaydet; aktif sekme gizlendiyse ilk görünür sekmeye geç
+  // Tercihi kaydet.
   useEffect(() => {
     localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(visibleTabs))
-    if (!visibleTabs.includes(activeTab)) setActiveTab(visibleTabs[0])
-  }, [visibleTabs, activeTab])
+  }, [visibleTabs])
 
   function toggleTab(id: DashboardTab) {
-    setVisibleTabs((prev) => {
-      if (prev.includes(id)) {
-        if (prev.length === 1) return prev // en az bir bölüm görünür kalsın
-        return prev.filter((x) => x !== id)
-      }
-      return [...prev, id]
-    })
+    const next = visibleTabs.includes(id)
+      ? visibleTabs.length === 1
+        ? visibleTabs
+        : visibleTabs.filter((x) => x !== id)
+      : [...visibleTabs, id]
+
+    setVisibleTabs(next)
+    if (!next.includes(activeTab)) setActiveTab(next[0])
   }
 
   // Profil modalı
@@ -217,7 +468,22 @@ export function Dashboard() {
     queryKey: ['accounts'],
     queryFn: getAccounts,
   })
-  const accounts = data?.data ?? []
+  const accounts = useMemo(() => data?.data ?? [], [data?.data])
+  const balanceAccounts = accounts.filter((a) => a.isActive)
+  const activeAccounts = balanceAccounts.filter((a) => !a.isFrozen)
+  const totalBalance = balanceAccounts.reduce((sum, a) => sum + a.balance, 0)
+  const balanceHistoryQueries = useQueries({
+    queries: balanceAccounts.map((a) => ({
+      queryKey: ['transactions', a.id],
+      queryFn: () => getHistory(a.id),
+      staleTime: 30_000,
+    })),
+  })
+  const balanceTrendTransactions = balanceAccounts.flatMap(
+    (_, i) => balanceHistoryQueries[i]?.data?.data ?? [],
+  )
+  const balanceTrend = buildBalanceTrend(totalBalance, balanceTrendTransactions)
+  const balanceTrendLoading = balanceHistoryQueries.some((q) => q.isLoading)
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['accounts'] })
@@ -296,7 +562,7 @@ export function Dashboard() {
     mutationFn: () =>
       transfer({
         fromAccountId,
-        toIban,
+        toIban: normalizeIban(toIban),
         amount: Number(transferAmount),
         description: transferDesc || undefined,
       }),
@@ -309,20 +575,13 @@ export function Dashboard() {
   })
 
   // --- İşlem geçmişi (seçili hesap ya da tüm hesaplar) ---
-  const [historyAccountId, setHistoryAccountId] = useState('')
+  const [historyAccountId, setHistoryAccountId] = useState(ALL_ACCOUNTS)
   const [txVisible, setTxVisible] = useState(PAGE_SIZE)
-  useEffect(() => {
-    // Varsayılan: tüm hesapların işlemleri birlikte görünsün
-    if (!historyAccountId && accounts.length > 0) {
-      setHistoryAccountId(ALL_ACCOUNTS)
-    }
-  }, [accounts, historyAccountId])
 
   const isAllAccounts = historyAccountId === ALL_ACCOUNTS
 
-  // İşlem sorguları yalnız "İşlemler" sekmesi açıkken çalışsın — aksi halde
-  // panele girer girmez (özellikle "Tüm Hesaplar"da) hesap başına bir istek
-  // atılır ve çok hesaplı kullanıcıda sayfa boşuna yavaşlar.
+  // Tek hesap seçilirse ek geçmiş sorgusu yalnız İşlemler sekmesinde çalışsın.
+  // Tüm Hesaplar görünümü üst özet için zaten çekilen hesap geçmişlerini kullanır.
   const txTabActive = activeTab === 'transactions'
 
   // Tek hesap görünümü
@@ -332,21 +591,12 @@ export function Dashboard() {
     enabled: txTabActive && !!historyAccountId && !isAllAccounts,
   })
 
-  // Tüm hesaplar görünümü — her hesabın geçmişini paralel çek, sonra birleştir
-  const allHistories = useQueries({
-    queries: accounts.map((a) => ({
-      queryKey: ['transactions', a.id],
-      queryFn: () => getHistory(a.id),
-      enabled: txTabActive && isAllAccounts,
-    })),
-  })
-
   // Birleşik liste: her işlemi ait olduğu hesabın IBAN'ı ile etiketle, tarihe göre sırala
   type HistoryRow = Transaction & { accountIban?: string }
   const mergedHistory: HistoryRow[] = isAllAccounts
-    ? accounts
+    ? balanceAccounts
         .flatMap((a, i) =>
-          (allHistories[i]?.data?.data ?? []).map((tx) => ({
+          (balanceHistoryQueries[i]?.data?.data ?? []).map((tx) => ({
             ...tx,
             accountIban: a.iban,
           })),
@@ -356,8 +606,9 @@ export function Dashboard() {
 
   const history: HistoryRow[] = isAllAccounts ? mergedHistory : (historyData?.data ?? [])
   const historyBusy = isAllAccounts
-    ? allHistories.some((q) => q.isLoading)
+    ? balanceTrendLoading
     : historyLoading
+  const cashFlowSummary = getCashFlowSummary(balanceTrendTransactions)
 
   // --- Krediler ---
   const { data: loansData, isLoading: loansLoading } = useQuery({
@@ -483,8 +734,6 @@ export function Dashboard() {
   const sortedPayCards = [...approvedCards].sort(
     (a, b) => cardBalance(b.accountIban) - cardBalance(a.accountIban),
   )
-  // Kart açılabilir hesaplar: aktif ve dondurulmamış (dondurulmuş hesaba kart açılamaz)
-  const activeAccounts = accounts.filter((a) => a.isActive && !a.isFrozen)
 
   const [cardModalOpen, setCardModalOpen] = useState(false)
   const [cardAccountId, setCardAccountId] = useState('')
@@ -599,9 +848,6 @@ export function Dashboard() {
     }
   }
 
-  const totalBalance = accounts
-    .filter((a) => a.isActive)
-    .reduce((sum, a) => sum + a.balance, 0)
   const firstName = user?.fullName?.split(' ')[0] ?? ''
 
   const accountOptions = [
@@ -690,7 +936,7 @@ export function Dashboard() {
           <p className="dashboard-summary-label">Toplam Bakiye</p>
           <div className="dashboard-summary-value-row">
             <p className="dashboard-summary-value">
-              {balanceVisible ? formatTL(totalBalance) : '₺*****,**'}
+              <AnimatedMoney value={totalBalance} hidden={!balanceVisible} />
             </p>
             <button
               type="button"
@@ -712,6 +958,17 @@ export function Dashboard() {
                 </svg>
               )}
             </button>
+          </div>
+          <div key={activeTab === 'transactions' ? 'cashflow' : 'sparkline'} className="dashboard-summary-chart">
+            {activeTab === 'transactions' ? (
+              <CashFlowSummary {...cashFlowSummary} />
+            ) : (
+              <BalanceSparkline
+                values={balanceTrend}
+                hidden={!balanceVisible}
+                loading={balanceTrendLoading}
+              />
+            )}
           </div>
         </div>
 
@@ -789,13 +1046,30 @@ export function Dashboard() {
         {accounts.length > 0 && (
           <div className="dashboard-accounts">
             {accounts.map((acc) => (
-              <Card key={acc.id}>
-                <CardContent>
+              <Card
+                key={acc.id}
+                className={`dashboard-account-card ${accountCardVariant(acc)}`}
+              >
+                <CardContent className="dashboard-account-card-content">
                   <div className="dashboard-account-top">
-                    <Badge variant="info">
-                      {acc.accountType === 'Bireysel' ? 'Bireysel' : 'İşletme'}
-                    </Badge>
-                    {acc.isFrozen && <Badge variant="warning">Dondurulmuş</Badge>}
+                    <div className="dashboard-account-identity">
+                      <span className="dashboard-account-icon">
+                        <AccountVisualIcon type={acc.accountType} />
+                      </span>
+                      <div>
+                        <p className="dashboard-account-name">
+                          {acc.accountType === 'Bireysel'
+                            ? 'Bireysel Hesap'
+                            : 'İşletme Hesabı'}
+                        </p>
+                        <p className="dashboard-account-caption">TurkcellBank</p>
+                      </div>
+                    </div>
+                    {acc.isFrozen && (
+                      <Badge variant="warning" className="dashboard-account-status">
+                        Dondurulmuş
+                      </Badge>
+                    )}
                   </div>
                   <div className="dashboard-account-iban-row">
                     <span className="dashboard-account-iban">{formatIban(acc.iban)}</span>
@@ -808,10 +1082,10 @@ export function Dashboard() {
                     </button>
                   </div>
                   <p className="dashboard-account-balance">
-                    {balanceVisible ? formatTL(acc.balance) : '₺*****,**'}
+                    <AnimatedMoney value={acc.balance} hidden={!balanceVisible} />
                   </p>
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="dashboard-account-card-footer">
                   <div className="dashboard-account-footer">
                     {acc.isFrozen && acc.freezeType === 'Bank' ? (
                       // Banka bloğu: müşteri kaldıramaz/kapatamaz, sadece bilgilendirilir
@@ -1263,9 +1537,11 @@ export function Dashboard() {
         <div className="dashboard-modal-field">
           <Input
             label="Alıcı IBAN"
-            placeholder="TR..."
+            placeholder="TR12 3456 7890 1234 5678 9012 34"
+            inputMode="numeric"
+            maxLength={32}
             value={toIban}
-            onChange={(e) => setToIban(e.target.value)}
+            onChange={(e) => setToIban(formatIbanInput(e.target.value))}
           />
         </div>
         <div className="dashboard-modal-field">
@@ -1529,10 +1805,13 @@ export function Dashboard() {
       >
         {resultLoan && (
           <>
-            <div className="dashboard-loan-result-badge">
-              <Badge variant={loanBadgeVariant(resultLoan.status)}>
-                {loanLabel(resultLoan.status)}
-              </Badge>
+            <div className="dashboard-loan-result-head">
+              <LoanResultMark status={resultLoan.status} />
+              <div className="dashboard-loan-result-badge">
+                <Badge variant={loanBadgeVariant(resultLoan.status)}>
+                  {loanLabel(resultLoan.status)}
+                </Badge>
+              </div>
             </div>
             <div className="dashboard-plan-summary">
               Talep: <strong>{formatTL(resultLoan.amount)}</strong>

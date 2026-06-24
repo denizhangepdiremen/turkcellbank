@@ -103,9 +103,13 @@
 .dashboard-summary {
   margin-bottom: 2rem;
   padding: 1.5rem;
+  height: 208px;
   border-radius: 12px;
-  background-color: #4f46e5; /* indigo-600 */
+  background:
+    linear-gradient(135deg, rgba(250, 204, 21, 0.12) 0%, rgba(250, 204, 21, 0) 34%),
+    linear-gradient(135deg, #4f46e5 0%, #2563eb 58%, #0f172a 100%);
   color: #ffffff;
+  overflow: hidden;
 }
 
 .dashboard-summary-label {
@@ -141,6 +145,70 @@
   font-weight: 700;
 }
 
+.dashboard-summary-chart {
+  animation: summaryChartFade 0.2s ease-out;
+}
+
+@keyframes summaryChartFade {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dashboard-sparkline {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  height: 92px;
+}
+
+.dashboard-sparkline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.dashboard-sparkline-head strong {
+  color: #ffffff;
+  font-size: 0.82rem;
+}
+
+.dashboard-sparkline-head strong.negative {
+  color: #fecdd3;
+}
+
+.dashboard-sparkline svg {
+  display: block;
+  width: 100%;
+  height: 54px;
+}
+
+.dashboard-sparkline-line {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dashboard-sparkline-area {
+  fill: rgba(255, 255, 255, 0.13);
+  stroke: none;
+}
+
+.dashboard-sparkline.is-loading {
+  opacity: 0.72;
+}
+
 /* Bölüm başlığı + yanındaki aksiyon (Hesap Aç) */
 .dashboard-section-head {
   display: flex;
@@ -164,10 +232,122 @@
   margin-bottom: 2rem;
 }
 
+.dashboard-account-card {
+  position: relative;
+  overflow: hidden;
+  border: none;
+  color: #ffffff;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.dashboard-account-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+}
+
+.dashboard-account-card::before,
+.dashboard-account-card::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.dashboard-account-card::before {
+  width: 190px;
+  height: 190px;
+  right: -64px;
+  top: -72px;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.dashboard-account-card::after {
+  width: 130px;
+  height: 130px;
+  left: -46px;
+  bottom: -58px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dashboard-account-card--personal {
+  background:
+    linear-gradient(135deg, rgba(250, 204, 21, 0.14) 0%, rgba(250, 204, 21, 0) 34%),
+    linear-gradient(135deg, #4f46e5 0%, #2563eb 56%, #0284c7 100%);
+}
+
+.dashboard-account-card--business {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 38%),
+    linear-gradient(135deg, #1d4ed8 0%, #3b82f6 52%, #0891b2 100%);
+}
+
+.dashboard-account-card--frozen {
+  background: linear-gradient(135deg, #334155 0%, #475569 52%, #64748b 100%);
+}
+
+.dashboard-account-card-content,
+.dashboard-account-card-footer {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-account-card-footer {
+  padding-top: 0;
+}
+
 .dashboard-account-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
+}
+
+.dashboard-account-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.dashboard-account-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.dashboard-account-icon svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dashboard-account-name {
+  margin: 0;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.dashboard-account-caption {
+  margin: 0.15rem 0 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.dashboard-account-status {
+  flex-shrink: 0;
 }
 
 .dashboard-account-iban-row {
@@ -175,12 +355,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-top: 0.75rem;
+  margin-top: 1.25rem;
 }
 
 .dashboard-account-iban {
   font-size: 0.8rem;
-  color: #6b7280;
+  color: rgba(255, 255, 255, 0.78);
   letter-spacing: 0.5px;
   min-width: 0;          /* uzun IBAN'ın kutuyu taşırmasını engelle */
   word-break: break-all; /* gerekiyorsa alt satıra kır */
@@ -189,9 +369,9 @@
 .dashboard-iban-copy {
   background: none;
   border: none;
-  color: #4f46e5;
+  color: rgba(255, 255, 255, 0.92);
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
   padding: 0;
   white-space: nowrap;
@@ -214,8 +394,19 @@
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
   padding-top: 0.6rem;
+}
+
+.dashboard-account-card .dashboard-account-close .border-rose-300 {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(254, 205, 211, 0.95);
+  color: #be123c;
+}
+
+.dashboard-account-card .dashboard-account-close .border-rose-300:hover {
+  background: #fff1f2;
+  color: #9f1239;
 }
 
 /* "Daha fazla göster" */
@@ -226,10 +417,10 @@
 }
 
 .dashboard-account-balance {
-  margin: 0.5rem 0 0;
+  margin: 0.65rem 0 0;
   font-size: 1.5rem;
   font-weight: 700;
-  color: #111827;
+  color: #ffffff;
 }
 
 /* Yükleniyor / boş / bilgi durumları */
@@ -271,6 +462,102 @@
 
 .dashboard-history-select {
   width: 240px;
+}
+
+.dashboard-cashflow {
+  margin-top: 1rem;
+  margin-bottom: 0;
+  padding: 0.65rem 0 0.2rem;
+  height: 92px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.45rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.dashboard-cashflow-badge {
+  align-self: flex-start;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dashboard-cashflow-bar {
+  display: flex;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.dashboard-cashflow-bar span {
+  min-width: 3px;
+}
+
+.dashboard-cashflow-in {
+  background: linear-gradient(90deg, #bfdbfe, #60a5fa);
+}
+
+.dashboard-cashflow-out {
+  background: linear-gradient(90deg, #facc15, #f97316);
+}
+
+.dashboard-cashflow-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 0;
+}
+
+.dashboard-cashflow-stats > div {
+  position: relative;
+  padding-left: 1rem;
+}
+
+.dashboard-cashflow-stats > div:last-child {
+  padding-left: 0;
+  padding-right: 1rem;
+  text-align: right;
+}
+
+.dashboard-cashflow-dot {
+  position: absolute;
+  left: 0;
+  top: 0.25rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.dashboard-cashflow-dot.in {
+  background: #93c5fd;
+}
+
+.dashboard-cashflow-dot.out {
+  left: auto;
+  right: 0;
+  background: #facc15;
+}
+
+.dashboard-cashflow-stats p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.dashboard-cashflow-stats strong {
+  display: block;
+  margin-top: 0.1rem;
+  color: #ffffff;
+  font-size: 0.84rem;
 }
 
 /* İşlem satırı */
@@ -443,15 +730,21 @@
 
 /* Renk varyantları */
 .bank-card--indigo {
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  background:
+    linear-gradient(135deg, rgba(250, 204, 21, 0.16) 0%, rgba(250, 204, 21, 0) 34%),
+    linear-gradient(135deg, #0b1120 0%, #1e3a8a 58%, #172554 100%);
 }
 
 .bank-card--emerald {
-  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+  background:
+    linear-gradient(135deg, rgba(96, 165, 250, 0.16) 0%, rgba(96, 165, 250, 0) 38%),
+    linear-gradient(135deg, #111827 0%, #334155 55%, #0f172a 100%);
 }
 
 .bank-card--slate {
-  background: linear-gradient(135deg, #334155 0%, #475569 100%);
+  background:
+    linear-gradient(135deg, rgba(203, 213, 225, 0.13) 0%, rgba(203, 213, 225, 0) 42%),
+    linear-gradient(135deg, #18181b 0%, #3f3f46 52%, #27272a 100%);
 }
 
 /* Bloke kart soluk görünür */
@@ -667,8 +960,59 @@
 }
 
 /* Kredi sonucu / gerekçe modalı */
+.dashboard-loan-result-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.dashboard-loan-result-mark {
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  animation: loanResultPop 0.42s cubic-bezier(0.2, 1.35, 0.35, 1);
+}
+
+.dashboard-loan-result-mark.success {
+  background: #dcfce7;
+  color: #15803d;
+  box-shadow: 0 0 0 8px rgba(34, 197, 94, 0.12);
+}
+
+.dashboard-loan-result-mark.error {
+  background: #ffe4e6;
+  color: #be123c;
+  box-shadow: 0 0 0 8px rgba(225, 29, 72, 0.12);
+}
+
+.dashboard-loan-result-mark.pending {
+  background: #eef2ff;
+  color: #4f46e5;
+  box-shadow: 0 0 0 8px rgba(79, 70, 229, 0.12);
+}
+
+@keyframes loanResultPop {
+  from {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .dashboard-loan-result-badge {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0;
 }
 
 .dashboard-loan-reason {
@@ -697,6 +1041,12 @@
   text-align: center;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-loan-result-mark {
+    animation: none;
+  }
+}
+
 /* --- Responsive: dar ekranlar (telefon/tablet) --- */
 @media (max-width: 640px) {
   /* Hesap kartları tek sütuna düşsün */
@@ -721,6 +1071,11 @@
 
   .dashboard-summary-value {
     font-size: 1.6rem;
+  }
+
+  .dashboard-summary {
+    height: auto;
+    min-height: 208px;
   }
 
   /* İşlem geçmişi başlığı + hesap seçici alt alta */
