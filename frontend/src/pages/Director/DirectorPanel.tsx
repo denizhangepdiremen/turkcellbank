@@ -1,5 +1,5 @@
 import { usePageTitle } from '../../lib/usePageTitle'
-import { StaffShell } from '../staff/StaffShell'
+import { StaffShell, StaffTabs } from '../staff/StaffShell'
 import { LoanApprovalQueue } from '../staff/LoanApprovalQueue'
 import { OrgTeamView } from '../staff/OrgTeamView'
 
@@ -13,11 +13,12 @@ export function DirectorPanel() {
       title="Direktör Paneli"
       subtitle="100M üstü kredi onayları; genel görünüm."
     >
-      <h2 className="staff-section-title">Kredi Onay Kuyruğu</h2>
-      <LoanApprovalQueue />
-
-      <h2 className="staff-section-title">Tüm Banka</h2>
-      <OrgTeamView />
+      <StaffTabs
+        tabs={[
+          { id: 'loans', label: 'Kredi Onayları', content: <LoanApprovalQueue /> },
+          { id: 'org', label: 'Tüm Banka', content: <OrgTeamView /> },
+        ]}
+      />
     </StaffShell>
   )
 }

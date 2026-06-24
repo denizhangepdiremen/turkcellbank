@@ -109,6 +109,41 @@
   margin-top: 0;
 }
 
+/* Panel sekmeleri — müşteri panelindeki gibi yapışkan, tek seferde tek bölüm */
+.staff-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0 0 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  overflow-x: auto;
+  position: sticky;
+  top: 0;
+  background-color: #f8fafc; /* .staff-page arkaplanı — içerik altından görünmesin */
+  z-index: 5;
+}
+
+.staff-tab {
+  padding: 0.65rem 1.1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #64748b;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.staff-tab:hover {
+  color: #1e293b;
+}
+
+.staff-tab.active {
+  color: #4f46e5; /* indigo-600 */
+  border-bottom-color: #4f46e5;
+}
+
 /* Placeholder kutusu */
 .staff-placeholder {
   background-color: #ffffff;

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { roleLabel } from '../../lib/roles'
@@ -52,6 +52,39 @@ export function StaffShell({
         {children}
       </main>
     </div>
+  )
+}
+
+/**
+ * Personel panelleri için sekme çubuğu. Müşteri panelindeki gibi: üstte yapışkan
+ * (sticky) sekmeler, aynı anda tek bölüm görünür — uzun listede aşağı kaydırma derdi yok.
+ * tabs: her biri { id, label, content } olan bölümler.
+ */
+export interface StaffTab {
+  id: string
+  label: string
+  content: ReactNode
+}
+
+export function StaffTabs({ tabs }: { tabs: StaffTab[] }) {
+  const [activeId, setActiveId] = useState(tabs[0]?.id)
+  const active = tabs.find((t) => t.id === activeId) ?? tabs[0]
+  return (
+    <>
+      <nav className="staff-tabs">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={active?.id === t.id ? 'staff-tab active' : 'staff-tab'}
+            onClick={() => setActiveId(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+      <div className="staff-tab-panel">{active?.content}</div>
+    </>
   )
 }
 

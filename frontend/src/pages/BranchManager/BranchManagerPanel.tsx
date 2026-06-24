@@ -1,5 +1,5 @@
 import { usePageTitle } from '../../lib/usePageTitle'
-import { StaffShell } from '../staff/StaffShell'
+import { StaffShell, StaffTabs } from '../staff/StaffShell'
 import { LoanApprovalQueue } from '../staff/LoanApprovalQueue'
 import { TransferApprovalQueue } from '../staff/TransferApprovalQueue'
 import { CardApprovalQueue } from '../staff/CardApprovalQueue'
@@ -16,17 +16,14 @@ export function BranchManagerPanel() {
       title="Şube Müdürü Paneli"
       subtitle="Kredi, yüksek havale ve kart onayları; şube görünümü."
     >
-      <h2 className="staff-section-title">Kredi Onay Kuyruğu</h2>
-      <LoanApprovalQueue />
-
-      <h2 className="staff-section-title">Yüksek Havale Onayı</h2>
-      <TransferApprovalQueue />
-
-      <h2 className="staff-section-title">Kart Onay Kuyruğu</h2>
-      <CardApprovalQueue />
-
-      <h2 className="staff-section-title">Şubem</h2>
-      <OrgTeamView />
+      <StaffTabs
+        tabs={[
+          { id: 'loans', label: 'Kredi Onayları', content: <LoanApprovalQueue /> },
+          { id: 'transfers', label: 'Yüksek Havale', content: <TransferApprovalQueue /> },
+          { id: 'cards', label: 'Kart Onayları', content: <CardApprovalQueue /> },
+          { id: 'org', label: 'Şubem', content: <OrgTeamView /> },
+        ]}
+      />
     </StaffShell>
   )
 }

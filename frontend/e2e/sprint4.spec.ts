@@ -6,6 +6,7 @@ import {
   loginViaUi,
   openAccount,
   applyForCard,
+  openStaffTab,
 } from './helpers'
 
 // Sprint 4: yüksek havale onayı, kart onayının şube müdürüne taşınması,
@@ -53,6 +54,7 @@ test.describe('Sprint 4 — yönetici onayları ve görünürlük', () => {
     // 2) Şube müdürü: havale onay kuyruğunda bu müşteriyi bulur ve onaylar
     await loginViaUi(page, STAFF.branchManager.email, STAFF_PASSWORD)
     await expect(page).toHaveURL(/\/sube-muduru$/)
+    await openStaffTab(page, 'Yüksek Havale')
     const card = page.locator('.approval-card', { hasText: customer.name }).first()
     await expect(card).toBeVisible()
     await card.getByRole('button', { name: 'Onayla' }).click()
@@ -78,6 +80,7 @@ test.describe('Sprint 4 — yönetici onayları ve görünürlük', () => {
     // 2) Şube müdürü: kart onay kuyruğunda bu müşteriyi bulur ve onaylar
     await loginViaUi(page, STAFF.branchManager.email, STAFF_PASSWORD)
     await expect(page).toHaveURL(/\/sube-muduru$/)
+    await openStaffTab(page, 'Kart Onayları')
     const card = page.locator('.approval-card', { hasText: customer.email }).first()
     await expect(card).toBeVisible()
     await card.getByRole('button', { name: 'Onayla' }).click()
@@ -87,7 +90,7 @@ test.describe('Sprint 4 — yönetici onayları ve görünürlük', () => {
   test('şube müdürü organizasyon görünümünü görür (Şubem + ekip istatistiği)', async ({ page }) => {
     await loginViaUi(page, STAFF.branchManager.email, STAFF_PASSWORD)
     await expect(page).toHaveURL(/\/sube-muduru$/)
-    await expect(page.getByRole('heading', { name: 'Şubem' })).toBeVisible()
+    await openStaffTab(page, 'Şubem')
     await expect(page.getByText('Şube çalışanı', { exact: true })).toBeVisible()
   })
 })

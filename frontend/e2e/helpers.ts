@@ -61,6 +61,11 @@ export async function openTab(
   await page.getByRole('button', { name: label, exact: true }).click()
 }
 
+// Personel panellerindeki (müdür/il müdürü/direktör) sekme çubuğu
+export async function openStaffTab(page: Page, label: string) {
+  await page.locator('.staff-tab').filter({ hasText: label }).click()
+}
+
 export async function openAccount(page: Page): Promise<string> {
   const ibans = page.locator('.dashboard-account-iban')
   // Açmadan önceki IBAN'lar (yeni eklenen, farktan bulunur)
