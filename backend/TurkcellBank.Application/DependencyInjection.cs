@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<Features.Loans.ILoanService, Features.Loans.LoanService>();
         services.AddScoped<Features.Branch.IBranchService, Features.Branch.BranchService>();
         services.AddScoped<Features.Org.IOrgService, Features.Org.OrgService>();
+        services.AddScoped<Features.Management.IManagerService, Features.Management.ManagerService>();
         services.AddScoped<Common.Interfaces.IAuditLogger, Features.Audit.AuditLogger>();
         services.AddScoped<Features.Audit.IAuditService, Features.Audit.AuditService>();
         services.AddScoped<Features.Notifications.INotificationService, Features.Notifications.NotificationService>();

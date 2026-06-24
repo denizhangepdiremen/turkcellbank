@@ -25,8 +25,10 @@ public class Account
     public bool IsActive { get; set; } = true;
 
     // Hesap dondurma (deaktive): hesap listede kalır ama işlem yapılamaz; bağlı
-    // kartlar bloke edilir. Müşteri istediğinde geri aktifleştirebilir.
+    // kartlar bloke edilir. Müşteri istediğinde geri aktifleştirebilir (Customer
+    // dondurması). Banka (müdür) dondurmasını müşteri kaldıramaz.
     public bool IsFrozen { get; set; } = false;
+    public FreezeType FreezeType { get; set; } = FreezeType.None;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

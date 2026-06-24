@@ -31,6 +31,7 @@ export interface Account {
   balance: number
   isActive: boolean // false = kapalı (listede gösterilmez)
   isFrozen: boolean // true = dondurulmuş/deaktive (listede kalır, işlem yapılamaz)
+  freezeType: 'None' | 'Customer' | 'Bank' // banka bloğunu müşteri kaldıramaz
   createdAt: string
 }
 
@@ -46,6 +47,15 @@ export interface Transaction {
 }
 
 export type CardStatus = 'Pending' | 'Approved' | 'Rejected' | 'Blocked'
+
+// Yönetici müşteri arama sonucu (banka bloğu işlemleri için)
+export interface ManagedCustomer {
+  id: string
+  fullName: string
+  email: string
+  nationalId: string | null
+  accounts: Account[]
+}
 
 export interface Card {
   id: string

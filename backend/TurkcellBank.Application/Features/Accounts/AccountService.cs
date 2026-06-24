@@ -81,6 +81,10 @@ public class AccountService : IAccountService
 
         if (!account.IsActive)
             throw new BusinessException("Hesap zaten kapalı.");
+        // Banka bloğu varken müşteri hesabı kapatıp parayı çekemez
+        if (account.FreezeType == FreezeType.Bank)
+            throw new BusinessException(
+                "Hesabınız banka tarafından donduruldu; kapatma için şubenize başvurun.");
 
         // Bakiye varsa başka bir aktif hesaba aktar (hesap kapanınca para kaybolmaz)
         if (account.Balance > 0m)
@@ -122,6 +126,7 @@ public class AccountService : IAccountService
             _cards.RemoveRange(cards);
         account.IsActive = false;
         account.IsFrozen = false;
+        account.FreezeType = FreezeType.None;
         await _accounts.SaveChangesAsync();
 
         return Map(account);
@@ -137,6 +142,7 @@ public class AccountService : IAccountService
             throw new BusinessException("Hesap zaten dondurulmuş.");
 
         account.IsFrozen = true;
+        account.FreezeType = FreezeType.Customer; // müşteri kendi dondurdu
 
         // Onaylı kartları geçici olarak bloke et (hesap aktifleşince geri açılır)
         var cards = await _cards.GetByAccountIdAsync(account.Id);
@@ -155,8 +161,13 @@ public class AccountService : IAccountService
             throw new BusinessException("Kapalı hesap aktifleştirilemez.");
         if (!account.IsFrozen)
             throw new BusinessException("Hesap zaten aktif.");
+        // Banka tarafından konan bloğu müşteri kaldıramaz
+        if (account.FreezeType == FreezeType.Bank)
+            throw new BusinessException(
+                "Hesabınız banka tarafından donduruldu; lütfen şubenize başvurun.");
 
         account.IsFrozen = false;
+        account.FreezeType = FreezeType.None;
 
         // Dondurma sırasında bloke edilen kartları geri onaylıya çevir
         var cards = await _cards.GetByAccountIdAsync(account.Id);
@@ -178,5 +189,6 @@ public class AccountService : IAccountService
 
     // Entity -> DTO dönüşümü (hassas/iç alanlar dışarı çıkmaz)
     private static AccountDto Map(Account a) =>
-        new(a.Id, a.Iban, a.AccountType, a.Balance, a.IsActive, a.IsFrozen, a.CreatedAt);
+        new(a.Id, a.Iban, a.AccountType, a.Balance, a.IsActive, a.IsFrozen,
+            a.FreezeType.ToString(), a.CreatedAt);
 }

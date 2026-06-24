@@ -4,6 +4,7 @@ import { LoanApprovalQueue } from '../staff/LoanApprovalQueue'
 import { TransferApprovalQueue } from '../staff/TransferApprovalQueue'
 import { CardApprovalQueue } from '../staff/CardApprovalQueue'
 import { OrgTeamView } from '../staff/OrgTeamView'
+import { ManagedCustomers } from '../staff/ManagedCustomers'
 
 /**
  * Şube müdürü paneli. Müdür çalışan değildir; görüntüleme + onay rolündedir.
@@ -21,6 +22,7 @@ export function BranchManagerPanel() {
           { id: 'loans', label: 'Kredi Onayları', content: <LoanApprovalQueue /> },
           { id: 'transfers', label: 'Yüksek Havale', content: <TransferApprovalQueue /> },
           { id: 'cards', label: 'Kart Onayları', content: <CardApprovalQueue /> },
+          { id: 'customers', label: 'Müşteri Hesapları', content: <ManagedCustomers /> },
           { id: 'org', label: 'Şubem', content: <OrgTeamView /> },
         ]}
       />

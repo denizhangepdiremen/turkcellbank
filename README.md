@@ -16,7 +16,8 @@ yapabilir; adminler ise başvuruları yönetip işlemleri denetleyebilir.
 - **Rol Bazlı Yetkilendirme (RBAC):** Müşteri, Admin (teknik) + banka hiyerarşisi: **Şube Çalışanı, Şube Müdürü, İl Müdürü, Direktör**
 - **Banka Organizasyonu & Onay Hiyerarşisi:** Gerçek şube yapısı (il/şube/personel); krediler tutar bandına göre otomatik veya yetkili onayına düşer; her yönetici bir alt kademeyi görür (detay aşağıda)
 - **Şube İşlemleri (adına işlem):** Şube çalışanı, masaya gelen müşteriyi TC/e-posta ile bulup **onun adına** hesap açar, para yatırır, havale/kredi/kart başvurusu yapar; her kayıt **Şube kanalı + çalışan damgası** taşır
-- **Hesap Yönetimi:** Hesap açma (otomatik **geçerli IBAN** — ISO 13616 mod-97), listeleme, **dondurma/aktifleştirme** ve **kapatma**. Kapatınca bakiye seçilen başka bir hesaba aktarılır ve bağlı kartlar (onay alınarak) silinir; kapalı hesap listeden kalkar. Dondurulan hesapta işlem yapılamaz, bağlı kartlar **bloke** olur, aktifleştirince geri açılır
+- **Hesap Yönetimi:** Hesap açma (otomatik **geçerli IBAN** — ISO 13616 mod-97), listeleme, **dondurma/aktifleştirme** ve **kapatma**. Kapatınca bakiye seçilen başka bir hesaba aktarılır ve bağlı kartlar (onay alınarak) silinir; kapalı hesap listeden kalkar. Dondurulan hesapta işlem yapılamaz, bağlı kartlar **bloke** olur, aktifleştirince geri açılır. **Banka bloğu:** şube/il müdürü ve direktör bir müşteriyi TC/e-posta ile bulup hesabına blok koyabilir; bu bloğu **müşteri kaldıramaz** (yalnızca personel), karar denetim kaydına yazılır ve müşteriye bildirim düşer
+- **Kart Ekstresi:** Onaylı kartların aylık harcamaları (POS işlemleri + toplamlar) **PDF olarak** indirilebilir
 - **Para Transferi:** Para yatırma, banka içi havale (bakiye kontrolü, atomik), işlem geçmişi. Güvenlik: **250k₺ üstü internette bloklu** (şubeye yönlendirilir), **1M₺ üstü şube müdürü onayı** (maker-checker)
 - **AI Destekli Kredi:** Genişletilmiş başvuru (TC kimlik, demografi, gelir/gider); başvuran 30.000 kişilik referans nüfusla karşılaştırılır, yapay zeka (Gemini) maksimum limiti tahmin eder, diğer banka + bizim banka borçları düşülerek karar üretilir. **10M₺ altı otomatik**, üstü tutar bandına göre yetkili onayına düşer (detay aşağıda)
 - **Sanal POS:** Kartla ödeme, 3D Secure simülasyonu, ödeme geçmişi, iade (admin), fraud kontrolü. Kart başvuruları **şube müdürü** tarafından onaylanır; **reddedilen kartlar müşterinin listesinde görünmez** (sadece bildirim düşer). Ödeme kartı seçiminde **bağlı hesabın bakiyesi** gösterilir
@@ -217,6 +218,7 @@ for i in $(seq 1 7); do curl -s -o /dev/null -w "%{http_code}\n" -X POST \
 | GET/POST | `/api/branch/*` | Şube çalışanı: müşteri arama + adına işlem (ŞubeÇalışanı rolü) |
 | GET/POST | `/api/approvals/*` | Yetkili onay kuyrukları: kredi/havale/kart (müdür rolleri) |
 | GET | `/api/org/team` | Yönetici organizasyon görünümü (müdür rolleri) |
+| GET/POST | `/api/management/*` | Müşteri arama + banka bloğu (dondur/aç) — müdür rolleri |
 | GET | `/api/audit` | Denetim kaydı (Admin/Direktör) |
 | GET/POST | `/api/notifications` | Müşteri bildirimleri / okundu işaretle |
 | GET/POST | `/api/admin/*` | Admin (teknik): kullanıcı listesi, ödeme iade (Admin rolü) |

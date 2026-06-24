@@ -783,7 +783,13 @@ export function Dashboard() {
                 </CardContent>
                 <CardFooter>
                   <div className="dashboard-account-footer">
-                    {acc.isFrozen ? (
+                    {acc.isFrozen && acc.freezeType === 'Bank' ? (
+                      // Banka bloğu: müşteri kaldıramaz/kapatamaz, sadece bilgilendirilir
+                      <div className="dashboard-account-bankhold">
+                        🔒 Hesabınız banka tarafından donduruldu. Kaldırmak için
+                        şubenize başvurun.
+                      </div>
+                    ) : acc.isFrozen ? (
                       <>
                         <div className="dashboard-account-actions">
                           <Button

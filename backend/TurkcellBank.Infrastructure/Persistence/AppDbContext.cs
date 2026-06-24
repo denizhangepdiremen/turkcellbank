@@ -87,6 +87,8 @@ public class AppDbContext : DbContext
 
             entity.Property(a => a.Channel).HasConversion<string>().HasMaxLength(10);
 
+            entity.Property(a => a.FreezeType).HasConversion<string>().HasMaxLength(10);
+
             // İlişki: Account -> User (çok hesap, tek kullanıcı).
             // Kullanıcı silinirse hesapları da silinir (Cascade).
             entity.HasOne(a => a.User)

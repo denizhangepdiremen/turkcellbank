@@ -10,4 +10,5 @@ public record AccountDto(
     decimal Balance,
     bool IsActive,
     bool IsFrozen,
+    string FreezeType, // None / Customer / Bank — banka bloğunu müşteri kaldıramaz
     DateTime CreatedAt);
