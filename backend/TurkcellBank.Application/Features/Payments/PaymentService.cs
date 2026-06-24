@@ -175,5 +175,5 @@ public class PaymentService : IPaymentService
     }
 
     private static PaymentDto Map(Payment p) =>
-        new(p.Id, p.MaskedCardNumber, p.Amount, p.Status.ToString(), p.Description, p.CreatedAt);
+        new(p.Id, p.CardId, p.MaskedCardNumber, p.Amount, p.Status.ToString(), p.Description, p.CreatedAt);
 }

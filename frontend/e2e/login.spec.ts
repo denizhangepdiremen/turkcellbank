@@ -16,7 +16,12 @@ test.describe('Giriş akışı', () => {
   test('doğru bilgilerle giriş dashboard’a yönlendirir', async ({ page }) => {
     await loginViaUi(page, DUMMY.email, DUMMY.password)
     await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(page.getByRole('heading', { name: /Merhaba/ })).toBeVisible()
+    // Selamlama saate göre değişir (Günaydın / İyi günler / İyi akşamlar / İyi geceler)
+    await expect(
+      page.getByRole('heading', {
+        name: /Günaydın|İyi günler|İyi akşamlar|İyi geceler/,
+      }),
+    ).toBeVisible()
   })
 
   test('yanlış şifre hata bildirimi gösterir', async ({ page }) => {

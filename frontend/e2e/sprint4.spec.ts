@@ -7,6 +7,7 @@ import {
   openAccount,
   applyForCard,
   openStaffTab,
+  openTab,
 } from './helpers'
 
 // Sprint 4: yüksek havale onayı, kart onayının şube müdürüne taşınması,
@@ -85,6 +86,15 @@ test.describe('Sprint 4 — yönetici onayları ve görünürlük', () => {
     await expect(card).toBeVisible()
     await card.getByRole('button', { name: 'Onayla' }).click()
     await expect(page.getByText('Kart onaylandı.')).toBeVisible()
+    await page.evaluate(() => localStorage.clear())
+
+    // 3) Müşteri onaylı kartında "Ekstre (PDF)" ile ekstre modalını açabilir
+    await loginViaUi(page, customer.email, customer.password)
+    await openTab(page, 'Kartlar')
+    await page.getByRole('button', { name: 'Ekstre (PDF)' }).first().click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByText('Kart Ekstresi')).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'PDF İndir' })).toBeVisible()
   })
 
   test('şube müdürü organizasyon görünümünü görür (Şubem + ekip istatistiği)', async ({ page }) => {

@@ -114,6 +114,27 @@
   opacity: 0.85;
 }
 
+/* Bakiye gizle/göster toggle — bakiye değerinin yanındaki göz ikonu */
+.dashboard-summary-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dashboard-balance-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 0;
+  padding: 0.25rem;
+  transition: color 0.15s ease;
+}
+
+.dashboard-balance-toggle:hover {
+  color: rgba(255, 255, 255, 1);
+}
+
 .dashboard-summary-value {
   margin: 0.25rem 0 0;
   font-size: 2rem;
@@ -278,6 +299,18 @@
   margin: 0.15rem 0 0;
 }
 
+/* Kart hücresi: banka kartı görseli + altında aksiyon (Ekstre) */
+.dashboard-card-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.dashboard-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 /* Hesap kapatma/dondurma modalı metni */
 .dashboard-close-lead {
   margin: 0 0 1rem;
@@ -305,6 +338,15 @@
   vertical-align: middle;
 }
 
+/* İşlem satırı sağ taraf: tutar + bakiye alt alta */
+.dashboard-tx-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
 .dashboard-tx-amount {
   font-size: 0.95rem;
   font-weight: 600;
@@ -316,6 +358,149 @@
 
 .dashboard-tx-amount.out {
   color: #dc2626; /* red-600 */
+}
+
+.dashboard-tx-balance {
+  font-size: 0.72rem;
+  color: #9ca3af; /* gray-400 */
+  font-weight: 400;
+}
+
+/* --- Gerçekçi banka kartı görünümü --- */
+.dashboard-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 640px) {
+  .dashboard-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bank-card {
+  position: relative;
+  padding: 1.5rem;
+  border-radius: 16px;
+  color: #ffffff;
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bank-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+}
+
+/* Dekoratif daire arka plan */
+.bank-card::before {
+  content: '';
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+.bank-card::after {
+  content: '';
+  position: absolute;
+  bottom: -30px;
+  left: -30px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+}
+
+/* Renk varyantları */
+.bank-card--indigo {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+}
+
+.bank-card--emerald {
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+}
+
+.bank-card--slate {
+  background: linear-gradient(135deg, #334155 0%, #475569 100%);
+}
+
+/* Bloke kart soluk görünür */
+.bank-card--blocked {
+  opacity: 0.55;
+  filter: grayscale(0.4);
+}
+
+/* Üst satır: logo + durum badge */
+.bank-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bank-card__brand {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  opacity: 0.9;
+}
+
+/* Chip */
+.bank-card__chip {
+  margin: 0.75rem 0 0.5rem;
+}
+
+/* Kart numarası */
+.bank-card__number {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 2.5px;
+  margin: 0;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.bank-card__holder {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  margin: 0.35rem 0 0;
+  opacity: 0.85;
+  text-transform: uppercase;
+}
+
+/* Alt satır: SKT + Hesap */
+.bank-card__bottom {
+  display: flex;
+  gap: 2rem;
+  margin-top: 0.5rem;
+}
+
+.bank-card__label {
+  display: block;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.6;
+  font-weight: 500;
+}
+
+.bank-card__expiry {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
 /* Modal içi alanlar arası boşluk */
@@ -370,6 +555,22 @@
   margin-bottom: 0.75rem;
   font-size: 0.9rem;
   color: #111827;
+}
+
+/* Sekme paneli fade-in animasyonu (sekme geçişlerinde) */
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dashboard-tab-panel {
+  animation: tabFadeIn 0.2s ease-out;
 }
 
 /* Bölüm sekmeleri (Garanti benzeri üst menü) */

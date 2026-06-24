@@ -28,16 +28,18 @@ import { pay, getMyPayments } from '../../api/paymentApi'
 import { createCard, getMyCards } from '../../api/cardApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
-import { digitsOnly } from '../../lib/format'
+import { digitsOnly, formatIban } from '../../lib/format'
 import type {
   Account,
   AccountType,
+  Card as BankCard,
   CardStatus,
   Loan,
   LoanStatus,
   PaymentStatus,
   Transaction,
 } from '../../lib/types'
+import { openCardStatement } from '../../lib/cardStatement'
 import './Dashboard.css'
 
 const accountTypeOptions = [
@@ -96,6 +98,15 @@ const formatTL = (n: number) =>
 const trDate = (iso: string) =>
   new Date(iso).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })
 
+// Saate göre selamlama mesajı (gerçek banka uygulamalarındaki gibi)
+function getGreeting(name: string) {
+  const hour = new Date().getHours()
+  if (hour >= 6 && hour < 12) return `Günaydın, ${name} ☀️`
+  if (hour >= 12 && hour < 18) return `İyi günler, ${name} 👋`
+  if (hour >= 18 && hour < 22) return `İyi akşamlar, ${name} 🌆`
+  return `İyi geceler, ${name} 🌙`
+}
+
 // Liste yüklenirken gösterilen skeleton satırlar
 function ListSkeleton() {
   return (
@@ -128,6 +139,9 @@ export function Dashboard() {
 
   // Aktif sekme — varsayılan: Hesaplarım
   const [activeTab, setActiveTab] = useState<DashboardTab>('accounts')
+
+  // Bakiye gizle/göster (göz ikonu) — gerçek banka uygulamalarının standart özelliği
+  const [balanceVisible, setBalanceVisible] = useState(true)
 
   // Görünür sekmeler (kullanıcı ekleyip çıkarabilir; localStorage'da kalıcı)
   const [visibleTabs, setVisibleTabs] = useState<DashboardTab[]>(() => {
@@ -304,11 +318,16 @@ export function Dashboard() {
 
   const isAllAccounts = historyAccountId === ALL_ACCOUNTS
 
+  // İşlem sorguları yalnız "İşlemler" sekmesi açıkken çalışsın — aksi halde
+  // panele girer girmez (özellikle "Tüm Hesaplar"da) hesap başına bir istek
+  // atılır ve çok hesaplı kullanıcıda sayfa boşuna yavaşlar.
+  const txTabActive = activeTab === 'transactions'
+
   // Tek hesap görünümü
   const { data: historyData, isLoading: historyLoading } = useQuery({
     queryKey: ['transactions', historyAccountId],
     queryFn: () => getHistory(historyAccountId),
-    enabled: !!historyAccountId && !isAllAccounts,
+    enabled: txTabActive && !!historyAccountId && !isAllAccounts,
   })
 
   // Tüm hesaplar görünümü — her hesabın geçmişini paralel çek, sonra birleştir
@@ -316,7 +335,7 @@ export function Dashboard() {
     queries: accounts.map((a) => ({
       queryKey: ['transactions', a.id],
       queryFn: () => getHistory(a.id),
-      enabled: isAllAccounts,
+      enabled: txTabActive && isAllAccounts,
     })),
   })
 
@@ -439,6 +458,10 @@ export function Dashboard() {
 
   const [cardModalOpen, setCardModalOpen] = useState(false)
   const [cardAccountId, setCardAccountId] = useState('')
+
+  // Kart ekstresi (PDF) modalı
+  const [statementCard, setStatementCard] = useState<BankCard | null>(null)
+  const [statementMonth, setStatementMonth] = useState('') // 'YYYY-MM'
   const createCardMutation = useMutation({
     mutationFn: () => createCard(cardAccountId),
     onSuccess: () => {
@@ -461,6 +484,40 @@ export function Dashboard() {
   })
   const payments = paymentsData?.data ?? []
   const [payVisible, setPayVisible] = useState(PAGE_SIZE)
+
+  // Kart ekstresi: son 12 ay seçeneği (YYYY-MM)
+  const statementMonthOptions = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date()
+    d.setDate(1)
+    d.setMonth(d.getMonth() - i)
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = d.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
+    return { value, label }
+  })
+
+  function openStatement(card: BankCard) {
+    setStatementCard(card)
+    setStatementMonth(statementMonthOptions[0].value)
+  }
+
+  function generateStatement() {
+    if (!statementCard) return
+    const [y, m] = statementMonth.split('-').map(Number)
+    const monthPayments = payments.filter((p) => {
+      if (p.cardId !== statementCard.id) return false
+      const d = new Date(p.createdAt)
+      return d.getFullYear() === y && d.getMonth() === m - 1
+    })
+    const ok = openCardStatement({
+      card: statementCard,
+      payments: monthPayments,
+      year: y,
+      month: m - 1,
+      customerName: user?.fullName ?? '',
+    })
+    if (!ok) toast.error('Açılır pencere engellendi. Lütfen pop-up iznine bakın.')
+    setStatementCard(null)
+  }
 
   const [payOpen, setPayOpen] = useState(false)
   const [payStep, setPayStep] = useState<'form' | '3ds'>('form')
@@ -597,11 +654,35 @@ export function Dashboard() {
       </header>
 
       <div className="dashboard-body">
-        <h1 className="dashboard-greeting">Merhaba, {firstName} 👋</h1>
+        <h1 className="dashboard-greeting">{getGreeting(firstName)}</h1>
 
         <div className="dashboard-summary">
           <p className="dashboard-summary-label">Toplam Bakiye</p>
-          <p className="dashboard-summary-value">{formatTL(totalBalance)}</p>
+          <div className="dashboard-summary-value-row">
+            <p className="dashboard-summary-value">
+              {balanceVisible ? formatTL(totalBalance) : '₺*****,**'}
+            </p>
+            <button
+              type="button"
+              className="dashboard-balance-toggle"
+              onClick={() => setBalanceVisible((v) => !v)}
+              aria-label={balanceVisible ? 'Bakiyeyi gizle' : 'Bakiyeyi göster'}
+            >
+              {balanceVisible ? (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              ) : (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                  <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Bölüm sekmeleri — tıklanınca ilgili bölüm gösterilir (kaydırma yok) */}
@@ -652,6 +733,7 @@ export function Dashboard() {
           ))}
         </Modal>
 
+        <div key={activeTab} className="dashboard-tab-panel">
         {activeTab === 'accounts' && (
           <>
         <div className="dashboard-section-head">
@@ -686,7 +768,7 @@ export function Dashboard() {
                     {acc.isFrozen && <Badge variant="warning">Dondurulmuş</Badge>}
                   </div>
                   <div className="dashboard-account-iban-row">
-                    <span className="dashboard-account-iban">{acc.iban}</span>
+                    <span className="dashboard-account-iban">{formatIban(acc.iban)}</span>
                     <button
                       type="button"
                       className="dashboard-iban-copy"
@@ -695,7 +777,9 @@ export function Dashboard() {
                       Kopyala
                     </button>
                   </div>
-                  <p className="dashboard-account-balance">{formatTL(acc.balance)}</p>
+                  <p className="dashboard-account-balance">
+                    {balanceVisible ? formatTL(acc.balance) : '₺*****,**'}
+                  </p>
                 </CardContent>
                 <CardFooter>
                   <div className="dashboard-account-footer">
@@ -793,7 +877,19 @@ export function Dashboard() {
               </div>
             ) : (
               <>
-                {history.slice(0, txVisible).map((tx) => (
+                {history.slice(0, txVisible).map((tx, idx) => {
+                  // Mevcut bakiyeden geriye hesaplayarak her işlem anındaki bakiyeyi bul
+                  // Bu satırdan sonraki işlemlerin etkisini mevcut bakiyeden çıkar
+                  const accountIban = tx.accountIban ?? accounts.find(a => a.id === historyAccountId)?.iban
+                  const currentBalance = accounts.find(a => a.iban === accountIban)?.balance ?? 0
+                  // Bu işlemden sonraki (daha yeni) işlemlerin etkisini geri al
+                  const laterTxs = history.slice(0, idx)
+                    .filter(t => (t.accountIban ?? accountIban) === accountIban)
+                  const laterEffect = laterTxs.reduce((sum, t) =>
+                    sum + (t.direction === 'In' ? -t.amount : t.amount), 0)
+                  const balanceAfterTx = currentBalance + laterEffect
+
+                  return (
                   <div key={tx.id} className="dashboard-tx-row">
                     <div>
                       <p className="dashboard-tx-desc">
@@ -810,14 +906,20 @@ export function Dashboard() {
                         {tx.channel === 'Branch' ? ' · Şube' : ''}
                       </p>
                     </div>
-                    <span
-                      className={`dashboard-tx-amount ${tx.direction === 'In' ? 'in' : 'out'}`}
-                    >
-                      {tx.direction === 'In' ? '+' : '-'}
-                      {formatTL(tx.amount)}
-                    </span>
+                    <div className="dashboard-tx-right">
+                      <span
+                        className={`dashboard-tx-amount ${tx.direction === 'In' ? 'in' : 'out'}`}
+                      >
+                        {tx.direction === 'In' ? '+' : '-'}
+                        {formatTL(tx.amount)}
+                      </span>
+                      <span className="dashboard-tx-balance">
+                        Bakiye: {balanceVisible ? formatTL(balanceAfterTx) : '₺*****,**'}
+                      </span>
+                    </div>
                   </div>
-                ))}
+                  )
+                })}
                 {history.length > txVisible && (
                   <div className="dashboard-loadmore">
                     <Button
@@ -902,31 +1004,70 @@ export function Dashboard() {
           </Button>
         </div>
 
-        <Card>
-          <CardContent>
-            {cardsLoading ? (
-              <ListSkeleton />
-            ) : cards.length === 0 ? (
-              <div className="dashboard-state">Henüz kartınız yok.</div>
-            ) : (
-              cards.map((c) => (
-                <div key={c.id} className="dashboard-loan-row">
-                  <div>
-                    <p className="dashboard-loan-amount">{c.maskedCardNumber}</p>
-                    <p className="dashboard-loan-sub">
-                      Son kullanma {String(c.expiryMonth).padStart(2, '0')}/{c.expiryYear}
-                      {' · '}
-                      Hesap ...{c.accountIban.slice(-4)}
-                    </p>
-                  </div>
+        {cardsLoading ? (
+          <div className="dashboard-cards-grid">
+            <Skeleton className="h-48 rounded-2xl" />
+            <Skeleton className="h-48 rounded-2xl" />
+          </div>
+        ) : cards.length === 0 ? (
+          <Card><CardContent><div className="dashboard-state">Henüz kartınız yok.</div></CardContent></Card>
+        ) : (
+          <div className="dashboard-cards-grid">
+            {cards.map((c, i) => (
+              <div key={c.id} className="dashboard-card-cell">
+              <div
+                className={`bank-card bank-card--${i % 3 === 0 ? 'indigo' : i % 3 === 1 ? 'emerald' : 'slate'} ${c.status === 'Blocked' ? 'bank-card--blocked' : ''}`}
+              >
+                {/* Üst satır: logo + durum */}
+                <div className="bank-card__top">
+                  <span className="bank-card__brand">TurkcellBank</span>
                   <Badge variant={cardBadgeVariant(c.status)}>
                     {cardLabel(c.status)}
                   </Badge>
                 </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+
+                {/* Chip ikonu */}
+                <div className="bank-card__chip">
+                  <svg width="36" height="28" viewBox="0 0 36 28" fill="none">
+                    <rect x="0.5" y="0.5" width="35" height="27" rx="4" fill="#d4a843" stroke="#b8922e"/>
+                    <line x1="0" y1="10" x2="36" y2="10" stroke="#b8922e" strokeWidth="0.7"/>
+                    <line x1="0" y1="18" x2="36" y2="18" stroke="#b8922e" strokeWidth="0.7"/>
+                    <line x1="12" y1="0" x2="12" y2="28" stroke="#b8922e" strokeWidth="0.7"/>
+                    <line x1="24" y1="0" x2="24" y2="28" stroke="#b8922e" strokeWidth="0.7"/>
+                  </svg>
+                </div>
+
+                {/* Kart numarası */}
+                <p className="bank-card__number">{c.maskedCardNumber}</p>
+                <p className="bank-card__holder">{user?.fullName?.toUpperCase()}</p>
+
+                {/* Alt satır: son kullanma + hesap */}
+                <div className="bank-card__bottom">
+                  <div>
+                    <span className="bank-card__label">SKT</span>
+                    <span className="bank-card__expiry">
+                      {String(c.expiryMonth).padStart(2, '0')}/{c.expiryYear}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="bank-card__label">HESAP</span>
+                    <span className="bank-card__expiry">
+                      ...{c.accountIban.slice(-4)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {(c.status === 'Approved' || c.status === 'Blocked') && (
+                <div className="dashboard-card-actions">
+                  <Button size="sm" variant="ghost" onClick={() => openStatement(c)}>
+                    Ekstre (PDF)
+                  </Button>
+                </div>
+              )}
+              </div>
+            ))}
+          </div>
+        )}
           </>
         )}
 
@@ -981,6 +1122,7 @@ export function Dashboard() {
         </Card>
           </>
         )}
+        </div>
       </div>
 
       {/* --- Hesap açma modalı --- */}
@@ -1506,6 +1648,40 @@ export function Dashboard() {
               onChange={(e) => setCardAccountId(e.target.value)}
             />
           </div>
+        )}
+      </Modal>
+
+      {/* --- Kart ekstresi (PDF) modalı --- */}
+      <Modal
+        open={!!statementCard}
+        onClose={() => setStatementCard(null)}
+        title="Kart Ekstresi"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setStatementCard(null)}>
+              İptal
+            </Button>
+            <Button variant="primary" onClick={generateStatement}>
+              PDF İndir
+            </Button>
+          </>
+        }
+      >
+        {statementCard && (
+          <>
+            <p className="dashboard-close-lead">
+              <strong>{statementCard.maskedCardNumber}</strong> kartının seçtiğiniz
+              aydaki harcamalarını PDF olarak indirin.
+            </p>
+            <div className="dashboard-modal-field">
+              <Select
+                label="Dönem"
+                options={statementMonthOptions}
+                value={statementMonth}
+                onChange={(e) => setStatementMonth(e.target.value)}
+              />
+            </div>
+          </>
         )}
       </Modal>
 

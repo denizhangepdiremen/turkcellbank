@@ -202,6 +202,7 @@ export type PaymentStatus = 'Success' | 'Failed' | 'Refunded'
 
 export interface Payment {
   id: string
+  cardId: string | null // ödemenin yapıldığı kart (ekstre filtresi için)
   maskedCardNumber: string
   amount: number
   status: PaymentStatus
