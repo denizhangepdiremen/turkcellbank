@@ -140,7 +140,7 @@ export function BranchEmployeePanel() {
                 <Button size="sm" variant="ghost" disabled={activeAccounts.length === 0} onClick={() => setModal('card')}>
                   Kart Başvur
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setModal('loan')}>
+                <Button size="sm" variant="ghost" disabled={activeAccounts.length === 0} onClick={() => setModal('loan')}>
                   Kredi Başvur
                 </Button>
               </div>
@@ -189,6 +189,7 @@ export function BranchEmployeePanel() {
             onClose={() => setModal(null)}
             customerId={customer.id}
             nationalId={customer.nationalId ?? ''}
+            accountOptions={accountOptions}
             onDone={(loan) =>
               afterAction(`Kredi başvurusu ${loanStatusLabel(loan.status)}.`)
             }
@@ -329,8 +330,8 @@ function CardModal({ open, onClose, customerId, accountOptions, onDone }: {
   )
 }
 
-function LoanModal({ open, onClose, customerId, nationalId, onDone }: {
-  open: boolean; onClose: () => void; customerId: string; nationalId: string; onDone: (loan: Loan) => void
+function LoanModal({ open, onClose, customerId, nationalId, accountOptions, onDone }: {
+  open: boolean; onClose: () => void; customerId: string; nationalId: string; accountOptions: AccountOption[]; onDone: (loan: Loan) => void
 }) {
   const [tc, setTc] = useState(nationalId)
   const [age, setAge] = useState('')
@@ -343,6 +344,7 @@ function LoanModal({ open, onClose, customerId, nationalId, onDone }: {
   const [profession, setProfession] = useState('')
   const [amount, setAmount] = useState('')
   const [term, setTerm] = useState('12')
+  const [accountId, setAccountId] = useState('') // kredinin yatırılacağı hesap
 
   const m = useMutation({
     mutationFn: () =>
@@ -358,6 +360,7 @@ function LoanModal({ open, onClose, customerId, nationalId, onDone }: {
         profession: profession.trim(),
         amount: Number(amount),
         termMonths: Number(term),
+        disbursementAccountId: accountId || accountOptions[0]?.value,
       }),
     onSuccess: (res) => res.data && onDone(res.data),
     onError: (err) => toast.error(getApiErrorMessage(err, 'Kredi başvurusu alınamadı.')),
@@ -387,6 +390,7 @@ function LoanModal({ open, onClose, customerId, nationalId, onDone }: {
         <Input label="Meslek" value={profession} onChange={(e) => setProfession(e.target.value)} />
         <Input label="Kredi Tutarı (₺)" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
         <Input label="Vade (ay)" type="number" value={term} onChange={(e) => setTerm(e.target.value)} />
+        <Select label="Krediyi yatıracağımız hesap" options={accountOptions} value={accountId} onChange={(e) => setAccountId(e.target.value)} placeholder="Hesap seçin" />
       </div>
     </Modal>
   )
