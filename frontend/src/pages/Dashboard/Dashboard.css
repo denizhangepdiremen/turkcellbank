@@ -299,6 +299,12 @@
   margin: 0.15rem 0 0;
 }
 
+/* Ödeme planında ödenmiş taksit etiketi */
+.dashboard-plan-paid {
+  color: #059669; /* emerald-600 */
+  font-weight: 600;
+}
+
 /* Banka bloğu bilgilendirmesi (müşteri kaldıramaz) */
 .dashboard-account-bankhold {
   font-size: 0.82rem;

@@ -12,6 +12,8 @@ public class LoanService : ILoanService
 {
     private readonly ILoanRepository _loans;
     private readonly IUserRepository _users;
+    private readonly IAccountRepository _accounts;
+    private readonly ITransactionRepository _transactions;
     private readonly IReferenceCreditRepository _reference;
     private readonly IExternalBankLoanRepository _external;
     private readonly ILoanAiEvaluator _evaluator;
@@ -25,6 +27,8 @@ public class LoanService : ILoanService
     public LoanService(
         ILoanRepository loans,
         IUserRepository users,
+        IAccountRepository accounts,
+        ITransactionRepository transactions,
         IReferenceCreditRepository reference,
         IExternalBankLoanRepository external,
         ILoanAiEvaluator evaluator,
@@ -37,6 +41,8 @@ public class LoanService : ILoanService
     {
         _loans = loans;
         _users = users;
+        _accounts = accounts;
+        _transactions = transactions;
         _reference = reference;
         _external = external;
         _evaluator = evaluator;
@@ -57,6 +63,9 @@ public class LoanService : ILoanService
 
         var nationalId = request.NationalId.Trim();
         var profession = request.Profession.Trim();
+
+        // Kredinin yatırılacağı hesap müşteriye ait, aktif ve dondurulmamış olmalı
+        var disburseAccount = await GetDisbursableAccountAsync(request.DisbursementAccountId);
 
         // TC kimlik no'yu (işlem sahibi) müşteriye bir kez kaydet
         var user = await _users.GetByIdAsync(_ctx.ActingUserId);
@@ -142,6 +151,7 @@ public class LoanService : ILoanService
             Amount = request.Amount,
             TermMonths = request.TermMonths,
             Status = status,
+            DisbursementAccountId = disburseAccount.Id,
             RecommendedStatus = recommended,
             RequiredApproverRole = approverRole,
             Score = LoanScoring.Calculate(request.Income, request.Amount, request.TermMonths),
@@ -158,6 +168,11 @@ public class LoanService : ILoanService
         };
 
         await _loans.AddAsync(loan);
+
+        // Otomatik onaylanan kredilerde parayı hemen hesaba yatır
+        if (status == LoanStatus.Approved)
+            await DisburseAsync(loan, disburseAccount);
+
         return MapLoan(loan, includePlan: status == LoanStatus.Approved);
     }
 
@@ -232,6 +247,52 @@ public class LoanService : ILoanService
             CanApprove: role is not null && l.RequiredApproverRole == role)).ToList();
     }
 
+    public async Task<LoanDto> PayInstallmentAsync(Guid loanId, Guid accountId)
+    {
+        var loan = await _loans.GetByIdAsync(loanId);
+        if (loan is null || loan.UserId != _ctx.ActingUserId)
+            throw new NotFoundException("Kredi başvurusu bulunamadı.");
+
+        if (loan.Status != LoanStatus.Approved)
+            throw new BusinessException("Sadece onaylı kredilerin taksiti ödenir.");
+        if (loan.InstallmentsPaid >= loan.TermMonths)
+            throw new BusinessException("Bu kredinin tüm taksitleri ödenmiş.");
+
+        var account = await GetDisbursableAccountAsync(accountId);
+
+        // Son taksitte kalan borç tam kapatılır (yuvarlama farkını engelle)
+        var isLast = loan.InstallmentsPaid + 1 >= loan.TermMonths;
+        var amount = isLast ? loan.RemainingDebt : loan.MonthlyInstallment;
+
+        if (account.Balance < amount)
+            throw new BusinessException("Taksit için yeterli bakiye yok.");
+
+        account.Balance -= amount;
+        loan.RemainingDebt = isLast ? 0m : loan.RemainingDebt - amount;
+        loan.InstallmentsPaid += 1;
+
+        var tx = new Transaction
+        {
+            Id = Guid.NewGuid(),
+            Type = TransactionType.LoanRepayment,
+            FromAccountId = account.Id,
+            FromIban = account.Iban,
+            Amount = amount,
+            Description = "Kredi taksiti",
+            CreatedAt = DateTime.UtcNow,
+            Channel = _ctx.Channel,
+            PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
+        };
+        await _transactions.AddAsync(tx); // bakiye + taksit sayacı birlikte (atomik)
+
+        // Kredi tamamen kapandıysa müşteriye bildir
+        if (loan.InstallmentsPaid >= loan.TermMonths)
+            await _notifications.NotifyAsync(loan.UserId, "Krediniz tamamen ödendi",
+                $"{loan.Amount:N0} TL kredinizin tüm taksitleri ödenmiştir. Geçmiş olsun!");
+
+        return MapLoan(loan, includePlan: true);
+    }
+
     public Task<LoanDto> ApproveAsync(Guid id, string? note) => DecideAsync(id, note, approve: true);
     public Task<LoanDto> RejectAsync(Guid id, string? note) => DecideAsync(id, note, approve: false);
 
@@ -262,6 +323,18 @@ public class LoanService : ILoanService
         loan.DecidedAt = DateTime.UtcNow;
         await _loans.SaveChangesAsync();
 
+        // Onaylandıysa anaparayı başvuruda seçilen hesaba yatır
+        if (approve)
+        {
+            var account = loan.DisbursementAccountId is null
+                ? null
+                : await _accounts.GetByIdAsync(loan.DisbursementAccountId.Value);
+            if (account is null || !account.IsActive || account.IsFrozen)
+                throw new BusinessException(
+                    "Kredinin yatırılacağı hesap artık uygun değil; müşteriden güncel hesap alın.");
+            await DisburseAsync(loan, account);
+        }
+
         // Denetim kaydı + müşteri bildirimi
         var verdict = approve ? "onaylandı" : "reddedildi";
         await _audit.LogAsync(
@@ -274,6 +347,46 @@ public class LoanService : ILoanService
             (string.IsNullOrWhiteSpace(loan.DecisionNote) ? "" : $" Not: {loan.DecisionNote}"));
 
         return MapLoan(loan, includePlan: approve);
+    }
+
+    // Kredinin yatırılacağı hesabı doğrula: işlem sahibine ait, aktif, dondurulmamış
+    private async Task<Account> GetDisbursableAccountAsync(Guid accountId)
+    {
+        var account = await _accounts.GetByIdAsync(accountId);
+        if (account is null || account.UserId != _ctx.ActingUserId)
+            throw new NotFoundException("Hesap bulunamadı.");
+        if (!account.IsActive)
+            throw new BusinessException("Kapalı hesap kredi işlemlerinde kullanılamaz.");
+        if (account.IsFrozen)
+            throw new BusinessException("Dondurulmuş hesap kredi işlemlerinde kullanılamaz.");
+        return account;
+    }
+
+    // Anaparayı hesaba yatır + geri ödeme planını (taksit/kalan borç) yaz
+    private async Task DisburseAsync(LoanApplication loan, Account account)
+    {
+        var plan = PaymentPlanCalculator.Calculate(
+            loan.Amount, loan.TermMonths, loan.DecidedAt ?? DateTime.UtcNow);
+
+        loan.MonthlyInstallment = plan.MonthlyPayment;
+        loan.RemainingDebt = plan.TotalPayment;
+        loan.InstallmentsPaid = 0;
+
+        account.Balance += loan.Amount;
+
+        var tx = new Transaction
+        {
+            Id = Guid.NewGuid(),
+            Type = TransactionType.LoanDisbursement,
+            ToAccountId = account.Id,
+            ToIban = account.Iban,
+            Amount = loan.Amount,
+            Description = "Kredi kullandırımı",
+            CreatedAt = DateTime.UtcNow,
+            Channel = _ctx.Channel,
+            PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
+        };
+        await _transactions.AddAsync(tx); // bakiye + kredi alanları + işlem birlikte (atomik)
     }
 
     // Tutar -> onaylayacak rol (null => otomatik karar bandı)
@@ -342,6 +455,8 @@ public class LoanService : ILoanService
         return new LoanDto(
             l.Id, l.Income, l.Profession, l.Amount, l.TermMonths,
             l.Status.ToString(), l.Score, l.MaxLimit, l.ExistingDebt, l.NetLimit,
-            l.AiReason, l.DecidedBy, l.DecisionNote, l.CreatedAt, l.DecidedAt, plan);
+            l.AiReason, l.DecidedBy, l.DecisionNote,
+            l.MonthlyInstallment, l.RemainingDebt, l.InstallmentsPaid,
+            l.CreatedAt, l.DecidedAt, plan);
     }
 }

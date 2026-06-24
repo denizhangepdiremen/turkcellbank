@@ -8,6 +8,7 @@ public interface ILoanService
     Task<LoanDto> ApplyAsync(LoanApplicationRequest request);
     Task<List<LoanDto>> GetMyLoansAsync();
     Task<LoanDto> GetMyLoanDetailAsync(Guid id); // onaylıysa ödeme planıyla
+    Task<LoanDto> PayInstallmentAsync(Guid loanId, Guid accountId); // taksiti seçilen hesaptan öde
 
     // --- Admin (teknik, salt-okunur) ---
     Task<List<AdminLoanDto>> GetAllLoansAsync();

@@ -13,11 +13,21 @@ export interface LoanApplyPayload {
   profession: string
   amount: number
   termMonths: number
+  disbursementAccountId: string // kredinin yatırılacağı hesap
 }
 
 // Kredi başvurusu yap
 export async function applyLoan(payload: LoanApplyPayload) {
   const { data } = await apiClient.post<ApiResponse<Loan>>('/api/loans', payload)
+  return data
+}
+
+// Bir taksiti seçilen hesaptan öde
+export async function payInstallment(loanId: string, accountId: string) {
+  const { data } = await apiClient.post<ApiResponse<Loan>>(
+    `/api/loans/${loanId}/pay-installment`,
+    { accountId },
+  )
   return data
 }
 

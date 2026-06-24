@@ -17,4 +17,5 @@ public record LoanApplicationRequest(
     int EmploymentMonths,
     string Profession,
     decimal Amount,
-    int TermMonths);
+    int TermMonths,
+    Guid DisbursementAccountId); // kredinin yatırılacağı / taksitlerin çekileceği hesap

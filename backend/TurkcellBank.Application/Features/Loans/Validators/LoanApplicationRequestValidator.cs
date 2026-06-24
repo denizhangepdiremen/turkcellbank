@@ -41,6 +41,9 @@ public class LoanApplicationRequestValidator : AbstractValidator<LoanApplication
 
         RuleFor(x => x.TermMonths)
             .InclusiveBetween(3, 60).WithMessage("Vade 3-60 ay arasında olmalı.");
+
+        RuleFor(x => x.DisbursementAccountId)
+            .NotEmpty().WithMessage("Kredinin yatırılacağı hesabı seçin.");
     }
 
     /// <summary>

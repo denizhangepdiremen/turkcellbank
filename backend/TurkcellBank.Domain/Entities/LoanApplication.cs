@@ -31,6 +31,14 @@ public class LoanApplication
     public decimal Amount { get; set; }       // istenen kredi tutarı
     public int TermMonths { get; set; }       // vade (ay)
 
+    // Kredinin yatırılacağı / taksitlerin çekileceği müşteri hesabı
+    public Guid? DisbursementAccountId { get; set; }
+
+    // --- Geri ödeme takibi (onaylanınca doldurulur) ---
+    public decimal MonthlyInstallment { get; set; } // aylık eşit taksit
+    public decimal RemainingDebt { get; set; }       // kalan toplam borç (faiz dahil)
+    public int InstallmentsPaid { get; set; }        // ödenen taksit sayısı
+
     // --- Karar ---
     public LoanStatus Status { get; set; } = LoanStatus.Pending;
     public int Score { get; set; }            // tavsiye amaçlı risk skoru (0-100)

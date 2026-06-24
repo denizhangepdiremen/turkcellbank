@@ -19,7 +19,7 @@ yapabilir; adminler ise başvuruları yönetip işlemleri denetleyebilir.
 - **Hesap Yönetimi:** Hesap açma (otomatik **geçerli IBAN** — ISO 13616 mod-97), listeleme, **dondurma/aktifleştirme** ve **kapatma**. Kapatınca bakiye seçilen başka bir hesaba aktarılır ve bağlı kartlar (onay alınarak) silinir; kapalı hesap listeden kalkar. Dondurulan hesapta işlem yapılamaz, bağlı kartlar **bloke** olur, aktifleştirince geri açılır. **Banka bloğu:** şube/il müdürü ve direktör bir müşteriyi TC/e-posta ile bulup hesabına blok koyabilir; bu bloğu **müşteri kaldıramaz** (yalnızca personel), karar denetim kaydına yazılır ve müşteriye bildirim düşer
 - **Kart Ekstresi:** Onaylı kartların aylık harcamaları (POS işlemleri + toplamlar) **PDF olarak** indirilebilir
 - **Para Transferi:** Para yatırma, banka içi havale (bakiye kontrolü, atomik), işlem geçmişi. Güvenlik: **250k₺ üstü internette bloklu** (şubeye yönlendirilir), **1M₺ üstü şube müdürü onayı** (maker-checker)
-- **AI Destekli Kredi:** Genişletilmiş başvuru (TC kimlik, demografi, gelir/gider); başvuran 30.000 kişilik referans nüfusla karşılaştırılır, yapay zeka (Gemini) maksimum limiti tahmin eder, diğer banka + bizim banka borçları düşülerek karar üretilir. **10M₺ altı otomatik**, üstü tutar bandına göre yetkili onayına düşer (detay aşağıda)
+- **AI Destekli Kredi:** Genişletilmiş başvuru (TC kimlik, demografi, gelir/gider); başvuran 30.000 kişilik referans nüfusla karşılaştırılır, yapay zeka (Gemini) maksimum limiti tahmin eder, diğer banka + bizim banka borçları düşülerek karar üretilir. **10M₺ altı otomatik**, üstü tutar bandına göre yetkili onayına düşer (detay aşağıda). Başvuruda **krediyi yatıracağı hesabı** seçer; onaylanınca anapara o hesaba **yatar** (ekstreye işlenir), taksitler seçilen hesaptan **"Taksit Öde"** ile ödenir (ödenen/kalan borç takip edilir, tüm taksitler bitince kredi kapanır)
 - **Sanal POS:** Kartla ödeme, 3D Secure simülasyonu, ödeme geçmişi, iade (admin), fraud kontrolü. Kart başvuruları **şube müdürü** tarafından onaylanır; **reddedilen kartlar müşterinin listesinde görünmez** (sadece bildirim düşer). Ödeme kartı seçiminde **bağlı hesabın bakiyesi** gösterilir
 - **Bildirimler:** Yetkili bir kredi/havale/kart kararı verince müşteriye panel içi bildirim düşer
 - **Denetim Kaydı (Audit Log):** Onay/red kararları, şube adına işlemler ve yüksek havaleler kaydedilir; admin/direktör görüntüler
@@ -214,6 +214,7 @@ for i in $(seq 1 7); do curl -s -o /dev/null -w "%{http_code}\n" -X POST \
 | POST | `/api/accounts/{id}/close` · `/freeze` · `/reactivate` | Hesabı kapat (bakiye aktarımı + kart silme) / dondur / aktifleştir |
 | POST | `/api/transactions/deposit` · `/transfer` | Para yatırma / transfer |
 | POST/GET | `/api/loans` | Kredi başvurusu (≤10M otomatik, üstü onaya) / kredilerim |
+| POST | `/api/loans/{id}/pay-installment` | Kredi taksiti öde (seçilen hesaptan) |
 | POST/GET | `/api/payments` | Sanal POS ödeme / geçmiş |
 | GET/POST | `/api/branch/*` | Şube çalışanı: müşteri arama + adına işlem (ŞubeÇalışanı rolü) |
 | GET/POST | `/api/approvals/*` | Yetkili onay kuyrukları: kredi/havale/kart (müdür rolleri) |

@@ -6,6 +6,7 @@ import {
   loginViaUi,
   loginAsAdmin,
   applyForLoan,
+  openAccount,
 } from './helpers'
 
 // Sprint 5: müşteri bildirimi + denetim kaydı. Backend gerektirir (5099).
@@ -19,8 +20,9 @@ test.describe('Sprint 5 — bildirim ve denetim kaydı', () => {
     }
     await ensureRegistered(customer)
 
-    // 1) Müşteri 30M kredi başvurusu (onaya düşer)
+    // 1) Müşteri hesap açar (kredi onaylanınca para buraya yatacak) + 30M başvuru (onaya düşer)
     await loginViaUi(page, customer.email, customer.password)
+    await openAccount(page)
     await applyForLoan(page, {
       income: '500000',
       expenses: '100000',

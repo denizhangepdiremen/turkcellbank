@@ -19,6 +19,9 @@ public record LoanDto(
     string AiReason,
     string DecidedBy,
     string DecisionNote, // yetkili karar notu (otomatik kredilerde boş)
+    decimal MonthlyInstallment, // aylık taksit (onaylıysa > 0)
+    decimal RemainingDebt,      // kalan toplam borç (faiz dahil)
+    int InstallmentsPaid,       // ödenen taksit sayısı
     DateTime CreatedAt,
     DateTime? DecidedAt,
     PaymentPlanDto? PaymentPlan);

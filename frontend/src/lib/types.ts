@@ -37,7 +37,7 @@ export interface Account {
 
 export interface Transaction {
   id: string
-  type: 'Deposit' | 'Transfer' | 'Payment' | 'Refund'
+  type: 'Deposit' | 'Transfer' | 'Payment' | 'Refund' | 'LoanDisbursement' | 'LoanRepayment'
   direction: 'In' | 'Out' // gelen / giden (o hesabın bakışıyla)
   amount: number
   counterpartyIban: string | null
@@ -110,6 +110,9 @@ export interface Loan {
   aiReason: string
   decidedBy: string
   decisionNote: string // yetkili karar notu (otomatik kredilerde boş)
+  monthlyInstallment: number // aylık taksit (onaylıysa > 0)
+  remainingDebt: number // kalan toplam borç (faiz dahil)
+  installmentsPaid: number // ödenen taksit sayısı
   createdAt: string
   decidedAt: string | null
   paymentPlan: PaymentPlan | null

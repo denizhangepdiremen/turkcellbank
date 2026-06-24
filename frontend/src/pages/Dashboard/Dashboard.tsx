@@ -23,7 +23,7 @@ import {
 import { updateProfile } from '../../api/authApi'
 import { getNotifications, markAllNotificationsRead } from '../../api/notificationApi'
 import { deposit, transfer, getHistory } from '../../api/transactionApi'
-import { applyLoan, getMyLoans, getLoanDetail } from '../../api/loanApi'
+import { applyLoan, getMyLoans, getLoanDetail, payInstallment } from '../../api/loanApi'
 import { pay, getMyPayments } from '../../api/paymentApi'
 import { createCard, getMyCards } from '../../api/cardApi'
 import { getApiErrorMessage } from '../../lib/apiError'
@@ -87,6 +87,8 @@ const txTitle = (tx: Transaction) => {
   if (tx.type === 'Deposit') return 'Para Yatırma'
   if (tx.type === 'Payment') return 'POS Ödemesi'
   if (tx.type === 'Refund') return 'POS İade'
+  if (tx.type === 'LoanDisbursement') return 'Kredi Kullandırımı'
+  if (tx.type === 'LoanRepayment') return 'Kredi Taksiti'
   return tx.direction === 'Out'
     ? `Transfer → ${tx.counterpartyIban}`
     : `Transfer ← ${tx.counterpartyIban}`
@@ -376,6 +378,7 @@ export function Dashboard() {
   const [loanProfession, setLoanProfession] = useState('')
   const [loanAmount, setLoanAmount] = useState('')
   const [loanTerm, setLoanTerm] = useState('12')
+  const [loanAccountId, setLoanAccountId] = useState('') // kredinin yatırılacağı hesap
 
   // Başvuru sonucu (onay/red + gerekçe) modalı. Kredilerim'den de açılır.
   const [resultLoan, setResultLoan] = useState<Loan | null>(null)
@@ -394,9 +397,12 @@ export function Dashboard() {
         profession: loanProfession,
         amount: Number(loanAmount),
         termMonths: Number(loanTerm),
+        disbursementAccountId: loanAccountId,
       }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['loans'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] }) // onaylanırsa para yatar
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
       if (res.data) setResultLoan(res.data) // sonuç modalını aç
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Başvuru yapılamadı.')),
@@ -414,6 +420,7 @@ export function Dashboard() {
     setLoanProfession('')
     setLoanAmount('')
     setLoanTerm('12')
+    setLoanAccountId(activeAccounts[0]?.id ?? '')
     setLoanOpen(true)
   }
 
@@ -426,8 +433,31 @@ export function Dashboard() {
       toast.error('Lütfen zorunlu alanları doldurun.')
       return
     }
+    if (!loanAccountId) {
+      toast.error('Kredinin yatırılacağı hesabı seçin.')
+      return
+    }
     setLoanOpen(false) // formu kapat -> "değerlendiriliyor" ekranı görünsün
     applyMutation.mutate()
+  }
+
+  // Taksit ödeme modalı (onaylı kredi)
+  const [payLoan, setPayLoan] = useState<Loan | null>(null)
+  const [payLoanAccountId, setPayLoanAccountId] = useState('')
+  const payInstallmentMutation = useMutation({
+    mutationFn: () => payInstallment(payLoan!.id, payLoanAccountId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['loans'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      setPayLoan(null)
+      toast.success('Taksit ödendi.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Taksit ödenemedi.')),
+  })
+  function openPayInstallment(loan: Loan) {
+    setPayLoan(loan)
+    setPayLoanAccountId(activeAccounts[0]?.id ?? '')
   }
 
   // Ödeme planı modalı (onaylı kredi detayı)
@@ -970,6 +1000,16 @@ export function Dashboard() {
                     <p className="dashboard-loan-sub">
                       {loan.profession} · skor {loan.score} · {trDate(loan.createdAt)}
                     </p>
+                    {loan.status === 'Approved' && (
+                      <p className="dashboard-loan-sub">
+                        {loan.installmentsPaid}/{loan.termMonths} taksit ödendi ·{' '}
+                        {loan.installmentsPaid >= loan.termMonths ? (
+                          <strong>Kapandı</strong>
+                        ) : (
+                          <>kalan borç <strong>{formatTL(loan.remainingDebt)}</strong></>
+                        )}
+                      </p>
+                    )}
                   </div>
                   <div className="dashboard-loan-right">
                     <Badge variant={loanBadgeVariant(loan.status)}>
@@ -991,6 +1031,16 @@ export function Dashboard() {
                         Ödeme Planı
                       </Button>
                     )}
+                    {loan.status === 'Approved' &&
+                      loan.installmentsPaid < loan.termMonths && (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={() => openPayInstallment(loan)}
+                        >
+                          Taksit Öde
+                        </Button>
+                      )}
                   </div>
                 </div>
               ))
@@ -1413,6 +1463,23 @@ export function Dashboard() {
           />
         </div>
         </div>
+        {activeAccounts.length === 0 ? (
+          <Alert variant="warning">
+            Kredi onaylanırsa para bir hesaba yatırılır. Önce aktif bir hesabınız olmalı.
+          </Alert>
+        ) : (
+          <div className="dashboard-modal-field">
+            <Select
+              label="Krediyi yatıracağımız hesap"
+              options={activeAccounts.map((a) => ({
+                value: a.id,
+                label: `${a.accountType} · ...${a.iban.slice(-4)} · ${formatTL(a.balance)}`,
+              }))}
+              value={loanAccountId}
+              onChange={(e) => setLoanAccountId(e.target.value)}
+            />
+          </div>
+        )}
       </Modal>
 
       {/* --- "Değerlendiriliyor" bekleme ekranı --- */}
@@ -1506,12 +1573,65 @@ export function Dashboard() {
               {' · '}Toplam: <strong>{formatTL(planLoan.paymentPlan.totalPayment)}</strong>
               {' · '}Faiz: %{(planLoan.paymentPlan.monthlyRate * 100).toFixed(1)}/ay
             </div>
-            {planLoan.paymentPlan.installments.map((ins) => (
-              <div key={ins.no} className="dashboard-plan-row">
-                <span>{ins.no}. taksit · {trDate(ins.dueDate)}</span>
-                <span>{formatTL(ins.amount)}</span>
+            {planLoan.paymentPlan.installments.map((ins) => {
+              const paid = ins.no <= planLoan.installmentsPaid
+              return (
+                <div key={ins.no} className="dashboard-plan-row">
+                  <span>
+                    {ins.no}. taksit · {trDate(ins.dueDate)}
+                    {paid && <span className="dashboard-plan-paid"> · Ödendi</span>}
+                  </span>
+                  <span>{formatTL(ins.amount)}</span>
+                </div>
+              )
+            })}
+          </>
+        )}
+      </Modal>
+
+      {/* --- Taksit ödeme modalı --- */}
+      <Modal
+        open={!!payLoan}
+        onClose={() => setPayLoan(null)}
+        title="Taksit Öde"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setPayLoan(null)}>
+              İptal
+            </Button>
+            <Button
+              variant="primary"
+              loading={payInstallmentMutation.isPending}
+              disabled={!payLoanAccountId}
+              onClick={() => payInstallmentMutation.mutate()}
+            >
+              Öde
+            </Button>
+          </>
+        }
+      >
+        {payLoan && (
+          <>
+            <div className="dashboard-plan-summary">
+              Aylık taksit: <strong>{formatTL(payLoan.monthlyInstallment)}</strong>
+              {' · '}Kalan borç: <strong>{formatTL(payLoan.remainingDebt)}</strong>
+              {' · '}{payLoan.installmentsPaid}/{payLoan.termMonths} ödendi
+            </div>
+            {activeAccounts.length === 0 ? (
+              <Alert variant="warning">Taksit ödemek için aktif bir hesabınız olmalı.</Alert>
+            ) : (
+              <div className="dashboard-modal-field">
+                <Select
+                  label="Taksitin çekileceği hesap"
+                  options={activeAccounts.map((a) => ({
+                    value: a.id,
+                    label: `${a.accountType} · ...${a.iban.slice(-4)} · ${formatTL(a.balance)}`,
+                  }))}
+                  value={payLoanAccountId}
+                  onChange={(e) => setPayLoanAccountId(e.target.value)}
+                />
               </div>
-            ))}
+            )}
           </>
         )}
       </Modal>

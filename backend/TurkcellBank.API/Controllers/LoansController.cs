@@ -42,4 +42,12 @@ public class LoansController : ControllerBase
         var loan = await _loanService.GetMyLoanDetailAsync(id);
         return Ok(ApiResponse<LoanDto>.SuccessResponse(loan));
     }
+
+    /// <summary>Bir taksiti seçilen hesaptan öde. POST /api/loans/{id}/pay-installment</summary>
+    [HttpPost("{id:guid}/pay-installment")]
+    public async Task<IActionResult> PayInstallment(Guid id, PayInstallmentRequest request)
+    {
+        var loan = await _loanService.PayInstallmentAsync(id, request.AccountId);
+        return Ok(ApiResponse<LoanDto>.SuccessResponse(loan, "Taksit ödendi."));
+    }
 }

@@ -126,6 +126,8 @@ public class AppDbContext : DbContext
             entity.Property(l => l.MaxLimit).HasPrecision(18, 2);
             entity.Property(l => l.ExistingDebt).HasPrecision(18, 2);
             entity.Property(l => l.NetLimit).HasPrecision(18, 2);
+            entity.Property(l => l.MonthlyInstallment).HasPrecision(18, 2);
+            entity.Property(l => l.RemainingDebt).HasPrecision(18, 2);
             entity.Property(l => l.AiReason).HasMaxLength(1000);
             entity.Property(l => l.DecidedBy).HasMaxLength(40);
             entity.Property(l => l.DecisionNote).HasMaxLength(1000);
