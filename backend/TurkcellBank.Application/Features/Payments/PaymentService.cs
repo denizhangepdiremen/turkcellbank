@@ -56,6 +56,8 @@ public class PaymentService : IPaymentService
             throw new NotFoundException("Karta bağlı hesap bulunamadı.");
         if (!account.IsActive)
             throw new BusinessException("Karta bağlı hesap kapalı.");
+        if (account.IsFrozen)
+            throw new BusinessException("Karta bağlı hesap dondurulmuş.");
 
         var masked = CardHelper.Mask(card.CardNumber);
 

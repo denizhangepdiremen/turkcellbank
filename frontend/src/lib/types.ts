@@ -29,7 +29,8 @@ export interface Account {
   iban: string
   accountType: AccountType
   balance: number
-  isActive: boolean
+  isActive: boolean // false = kapalı (listede gösterilmez)
+  isFrozen: boolean // true = dondurulmuş/deaktive (listede kalır, işlem yapılamaz)
   createdAt: string
 }
 
@@ -44,7 +45,7 @@ export interface Transaction {
   createdAt: string
 }
 
-export type CardStatus = 'Pending' | 'Approved' | 'Rejected'
+export type CardStatus = 'Pending' | 'Approved' | 'Rejected' | 'Blocked'
 
 export interface Card {
   id: string

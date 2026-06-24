@@ -4,24 +4,31 @@ using TurkcellBank.Application.Common.Exceptions;
 using TurkcellBank.Application.Common.Interfaces;
 using TurkcellBank.Application.Features.Accounts.Dtos;
 using TurkcellBank.Domain.Entities;
+using TurkcellBank.Domain.Enums;
 
 namespace TurkcellBank.Application.Features.Accounts;
 
 /// <summary>
-/// Hesap işlemleri iş mantığı. Şu anki kullanıcıyı ICurrentUserService'ten alır.
+/// Hesap işlemleri iş mantığı. Şu anki kullanıcıyı IOperationContext'ten alır.
 /// </summary>
 public class AccountService : IAccountService
 {
     private readonly IAccountRepository _accounts;
+    private readonly ICardRepository _cards;
+    private readonly ITransactionRepository _transactions;
     private readonly IOperationContext _ctx;
     private readonly IValidator<CreateAccountRequest> _createValidator;
 
     public AccountService(
         IAccountRepository accounts,
+        ICardRepository cards,
+        ITransactionRepository transactions,
         IOperationContext ctx,
         IValidator<CreateAccountRequest> createValidator)
     {
         _accounts = accounts;
+        _cards = cards;
+        _transactions = transactions;
         _ctx = ctx;
         _createValidator = createValidator;
     }
@@ -51,6 +58,7 @@ public class AccountService : IAccountService
             AccountType = request.AccountType,
             Balance = 0m, // yeni hesap sıfır bakiyeyle açılır
             IsActive = true,
+            IsFrozen = false,
             CreatedAt = DateTime.UtcNow,
             Channel = _ctx.Channel,
             PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
@@ -63,32 +71,112 @@ public class AccountService : IAccountService
     public async Task<List<AccountDto>> GetMyAccountsAsync()
     {
         var accounts = await _accounts.GetByUserIdAsync(_ctx.ActingUserId);
-        return accounts.Select(Map).ToList();
+        // Kapalı hesaplar müşteri listesinde gösterilmez; dondurulmuş hesaplar gösterilir.
+        return accounts.Where(a => a.IsActive).Select(Map).ToList();
     }
 
-    public async Task<AccountDto> CloseAccountAsync(Guid accountId)
+    public async Task<AccountDto> CloseAccountAsync(Guid accountId, CloseAccountRequest request)
     {
-        var account = await _accounts.GetByIdAsync(accountId);
-
-        // Güvenlik: hesap yoksa VEYA başkasının hesabıysa "bulunamadı" de
-        // (başkasının hesabının varlığını sızdırma).
-        if (account is null || account.UserId != _ctx.ActingUserId)
-        {
-            throw new NotFoundException("Hesap bulunamadı.");
-        }
+        var account = await GetOwnedAsync(accountId);
 
         if (!account.IsActive)
-        {
             throw new BusinessException("Hesap zaten kapalı.");
+
+        // Bakiye varsa başka bir aktif hesaba aktar (hesap kapanınca para kaybolmaz)
+        if (account.Balance > 0m)
+        {
+            if (request.TargetAccountId is null)
+                throw new BusinessException(
+                    "Hesapta bakiye var; kapatmadan önce bakiyenin aktarılacağı hesabı seçin.");
+
+            var target = await GetOwnedAsync(request.TargetAccountId.Value);
+            if (target.Id == account.Id)
+                throw new BusinessException("Bakiye aynı hesaba aktarılamaz.");
+            if (!target.IsActive || target.IsFrozen)
+                throw new BusinessException("Hedef hesap aktif değil; başka bir hesap seçin.");
+
+            var amount = account.Balance;
+            account.Balance = 0m;
+            target.Balance += amount;
+
+            var sweep = new Transaction
+            {
+                Id = Guid.NewGuid(),
+                Type = TransactionType.Transfer,
+                FromAccountId = account.Id,
+                FromIban = account.Iban,
+                ToAccountId = target.Id,
+                ToIban = target.Iban,
+                Amount = amount,
+                Description = "Hesap kapatma bakiye aktarımı",
+                CreatedAt = DateTime.UtcNow,
+                Channel = _ctx.Channel,
+                PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
+            };
+            await _transactions.AddAsync(sweep); // bakiye değişiklikleriyle birlikte atomik kaydeder
         }
 
-        account.IsActive = false; // hesap silinmez, pasifleştirilir
+        // Hesaba bağlı kartları sil ve hesabı pasifleştir
+        var cards = await _cards.GetByAccountIdAsync(account.Id);
+        if (cards.Count > 0)
+            _cards.RemoveRange(cards);
+        account.IsActive = false;
+        account.IsFrozen = false;
         await _accounts.SaveChangesAsync();
 
         return Map(account);
     }
 
+    public async Task<AccountDto> FreezeAccountAsync(Guid accountId)
+    {
+        var account = await GetOwnedAsync(accountId);
+
+        if (!account.IsActive)
+            throw new BusinessException("Kapalı hesap dondurulamaz.");
+        if (account.IsFrozen)
+            throw new BusinessException("Hesap zaten dondurulmuş.");
+
+        account.IsFrozen = true;
+
+        // Onaylı kartları geçici olarak bloke et (hesap aktifleşince geri açılır)
+        var cards = await _cards.GetByAccountIdAsync(account.Id);
+        foreach (var card in cards.Where(c => c.Status == CardStatus.Approved))
+            card.Status = CardStatus.Blocked;
+
+        await _accounts.SaveChangesAsync();
+        return Map(account);
+    }
+
+    public async Task<AccountDto> ReactivateAccountAsync(Guid accountId)
+    {
+        var account = await GetOwnedAsync(accountId);
+
+        if (!account.IsActive)
+            throw new BusinessException("Kapalı hesap aktifleştirilemez.");
+        if (!account.IsFrozen)
+            throw new BusinessException("Hesap zaten aktif.");
+
+        account.IsFrozen = false;
+
+        // Dondurma sırasında bloke edilen kartları geri onaylıya çevir
+        var cards = await _cards.GetByAccountIdAsync(account.Id);
+        foreach (var card in cards.Where(c => c.Status == CardStatus.Blocked))
+            card.Status = CardStatus.Approved;
+
+        await _accounts.SaveChangesAsync();
+        return Map(account);
+    }
+
+    // Hesap var mı ve bu kullanıcıya mı ait? (başkasının hesabını "bulunamadı" gibi gizle)
+    private async Task<Account> GetOwnedAsync(Guid accountId)
+    {
+        var account = await _accounts.GetByIdAsync(accountId);
+        if (account is null || account.UserId != _ctx.ActingUserId)
+            throw new NotFoundException("Hesap bulunamadı.");
+        return account;
+    }
+
     // Entity -> DTO dönüşümü (hassas/iç alanlar dışarı çıkmaz)
     private static AccountDto Map(Account a) =>
-        new(a.Id, a.Iban, a.AccountType, a.Balance, a.IsActive, a.CreatedAt);
+        new(a.Id, a.Iban, a.AccountType, a.Balance, a.IsActive, a.IsFrozen, a.CreatedAt);
 }

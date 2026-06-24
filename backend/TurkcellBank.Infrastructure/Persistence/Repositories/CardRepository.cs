@@ -41,6 +41,14 @@ public class CardRepository : ICardRepository
             .OrderByDescending(c => c.CreatedAt)
             .ToListAsync();
 
+    public Task<List<Card>> GetByAccountIdAsync(Guid accountId)
+        => _db.Cards
+            .Where(c => c.AccountId == accountId)
+            .ToListAsync();
+
+    public void RemoveRange(IEnumerable<Card> cards)
+        => _db.Cards.RemoveRange(cards);
+
     public Task SaveChangesAsync()
         => _db.SaveChangesAsync();
 }

@@ -84,6 +84,9 @@ public class TransactionService : ITransactionService
         if (to is null || !to.IsActive)
             throw new BusinessException("Alıcı hesap bulunamadı veya kapalı.");
 
+        if (to.IsFrozen)
+            throw new BusinessException("Alıcı hesap dondurulmuş; transfer yapılamaz.");
+
         if (to.Id == from!.Id)
             throw new BusinessException("Aynı hesaba transfer yapılamaz.");
 
@@ -151,5 +154,7 @@ public class TransactionService : ITransactionService
             throw new NotFoundException("Hesap bulunamadı.");
         if (requireActive && !account.IsActive)
             throw new BusinessException("Hesap kapalı.");
+        if (requireActive && account.IsFrozen)
+            throw new BusinessException("Hesap dondurulmuş; işlem yapılamaz.");
     }
 }

@@ -277,6 +277,20 @@
   margin: 0.15rem 0 0;
 }
 
+/* Hesap kapatma/dondurma modalı metni */
+.dashboard-close-lead {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.dashboard-close-cards {
+  margin: 0.5rem 0 0.25rem;
+  padding-left: 1.1rem;
+  font-weight: 600;
+}
+
 /* "Tüm hesaplar" görünümünde işlemin ait olduğu hesabı gösteren rozet */
 .dashboard-tx-account {
   display: inline-block;

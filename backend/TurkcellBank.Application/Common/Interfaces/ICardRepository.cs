@@ -19,6 +19,13 @@ public interface ICardRepository
     // Tüm kartlar, sahip + hesapla (admin)
     Task<List<Card>> GetAllWithUserAsync();
 
+    // Bir hesaba bağlı tüm kartlar (hesap dondurma/kapatmada kullanılır)
+    Task<List<Card>> GetByAccountIdAsync(Guid accountId);
+
+    // Kartları sil (hesap kapatılırken bağlı kartlar silinir).
+    // Not: silme henüz kaydedilmez; çağıran taraf SaveChanges ile atomik kapatır.
+    void RemoveRange(IEnumerable<Card> cards);
+
     // Karar (onay/red) sonrası kaydet
     Task SaveChangesAsync();
 }

@@ -20,8 +20,13 @@ public class Account
     // Para alanı: decimal (kuruş hassasiyeti). Yeni hesap 0 bakiyeyle açılır.
     public decimal Balance { get; set; }
 
-    // Hesap kapama için: kapalı hesaplar IsActive = false olur (silinmez).
+    // Hesap kapama için: kapalı hesaplar IsActive = false olur (silinmez ama
+    // müşteri listesinde gösterilmez).
     public bool IsActive { get; set; } = true;
+
+    // Hesap dondurma (deaktive): hesap listede kalır ama işlem yapılamaz; bağlı
+    // kartlar bloke edilir. Müşteri istediğinde geri aktifleştirebilir.
+    public bool IsFrozen { get; set; } = false;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

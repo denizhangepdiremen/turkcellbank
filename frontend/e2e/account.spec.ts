@@ -57,21 +57,38 @@ test.describe('Hesap kapatma işlemleri', () => {
     await expect(page).toHaveURL(/\/dashboard$/)
   })
 
-  test('hesap kapatılır', async ({ page }) => {
+  test('hesap kapatılır (bakiyesiz hesap listeden kalkar)', async ({ page }) => {
     const yeniIban = await openAccount(page);
     const card = page.locator('.rounded-xl.border.border-gray-200.bg-white.shadow-sm').filter({ hasText: yeniIban });
 
-    // Kart üzerindeki "Hesabı Kapat" butonuna tıkla → ConfirmDialog açılır
+    // Kart üzerindeki "Hesabı Kapat" butonuna tıkla → kapatma modalı açılır
     await card.getByRole('button', { name: 'Hesabı Kapat' }).click();
 
-    // ConfirmDialog'daki onay butonuna tıkla
+    // Modaldaki onay butonuna tıkla (yeni hesap bakiyesiz → hedef hesap gerekmez)
     await page.getByRole('dialog').getByRole('button', { name: 'Hesabı Kapat' }).click();
 
     // Backend başarılı toast mesajını bekle
     await expect(page.getByText('Hesap kapatıldı.')).toBeVisible();
 
-    // Hesap artık "Kapalı" olarak işaretlenmeli
-    await expect(card.getByText('Kapalı')).toBeVisible();
+    // Kapatılan hesap artık listede görünmez
+    await expect(card).toHaveCount(0);
+  })
+
+  test('hesap dondurulur ve yeniden aktifleştirilir', async ({ page }) => {
+    const yeniIban = await openAccount(page);
+    const card = page.locator('.rounded-xl.border.border-gray-200.bg-white.shadow-sm').filter({ hasText: yeniIban });
+
+    // Dondur → onay modalı → Hesabı Dondur
+    await card.getByRole('button', { name: 'Dondur', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Hesabı Dondur' }).click();
+    await expect(page.getByText('Hesap donduruldu.')).toBeVisible();
+    await expect(card.getByText('Dondurulmuş')).toBeVisible();
+
+    // Dondurulmuş hesapta Para Yatır yok, Aktifleştir var
+    await expect(card.getByRole('button', { name: 'Para Yatır' })).toHaveCount(0);
+    await card.getByRole('button', { name: 'Aktifleştir' }).click();
+    await expect(page.getByText('Hesap yeniden aktifleştirildi.')).toBeVisible();
+    await expect(card.getByText('Dondurulmuş')).toHaveCount(0);
   })
 
 })

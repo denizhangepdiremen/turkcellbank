@@ -11,10 +11,15 @@ import { Input } from '../../components/Input'
 import { Spinner } from '../../components/Spinner'
 import { Skeleton } from '../../components/Skeleton'
 import { Alert } from '../../components/Alert'
-import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Checkbox } from '../../components/Checkbox'
 import { useAuth } from '../../context/AuthContext'
-import { getAccounts, createAccount, closeAccount } from '../../api/accountApi'
+import {
+  getAccounts,
+  createAccount,
+  closeAccount,
+  freezeAccount,
+  reactivateAccount,
+} from '../../api/accountApi'
 import { updateProfile } from '../../api/authApi'
 import { getNotifications, markAllNotificationsRead } from '../../api/notificationApi'
 import { deposit, transfer, getHistory } from '../../api/transactionApi'
@@ -25,6 +30,7 @@ import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { digitsOnly } from '../../lib/format'
 import type {
+  Account,
   AccountType,
   CardStatus,
   Loan,
@@ -66,7 +72,13 @@ const paymentLabel = (s: PaymentStatus) =>
 const cardBadgeVariant = (s: CardStatus) =>
   s === 'Approved' ? 'success' : s === 'Rejected' ? 'error' : 'warning'
 const cardLabel = (s: CardStatus) =>
-  s === 'Approved' ? 'Onaylı' : s === 'Rejected' ? 'Reddedildi' : 'Bekliyor'
+  s === 'Approved'
+    ? 'Onaylı'
+    : s === 'Rejected'
+      ? 'Reddedildi'
+      : s === 'Blocked'
+        ? 'Bloke'
+        : 'Bekliyor'
 
 // İşlem geçmişi satır başlığı (tipe göre)
 const txTitle = (tx: Transaction) => {
@@ -210,8 +222,10 @@ export function Dashboard() {
   const [transferAmount, setTransferAmount] = useState('')
   const [transferDesc, setTransferDesc] = useState('')
 
-  // Hesap kapatma onayı
-  const [closeAccountId, setCloseAccountId] = useState<string | null>(null)
+  // Hesap kapatma (bakiye aktarımı + bağlı kart silme) ve dondurma onayları
+  const [closeTarget, setCloseTarget] = useState<Account | null>(null)
+  const [closeDestId, setCloseDestId] = useState('') // bakiyenin aktarılacağı hesap
+  const [freezeTarget, setFreezeTarget] = useState<Account | null>(null)
 
   // --- Mutations ---
   const createMutation = useMutation({
@@ -224,13 +238,34 @@ export function Dashboard() {
     onError: (err) => toast.error(getApiErrorMessage(err, 'Hesap açılamadı.')),
   })
   const closeMutation = useMutation({
-    mutationFn: (id: string) => closeAccount(id),
+    mutationFn: () =>
+      closeAccount(closeTarget!.id, closeDestId || undefined),
     onSuccess: () => {
       refresh()
-      setCloseAccountId(null)
+      queryClient.invalidateQueries({ queryKey: ['cards'] }) // bağlı kartlar silindi
+      setCloseTarget(null)
       toast.success('Hesap kapatıldı.')
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Hesap kapatılamadı.')),
+  })
+  const freezeMutation = useMutation({
+    mutationFn: (id: string) => freezeAccount(id),
+    onSuccess: () => {
+      refresh()
+      queryClient.invalidateQueries({ queryKey: ['cards'] }) // bağlı kartlar bloke oldu
+      setFreezeTarget(null)
+      toast.success('Hesap donduruldu.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Hesap dondurulamadı.')),
+  })
+  const reactivateMutation = useMutation({
+    mutationFn: (id: string) => reactivateAccount(id),
+    onSuccess: () => {
+      refresh()
+      queryClient.invalidateQueries({ queryKey: ['cards'] }) // bloke kartlar geri açıldı
+      toast.success('Hesap yeniden aktifleştirildi.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Hesap aktifleştirilemedi.')),
   })
   const depositMutation = useMutation({
     mutationFn: () => deposit(depositAccountId, Number(depositAmount)),
@@ -392,7 +427,8 @@ export function Dashboard() {
   })
   const cards = cardsData?.data ?? []
   const approvedCards = cards.filter((c) => c.status === 'Approved')
-  const activeAccounts = accounts.filter((a) => a.isActive)
+  // Kart açılabilir hesaplar: aktif ve dondurulmamış (dondurulmuş hesaba kart açılamaz)
+  const activeAccounts = accounts.filter((a) => a.isActive && !a.isFrozen)
 
   const [cardModalOpen, setCardModalOpen] = useState(false)
   const [cardAccountId, setCardAccountId] = useState('')
@@ -407,7 +443,7 @@ export function Dashboard() {
   })
 
   function openCardModal() {
-    setCardAccountId(accounts.find((a) => a.isActive)?.id ?? '')
+    setCardAccountId(activeAccounts[0]?.id ?? '')
     setCardModalOpen(true)
   }
 
@@ -492,6 +528,28 @@ export function Dashboard() {
     setTransferDesc('')
     setTransferOpen(true)
   }
+
+  // Bir hesaba bağlı kartlar (kapatma/dondurma uyarısında listelenir)
+  const cardsForAccount = (acc: Account) =>
+    cards.filter((c) => c.accountIban === acc.iban)
+
+  // Kapatma modalını aç: bakiyenin aktarılabileceği uygun hedefleri hazırla
+  function openClose(acc: Account) {
+    setCloseTarget(acc)
+    const firstDest = accounts.find(
+      (a) => a.id !== acc.id && a.isActive && !a.isFrozen,
+    )
+    setCloseDestId(firstDest?.id ?? '')
+  }
+  // Kapatılacak hesabın bakiyesinin aktarılabileceği diğer aktif hesaplar
+  const closeDestOptions = closeTarget
+    ? accounts
+        .filter((a) => a.id !== closeTarget.id && a.isActive && !a.isFrozen)
+        .map((a) => ({
+          value: a.id,
+          label: `${a.accountType} · ...${a.iban.slice(-4)} · ${formatTL(a.balance)}`,
+        }))
+    : []
 
   return (
     <div className="dashboard">
@@ -616,7 +674,7 @@ export function Dashboard() {
                     <Badge variant="info">
                       {acc.accountType === 'Bireysel' ? 'Bireysel' : 'İşletme'}
                     </Badge>
-                    {!acc.isActive && <Badge variant="error">Kapalı</Badge>}
+                    {acc.isFrozen && <Badge variant="warning">Dondurulmuş</Badge>}
                   </div>
                   <div className="dashboard-account-iban-row">
                     <span className="dashboard-account-iban">{acc.iban}</span>
@@ -630,29 +688,59 @@ export function Dashboard() {
                   </div>
                   <p className="dashboard-account-balance">{formatTL(acc.balance)}</p>
                 </CardContent>
-                {acc.isActive && (
-                  <CardFooter>
-                    <div className="dashboard-account-footer">
-                      <div className="dashboard-account-actions">
-                        <Button size="sm" variant="primary" onClick={() => openDeposit(acc.id)}>
-                          Para Yatır
-                        </Button>
-                        <Button size="sm" variant="secondary" onClick={() => openTransfer(acc.id)}>
-                          Gönder
-                        </Button>
-                      </div>
-                      <div className="dashboard-account-close">
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => setCloseAccountId(acc.id)}
-                        >
-                          Hesabı Kapat
-                        </Button>
-                      </div>
-                    </div>
-                  </CardFooter>
-                )}
+                <CardFooter>
+                  <div className="dashboard-account-footer">
+                    {acc.isFrozen ? (
+                      <>
+                        <div className="dashboard-account-actions">
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={() => reactivateMutation.mutate(acc.id)}
+                            loading={
+                              reactivateMutation.isPending &&
+                              reactivateMutation.variables === acc.id
+                            }
+                          >
+                            Aktifleştir
+                          </Button>
+                        </div>
+                        <div className="dashboard-account-close">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => openClose(acc)}
+                          >
+                            Hesabı Kapat
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="dashboard-account-actions">
+                          <Button size="sm" variant="primary" onClick={() => openDeposit(acc.id)}>
+                            Para Yatır
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => openTransfer(acc.id)}>
+                            Gönder
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setFreezeTarget(acc)}>
+                            Dondur
+                          </Button>
+                        </div>
+                        <div className="dashboard-account-close">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => openClose(acc)}
+                          >
+                            Hesabı Kapat
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </CardFooter>
               </Card>
             ))}
           </div>
@@ -693,7 +781,7 @@ export function Dashboard() {
                   <div key={tx.id} className="dashboard-tx-row">
                     <div>
                       <p className="dashboard-tx-desc">
-                        {txTitle(tx)}
+                        <span>{txTitle(tx)}</span>
                         {isAllAccounts && tx.accountIban && (
                           <span className="dashboard-tx-account">
                             ...{tx.accountIban.slice(-4)}
@@ -1310,10 +1398,16 @@ export function Dashboard() {
               <div className="dashboard-modal-field">
                 <Select
                   label="Kart"
-                  options={approvedCards.map((c) => ({
-                    value: c.id,
-                    label: `${c.maskedCardNumber} · Hesap ...${c.accountIban.slice(-4)}`,
-                  }))}
+                  options={approvedCards.map((c) => {
+                    // Müşteri hesabı numarasından değil bakiyesinden tanır:
+                    // karta bağlı hesabın bakiyesini de göster
+                    const acc = accounts.find((a) => a.iban === c.accountIban)
+                    const balanceText = acc ? ` · ${formatTL(acc.balance)}` : ''
+                    return {
+                      value: c.id,
+                      label: `${c.maskedCardNumber} · Hesap ...${c.accountIban.slice(-4)}${balanceText}`,
+                    }
+                  })}
                   value={payCardId}
                   onChange={(e) => setPayCardId(e.target.value)}
                 />
@@ -1396,17 +1490,106 @@ export function Dashboard() {
         )}
       </Modal>
 
-      {/* --- Hesap kapatma onayı --- */}
-      <ConfirmDialog
-        open={!!closeAccountId}
+      {/* --- Hesap kapatma onayı (bakiye aktarımı + bağlı kart silme) --- */}
+      <Modal
+        open={!!closeTarget}
+        onClose={() => setCloseTarget(null)}
         title="Hesabı Kapat"
-        message="Bu hesabı kapatmak istediğinize emin misiniz? Kapalı hesaplar pasifleştirilir."
-        confirmLabel="Hesabı Kapat"
-        confirmVariant="destructive"
-        loading={closeMutation.isPending}
-        onConfirm={() => closeAccountId && closeMutation.mutate(closeAccountId)}
-        onClose={() => setCloseAccountId(null)}
-      />
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setCloseTarget(null)}>
+              Vazgeç
+            </Button>
+            <Button
+              variant="destructive"
+              loading={closeMutation.isPending}
+              disabled={
+                !!closeTarget &&
+                closeTarget.balance > 0 &&
+                closeDestOptions.length === 0
+              }
+              onClick={() => closeMutation.mutate()}
+            >
+              Hesabı Kapat
+            </Button>
+          </>
+        }
+      >
+        {closeTarget && (
+          <>
+            <p className="dashboard-close-lead">
+              <strong>...{closeTarget.iban.slice(-4)}</strong> numaralı hesabı kapatmak
+              üzeresiniz. Bu işlem geri alınamaz.
+            </p>
+
+            {closeTarget.balance > 0 &&
+              (closeDestOptions.length > 0 ? (
+                <div className="dashboard-modal-field">
+                  <Select
+                    label={`Bakiye (${formatTL(closeTarget.balance)}) şu hesaba aktarılsın`}
+                    options={closeDestOptions}
+                    value={closeDestId}
+                    onChange={(e) => setCloseDestId(e.target.value)}
+                  />
+                </div>
+              ) : (
+                <Alert variant="warning">
+                  Hesapta {formatTL(closeTarget.balance)} bakiye var ama aktarılacak
+                  başka aktif hesabınız yok. Önce yeni bir hesap açın.
+                </Alert>
+              ))}
+
+            {cardsForAccount(closeTarget).length > 0 && (
+              <Alert variant="warning">
+                Bu hesaba bağlı aşağıdaki kart(lar) da kapatılıp silinecek:
+                <ul className="dashboard-close-cards">
+                  {cardsForAccount(closeTarget).map((c) => (
+                    <li key={c.id}>{c.maskedCardNumber}</li>
+                  ))}
+                </ul>
+                Onaylıyor musunuz?
+              </Alert>
+            )}
+          </>
+        )}
+      </Modal>
+
+      {/* --- Hesap dondurma onayı (kartlar bloke edilir) --- */}
+      <Modal
+        open={!!freezeTarget}
+        onClose={() => setFreezeTarget(null)}
+        title="Hesabı Dondur"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setFreezeTarget(null)}>
+              Vazgeç
+            </Button>
+            <Button
+              variant="primary"
+              loading={freezeMutation.isPending}
+              onClick={() => freezeTarget && freezeMutation.mutate(freezeTarget.id)}
+            >
+              Hesabı Dondur
+            </Button>
+          </>
+        }
+      >
+        {freezeTarget && (
+          <>
+            <p className="dashboard-close-lead">
+              <strong>...{freezeTarget.iban.slice(-4)}</strong> numaralı hesap dondurulacak.
+              Dondurulan hesapta işlem yapılamaz; istediğiniz zaman “Aktifleştir” ile geri
+              açabilirsiniz.
+            </p>
+            {cardsForAccount(freezeTarget).some((c) => c.status === 'Approved') && (
+              <Alert variant="info">
+                Bu hesaba bağlı kart(lar) geçici olarak bloke edilecek; hesabı
+                aktifleştirince tekrar kullanılabilir olacak.
+              </Alert>
+            )}
+          </>
+        )}
+      </Modal>
     </div>
   )
 }

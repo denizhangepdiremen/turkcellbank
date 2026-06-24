@@ -46,6 +46,8 @@ public class CardService : ICardService
             throw new NotFoundException("Hesap bulunamadı.");
         if (!account.IsActive)
             throw new BusinessException("Kapalı hesaba kart açılamaz.");
+        if (account.IsFrozen)
+            throw new BusinessException("Dondurulmuş hesaba kart açılamaz.");
 
         // Benzersiz kart numarası üret
         string number;
@@ -78,7 +80,11 @@ public class CardService : ICardService
     public async Task<List<CardDto>> GetMyCardsAsync()
     {
         var cards = await _cards.GetByUserIdAsync(_ctx.ActingUserId);
-        return cards.Select(c => MapCard(c, c.Account?.Iban ?? "—")).ToList();
+        // Reddedilen kartlar müşteriye listede gösterilmez (sadece bildirim olarak düşer).
+        return cards
+            .Where(c => c.Status != CardStatus.Rejected)
+            .Select(c => MapCard(c, c.Account?.Iban ?? "—"))
+            .ToList();
     }
 
     public async Task<List<AdminCardDto>> GetAllCardsAsync()

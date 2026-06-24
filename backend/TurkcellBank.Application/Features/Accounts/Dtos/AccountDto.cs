@@ -9,4 +9,5 @@ public record AccountDto(
     AccountType AccountType,
     decimal Balance,
     bool IsActive,
+    bool IsFrozen,
     DateTime CreatedAt);
