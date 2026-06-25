@@ -208,6 +208,44 @@
 .managed-customer-name { margin: 0; font-weight: 700; color: #1e293b; }
 .managed-customer-sub { margin: 0.15rem 0 0; font-size: 0.85rem; color: #64748b; }
 
+/* Müşteri özeti: KPI'lar + bakiye dağılımı grafiği */
+.managed-overview {
+  margin-bottom: 1rem;
+}
+.managed-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.6rem;
+}
+.managed-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.7rem 0.85rem;
+  background-color: #eef2ff;
+  border-radius: 0.6rem;
+}
+.managed-kpi-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #4f46e5;
+}
+.managed-kpi-label {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+.managed-chart {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f1f5f9;
+}
+.managed-chart-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
 .managed-account-row {
   display: flex;
   align-items: center;

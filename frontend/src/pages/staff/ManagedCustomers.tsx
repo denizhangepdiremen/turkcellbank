@@ -1,6 +1,14 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts'
 import { Card, CardContent } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Input } from '../../components/Input'
@@ -8,6 +16,7 @@ import { Badge } from '../../components/Badge'
 import { Modal } from '../../components/Modal'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { formatIban } from '../../lib/format'
+import { chartColor } from '../../lib/chartColors'
 import {
   searchManagedCustomer,
   bankFreezeAccount,
@@ -92,6 +101,8 @@ export function ManagedCustomers() {
                 </p>
               </div>
             </div>
+
+            <CustomerOverview accounts={customer.accounts} />
 
             {customer.accounts.length === 0 ? (
               <div className="managed-empty">Müşterinin aktif hesabı yok.</div>
@@ -186,6 +197,65 @@ export function ManagedCustomers() {
           </>
         )}
       </Modal>
+    </div>
+  )
+}
+
+/**
+ * Müşteri özeti: toplam bakiye / hesap sayısı / dondurulmuş sayısı KPI'ları
+ * + hesaplar arası bakiye dağılımı donut grafiği.
+ */
+function CustomerOverview({ accounts }: { accounts: Account[] }) {
+  if (accounts.length === 0) return null
+
+  const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0)
+  const frozenCount = accounts.filter((a) => a.isFrozen).length
+
+  // Donut: yalnızca bakiyesi olan hesaplar dilim olur
+  const donut = accounts
+    .filter((a) => a.balance > 0)
+    .map((a) => ({ name: `…${a.iban.slice(-4)}`, value: a.balance }))
+
+  return (
+    <div className="managed-overview">
+      <div className="managed-kpis">
+        <div className="managed-kpi">
+          <span className="managed-kpi-value">{formatTL(totalBalance)}</span>
+          <span className="managed-kpi-label">Toplam bakiye</span>
+        </div>
+        <div className="managed-kpi">
+          <span className="managed-kpi-value">{accounts.length}</span>
+          <span className="managed-kpi-label">Hesap sayısı</span>
+        </div>
+        <div className="managed-kpi">
+          <span className="managed-kpi-value">{frozenCount}</span>
+          <span className="managed-kpi-label">Dondurulmuş</span>
+        </div>
+      </div>
+
+      {donut.length > 0 && (
+        <div className="managed-chart">
+          <p className="managed-chart-title">Bakiye Dağılımı</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie
+                data={donut}
+                dataKey="value"
+                nameKey="name"
+                innerRadius={50}
+                outerRadius={80}
+                paddingAngle={2}
+              >
+                {donut.map((_, i) => (
+                  <Cell key={i} fill={chartColor(i)} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(v) => formatTL(Number(v))} />
+              <Legend verticalAlign="bottom" height={28} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   )
 }
