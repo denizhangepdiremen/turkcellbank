@@ -13,6 +13,7 @@ public interface ICardService
 
     // --- Şube müdürü onayı ---
     Task<List<AdminCardDto>> GetPendingCardsAsync();
+    Task<List<AdminCardDto>> GetDecidedCardsAsync();
     Task<CardDto> ApproveAsync(Guid id);
     Task<CardDto> RejectAsync(Guid id);
 }

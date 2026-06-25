@@ -118,6 +118,24 @@ public class CardService : ICardService
             .ToList();
     }
 
+    public async Task<List<AdminCardDto>> GetDecidedCardsAsync()
+    {
+        var cards = await _cards.GetAllWithUserAsync();
+        return cards
+            .Where(c => c.Status is CardStatus.Approved or CardStatus.Rejected)
+            .OrderByDescending(c => c.DecidedAt ?? c.CreatedAt)
+            .Select(c => new AdminCardDto(
+                c.Id,
+                c.User?.FullName ?? "—",
+                c.User?.Email ?? "—",
+                CardHelper.Mask(c.CardNumber),
+                c.Account?.Iban ?? "—",
+                c.Status.ToString(),
+                c.CreatedAt,
+                c.DecidedAt))
+            .ToList();
+    }
+
     public Task<CardDto> ApproveAsync(Guid id) => DecideAsync(id, CardStatus.Approved);
     public Task<CardDto> RejectAsync(Guid id) => DecideAsync(id, CardStatus.Rejected);
 

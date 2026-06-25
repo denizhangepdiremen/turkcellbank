@@ -2,6 +2,7 @@ import { apiClient } from '../lib/apiClient'
 import type {
   Account,
   AccountType,
+  AdminCard,
   ApiResponse,
   Card,
   Loan,
@@ -17,6 +18,9 @@ export interface CustomerLookup {
   email: string
   nationalId: string | null
   accounts: Account[]
+  cards: AdminCard[]
+  loans: Loan[]
+  recentTransactions: Transaction[]
 }
 
 // Müşteri ara (TC kimlik no veya e-posta)

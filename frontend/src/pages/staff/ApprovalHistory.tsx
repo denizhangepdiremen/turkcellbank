@@ -3,10 +3,10 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recha
 import { Card, CardContent } from '../../components/Card'
 import { Badge } from '../../components/Badge'
 import { Skeleton } from '../../components/Skeleton'
-import { getLoanHistory, getTransferHistory } from '../../api/approvalApi'
-import type { ApiResponse, LoanHistory, TransferHistory } from '../../lib/types'
+import { getCardHistory, getLoanHistory, getTransferHistory } from '../../api/approvalApi'
+import type { AdminCard, ApiResponse, LoanHistory, TransferHistory } from '../../lib/types'
 
-type HistoryItem = LoanHistory | TransferHistory
+type HistoryItem = LoanHistory | TransferHistory | AdminCard
 
 const formatTL = (n: number) =>
   new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n)
@@ -15,7 +15,7 @@ const trDate = (s: string | null) => (s ? new Date(s).toLocaleString('tr-TR') : 
 const APPROVED = '#10b981' // emerald-500
 const REJECTED = '#e11d48' // rose-600
 
-type ApprovalKind = 'loans' | 'transfers'
+type ApprovalKind = 'loans' | 'transfers' | 'cards'
 
 /**
  * Onay geçmişi: karara bağlanmış (onaylanan/reddedilen) kayıtların detaylı listesi
@@ -23,8 +23,13 @@ type ApprovalKind = 'loans' | 'transfers'
  */
 export function ApprovalHistory({ kind }: { kind: ApprovalKind }) {
   const isLoans = kind === 'loans'
+  const isCards = kind === 'cards'
   const fetchHistory = (): Promise<ApiResponse<HistoryItem[]>> =>
-    isLoans ? getLoanHistory() : getTransferHistory()
+    isLoans
+      ? getLoanHistory()
+      : isCards
+        ? getCardHistory()
+        : getTransferHistory()
   const { data, isLoading } = useQuery({
     queryKey: ['approval-history', kind],
     queryFn: fetchHistory,
@@ -70,12 +75,18 @@ export function ApprovalHistory({ kind }: { kind: ApprovalKind }) {
       <div className="approval-history-list">
         {items.map((item) => {
           const approved = item.status === 'Approved'
+          const card = item as AdminCard
           return (
             <Card key={item.id}>
               <CardContent>
                 <div className="approval-history-row">
                   <div className="approval-history-main">
-                    {isLoans ? (
+                    {isCards ? (
+                      <>
+                        <p className="approval-applicant">{card.holderName}</p>
+                        <p className="approval-applicant-sub">{card.holderEmail}</p>
+                      </>
+                    ) : isLoans ? (
                       <>
                         <p className="approval-applicant">{(item as LoanHistory).applicantName}</p>
                         <p className="approval-applicant-sub">{(item as LoanHistory).applicantEmail}</p>
@@ -90,8 +101,15 @@ export function ApprovalHistory({ kind }: { kind: ApprovalKind }) {
                     )}
                   </div>
                   <div className="approval-history-right">
-                    <span className="approval-amount-value">{formatTL(item.amount)}</span>
-                    {isLoans && (
+                    {isCards ? (
+                      <>
+                        <span className="approval-amount-value">{card.maskedCardNumber}</span>
+                        <span className="approval-amount-term">Hesap …{card.accountIban.slice(-4)}</span>
+                      </>
+                    ) : (
+                      <span className="approval-amount-value">{formatTL((item as LoanHistory | TransferHistory).amount)}</span>
+                    )}
+                    {isLoans && !isCards && (
                       <span className="approval-amount-term">{(item as LoanHistory).termMonths} ay</span>
                     )}
                   </div>
@@ -102,16 +120,22 @@ export function ApprovalHistory({ kind }: { kind: ApprovalKind }) {
                     {approved ? 'Onaylandı' : 'Reddedildi'}
                   </Badge>
                   <span className="approval-history-by">
-                    {item.decidedByName}
-                    {isLoans && (item as LoanHistory).decidedByRole
+                    {isCards
+                      ? `Hesap …${card.accountIban.slice(-4)}`
+                      : (item as LoanHistory | TransferHistory).decidedByName}
+                    {isLoans && !isCards && (item as LoanHistory).decidedByRole
                       ? ` · ${(item as LoanHistory).decidedByRole}`
                       : ''}
                   </span>
                   <span className="approval-history-date">{trDate(item.decidedAt)}</span>
                 </div>
 
-                {item.decisionNote ? (
-                  <p className="approval-history-note">“{item.decisionNote}”</p>
+                {!isCards && (item as LoanHistory | TransferHistory).decisionNote ? (
+                  <p className="approval-history-note">“{(item as LoanHistory | TransferHistory).decisionNote}”</p>
+                ) : isCards ? (
+                  <p className="approval-history-note">
+                    Kart başvurusu {approved ? 'onaylandı' : 'reddedildi'}.
+                  </p>
                 ) : (
                   <p className="approval-history-note approval-history-note-empty">Gerekçe notu girilmemiş.</p>
                 )}

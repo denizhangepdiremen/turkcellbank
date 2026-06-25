@@ -111,6 +111,14 @@ public class ApprovalsController : ControllerBase
         return Ok(ApiResponse<List<AdminCardDto>>.SuccessResponse(cards));
     }
 
+    /// <summary>Karara bağlanmış kart başvuruları (onay/ret geçmişi). GET /api/approvals/cards/history</summary>
+    [HttpGet("cards/history")]
+    public async Task<IActionResult> CardHistory()
+    {
+        var cards = await _cardService.GetDecidedCardsAsync();
+        return Ok(ApiResponse<List<AdminCardDto>>.SuccessResponse(cards));
+    }
+
     /// <summary>Kartı onayla. POST /api/approvals/cards/{id}/approve</summary>
     [HttpPost("cards/{id:guid}/approve")]
     public async Task<IActionResult> ApproveCard(Guid id)

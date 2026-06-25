@@ -55,6 +55,9 @@ export interface ManagedCustomer {
   email: string
   nationalId: string | null
   accounts: Account[]
+  cards: AdminCard[]
+  loans: Loan[]
+  recentTransactions: Transaction[]
 }
 
 export interface Card {

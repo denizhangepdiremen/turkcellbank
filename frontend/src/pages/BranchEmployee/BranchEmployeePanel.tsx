@@ -12,6 +12,7 @@ import { getApiErrorMessage } from '../../lib/apiError'
 import * as branchApi from '../../api/branchApi'
 import type { CustomerLookup } from '../../api/branchApi'
 import type { AccountType, Loan } from '../../lib/types'
+import { Customer360 } from '../staff/Customer360'
 import './BranchEmployeePanel.css'
 
 const formatTL = (n: number) =>
@@ -111,21 +112,12 @@ export function BranchEmployeePanel() {
                 </div>
               </div>
 
-              <div className="branch-accounts">
-                {customer.accounts.length === 0 ? (
-                  <p className="branch-empty">Müşterinin hesabı yok.</p>
-                ) : (
-                  customer.accounts.map((a) => (
-                    <div key={a.id} className="branch-account-row">
-                      <span className="branch-account-iban">{a.iban}</span>
-                      <span className="branch-account-bal">
-                        {formatTL(a.balance)}
-                        {!a.isActive && ' · kapalı'}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
+              <Customer360
+                accounts={customer.accounts}
+                cards={customer.cards ?? []}
+                loans={customer.loans ?? []}
+                recentTransactions={customer.recentTransactions ?? []}
+              />
 
               <div className="branch-actions">
                 <Button size="sm" variant="primary" onClick={() => setModal('account')}>

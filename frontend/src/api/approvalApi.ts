@@ -77,6 +77,11 @@ export async function getPendingCards() {
     await apiClient.get<ApiResponse<AdminCard[]>>('/api/approvals/cards')
   return data
 }
+export async function getCardHistory() {
+  const { data } =
+    await apiClient.get<ApiResponse<AdminCard[]>>('/api/approvals/cards/history')
+  return data
+}
 export async function approveCard(id: string) {
   const { data } = await apiClient.post<ApiResponse<Card>>(
     `/api/approvals/cards/${id}/approve`,
