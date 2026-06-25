@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using TurkcellBank.Application.Common;
 using TurkcellBank.Application.Common.Interfaces;
 using TurkcellBank.Domain.Entities;
 using TurkcellBank.Domain.Enums;
@@ -29,6 +30,7 @@ public static class DbSeeder
     {
         await SeedAdminAsync(db, passwordHasher, configuration);
         await SeedBranchesAndStaffAsync(db, passwordHasher, configuration);
+        await SeedDemoCustomersAsync(db, passwordHasher, configuration);
         await SeedReferenceCreditRecordsAsync(db);
         await SeedExternalBankLoansAsync(db);
     }
@@ -61,13 +63,18 @@ public static class DbSeeder
         await db.SaveChangesAsync();
     }
 
-    // Demo organizasyon: 3 il, her ilde 3 ilçe/şube = toplam 9 şube.
-    // (citySlug ile email-dostu, Türkçe karaktersiz adresler üretilir.)
+    // Demo organizasyon: 4 il, toplam 13 şube.
+    // NOT: Seeder additive (idempotent) çalıştığından yeni il/şubeler dizinin SONUNA
+    // eklenmelidir — mevcut şube kodları (SB001..) konuma göre atandığı için araya
+    // ekleme kodları kaydırır. (citySlug ile email-dostu, Türkçe karaktersiz adresler.)
     private static readonly (string City, string CitySlug, (string District, string Slug)[] Districts)[] Org =
     {
         ("İstanbul", "istanbul", new[] { ("Kadıköy", "kadikoy"), ("Şişli", "sisli"), ("Beşiktaş", "besiktas") }),
         ("Ankara", "ankara", new[] { ("Çankaya", "cankaya"), ("Keçiören", "kecioren"), ("Yenimahalle", "yenimahalle") }),
-        ("İzmir", "izmir", new[] { ("Konak", "konak"), ("Bornova", "bornova"), ("Karşıyaka", "karsiyaka") }),
+        // İzmir'e yeni şube (Çiğli) — mevcut ile yeni şube eklenmesi örneği
+        ("İzmir", "izmir", new[] { ("Konak", "konak"), ("Bornova", "bornova"), ("Karşıyaka", "karsiyaka"), ("Çiğli", "cigli") }),
+        // Yeni il (Bursa) — yeni il müdürü + 3 yeni şube
+        ("Bursa", "bursa", new[] { ("Nilüfer", "nilufer"), ("Osmangazi", "osmangazi"), ("Yıldırım", "yildirim") }),
     };
 
     /// <summary>
@@ -79,15 +86,25 @@ public static class DbSeeder
     private static async Task SeedBranchesAndStaffAsync(
         AppDbContext db, IPasswordHasher passwordHasher, IConfiguration configuration)
     {
-        if (await db.Branches.AnyAsync()) return;
-
         var staffPassword = configuration["StaffSeed:Password"];
         if (string.IsNullOrWhiteSpace(staffPassword)) return; // şifre yoksa personel seed'i yapma
 
         var passwordHash = passwordHasher.Hash(staffPassword);
         var rng = new Random(20260623); // sabit tohum -> deterministik personel sayısı
+
+        // Additive (idempotent): mevcut şube kodlarını ve personel e-postalarını al;
+        // yalnızca eksik olanlar eklenir. Böylece restart'ta yeni il/şube/çalışan
+        // mevcut veriyi bozmadan eklenir, var olanlar tekrar oluşturulmaz.
+        var existingCodes = (await db.Branches.Select(b => b.Code).ToListAsync()).ToHashSet();
+        var existingEmails = (await db.Users.Select(u => u.Email).ToListAsync()).ToHashSet();
+
         var branches = new List<Branch>();
         var staff = new List<User>();
+
+        void AddStaffIfMissing(User u)
+        {
+            if (existingEmails.Add(u.Email)) staff.Add(u);
+        }
 
         var branchNo = 0;
         foreach (var (city, citySlug, districts) in Org)
@@ -95,10 +112,16 @@ public static class DbSeeder
             foreach (var (district, slug) in districts)
             {
                 branchNo++;
+                var code = $"SB{branchNo:D3}";
+                var employeeCount = rng.Next(1, 4); // rng sırası korunsun diye her zaman çekilir
+
+                // Şube zaten varsa (mevcut DB) bu şubeyi ve personelini atla
+                if (existingCodes.Contains(code)) continue;
+
                 var branch = new Branch
                 {
                     Id = Guid.NewGuid(),
-                    Code = $"SB{branchNo:D3}",
+                    Code = code,
                     Name = $"{city} {district} Şubesi",
                     City = city,
                     CreatedAt = DateTime.UtcNow,
@@ -106,7 +129,7 @@ public static class DbSeeder
                 branches.Add(branch);
 
                 // Şube müdürü (her şubede 1)
-                staff.Add(new User
+                AddStaffIfMissing(new User
                 {
                     Id = Guid.NewGuid(),
                     FullName = $"{district} Şube Müdürü",
@@ -119,10 +142,9 @@ public static class DbSeeder
                 });
 
                 // Şube çalışanları (1-3 arası)
-                var employeeCount = rng.Next(1, 4);
                 for (var n = 1; n <= employeeCount; n++)
                 {
-                    staff.Add(new User
+                    AddStaffIfMissing(new User
                     {
                         Id = Guid.NewGuid(),
                         FullName = $"{district} Çalışan {n}",
@@ -137,7 +159,7 @@ public static class DbSeeder
             }
 
             // İl müdürü (her ilde 1) — belirli bir şubeye bağlı değil, ile bağlı
-            staff.Add(new User
+            AddStaffIfMissing(new User
             {
                 Id = Guid.NewGuid(),
                 FullName = $"{city} İl Müdürü",
@@ -149,8 +171,8 @@ public static class DbSeeder
             });
         }
 
-        // Direktör (tüm banka) — il/şube bağı yok
-        staff.Add(new User
+        // Direktör (tüm banka, tek) — il/şube bağı yok
+        AddStaffIfMissing(new User
         {
             Id = Guid.NewGuid(),
             FullName = "Genel Direktör",
@@ -160,8 +182,76 @@ public static class DbSeeder
             CreatedAt = DateTime.UtcNow,
         });
 
+        if (branches.Count == 0 && staff.Count == 0) return; // eklenecek yeni şey yok
+
         db.Branches.AddRange(branches);
         db.Users.AddRange(staff);
+        await db.SaveChangesAsync();
+    }
+
+    // Demo müşteri adları (deterministik atanır)
+    private static readonly string[] DemoCustomerNames =
+    {
+        "Ayşe Yılmaz", "Mehmet Demir", "Zeynep Kaya", "Ahmet Çelik", "Elif Şahin",
+        "Mustafa Aydın", "Fatma Arslan", "Can Doğan", "Merve Koç", "Burak Yıldız",
+    };
+
+    /// <summary>
+    /// Demo müşterileri seed'ler: geçerli TC + e-posta + 1-2 hesap (bakiyeli).
+    /// Yöneticiler "Müşteri Hesapları"nda arayıp grafiklerini görebilsin diye.
+    /// E-postaya göre idempotent; şifre StaffSeed:Password'tan okunur (demo).
+    /// </summary>
+    private static async Task SeedDemoCustomersAsync(
+        AppDbContext db, IPasswordHasher passwordHasher, IConfiguration configuration)
+    {
+        var demoPassword = configuration["StaffSeed:Password"];
+        if (string.IsNullOrWhiteSpace(demoPassword)) return;
+
+        var existingEmails = (await db.Users.Select(u => u.Email).ToListAsync()).ToHashSet();
+        var passwordHash = passwordHasher.Hash(demoPassword);
+        var rng = new Random(20260625); // sabit tohum -> deterministik bakiye/hesap
+
+        var newUsers = new List<User>();
+        var newAccounts = new List<Account>();
+
+        for (var i = 0; i < DemoCustomerNames.Length; i++)
+        {
+            var email = $"musteri{i + 1}@demo.turkcellbank.com";
+            if (existingEmails.Contains(email)) continue;
+
+            var userId = Guid.NewGuid();
+            newUsers.Add(new User
+            {
+                Id = userId,
+                FullName = DemoCustomerNames[i],
+                Email = email,
+                PasswordHash = passwordHash,
+                Role = UserRole.Customer,
+                NationalId = GenerateValidTc(200000000L + i * 1234567L),
+                CreatedAt = DateTime.UtcNow,
+            });
+
+            // Her müşteriye 1-2 hesap, bakiyeli
+            var accountCount = rng.Next(1, 3);
+            for (var a = 0; a < accountCount; a++)
+            {
+                newAccounts.Add(new Account
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId,
+                    Iban = IbanGenerator.Generate(),
+                    AccountType = rng.NextDouble() < 0.8 ? AccountType.Bireysel : AccountType.Isletme,
+                    Balance = Math.Round((5000m + (decimal)rng.NextDouble() * 245000m) / 100m) * 100m,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                });
+            }
+        }
+
+        if (newUsers.Count == 0) return;
+
+        db.Users.AddRange(newUsers);
+        db.Accounts.AddRange(newAccounts);
         await db.SaveChangesAsync();
     }
 

@@ -13,18 +13,9 @@ import { Skeleton } from '../../components/Skeleton'
 import { getTeam } from '../../api/orgApi'
 import { roleLabel } from '../../lib/roles'
 import { chartColor } from '../../lib/chartColors'
+import { StatIcon, statIconName } from './statIcons'
 import type { OrgStat } from '../../lib/types'
 import './OrgTeamView.css'
-
-// KPI kartına etiketine göre ikon ata
-function statIcon(label: string): string {
-  if (label.includes('kredi')) return '💳'
-  if (label.includes('kart')) return '🪪'
-  if (label.includes('havale')) return '💸'
-  if (label.includes('çalışan') || label.includes('müdür')) return '👤'
-  if (label.includes('şube') || label.includes('Şube')) return '🏢'
-  return '📊'
-}
 
 // "Bekleyen kredi (onayım)" → "Kredi" gibi kısa eksen etiketi
 function shortPendingLabel(label: string): string {
@@ -65,16 +56,17 @@ export function OrgTeamView() {
         {/* Renkli KPI kartları */}
         <div className="org-stats">
           {view.stats.map((s: OrgStat, i) => (
-            <div
-              key={s.label}
-              className="org-kpi"
-              style={{ borderTopColor: chartColor(i) }}
-            >
-              <span className="org-kpi-icon" aria-hidden="true">{statIcon(s.label)}</span>
-              <span className="org-kpi-value" style={{ color: chartColor(i) }}>
-                {s.value}
+            <div key={s.label} className="org-kpi">
+              <div className="org-kpi-text">
+                <span className="org-kpi-value">{s.value}</span>
+                <span className="org-kpi-label">{s.label}</span>
+              </div>
+              <span
+                className="org-kpi-icon"
+                style={{ color: chartColor(i), backgroundColor: `${chartColor(i)}1a` }}
+              >
+                <StatIcon name={statIconName(s.label)} />
               </span>
-              <span className="org-kpi-label">{s.label}</span>
             </div>
           ))}
         </div>
@@ -84,7 +76,7 @@ export function OrgTeamView() {
           <div className="org-chart">
             <p className="org-chart-title">Bekleyen Onaylar</p>
             {totalPending === 0 ? (
-              <p className="org-chart-empty">🎉 Bekleyen onay yok, kuyruk temiz.</p>
+              <p className="org-chart-empty">Bekleyen onay yok — kuyruk temiz.</p>
             ) : (
               <ResponsiveContainer width="100%" height={Math.max(120, pendingData.length * 56)}>
                 <BarChart
