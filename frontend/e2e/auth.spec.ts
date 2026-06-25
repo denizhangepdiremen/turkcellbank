@@ -6,7 +6,8 @@ import { test, expect } from '@playwright/test'
 test.describe('Auth & yönlendirme', () => {
   test('login sayfası açılır ve alanları görünür', async ({ page }) => {
     await page.goto('/login')
-    await expect(page.getByRole('heading', { name: 'TurkcellBank' })).toBeVisible()
+    // Marka üst şeritte logo olarak görünür
+    await expect(page.getByText('TurkcellBank').first()).toBeVisible()
     await expect(page.getByLabel('E-posta', { exact: true })).toBeVisible()
     await expect(page.getByLabel('Şifre', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Giriş Yap' })).toBeVisible()
@@ -39,9 +40,10 @@ test.describe('Auth & yönlendirme', () => {
     await expect(page).toHaveURL(/\/login$/)
   })
 
-  test('kayıt olun tuşuna basınca register ekranına gider', async ({ page }) => {
+  test('kayıt ol sekmesine basınca register ekranına gider', async ({ page }) => {
     await page.goto('/login')
-    await page.getByRole('link', { name: 'Kayıt olun' }).click()
+    // Üstteki segment toggle ile kayıt sekmesine geç
+    await page.getByRole('tab', { name: 'Kayıt Ol' }).click()
     await expect(page).toHaveURL(/\/register$/)
   })
 
