@@ -11,7 +11,7 @@ import { loginSchema, type LoginFormValues } from '../../lib/validation'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { roleHomePath } from '../../lib/roles'
-import './Login.css'
+import { AuthLayout } from '../auth/AuthLayout'
 
 /**
  * Login ekranı — gerçek backend'e bağlı.
@@ -51,69 +51,51 @@ export function Login() {
   }
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <div className="login-header">
-          <h1 className="login-brand">TurkcellBank</h1>
-          <p className="login-subtitle">Hesabınıza giriş yapın</p>
+    <AuthLayout title="Tekrar hoş geldiniz" subtitle="Hesabınıza giriş yapın">
+      {registered && (
+        <div className="auth-alert">
+          <Alert variant="success">
+            Kayıt başarılı! Şimdi giriş yapabilirsiniz.
+          </Alert>
+        </div>
+      )}
+
+      {serverError && (
+        <div className="auth-alert">
+          <Alert variant="error">{serverError}</Alert>
+        </div>
+      )}
+
+      <form className="auth-form" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <Input
+          label="E-posta"
+          type="email"
+          placeholder="ornek@turkcellbank.com"
+          error={errors.email?.message}
+          disabled={isSubmitting}
+          {...register('email')}
+        />
+
+        <Input
+          label="Şifre"
+          type="password"
+          placeholder="••••••••"
+          error={errors.password?.message}
+          disabled={isSubmitting}
+          {...register('password')}
+        />
+
+        <div className="auth-options">
+          <Checkbox label="Beni hatırla" disabled={isSubmitting} />
+          <Link className="auth-link" to="/forgot-password">
+            Şifremi unuttum
+          </Link>
         </div>
 
-        {registered && (
-          <div style={{ marginBottom: '1rem' }}>
-            <Alert variant="success">
-              Kayıt başarılı! Şimdi giriş yapabilirsiniz.
-            </Alert>
-          </div>
-        )}
-
-        {serverError && (
-          <div style={{ marginBottom: '1rem' }}>
-            <Alert variant="error">{serverError}</Alert>
-          </div>
-        )}
-
-        <form
-          className="login-form"
-          onSubmit={handleSubmit(onSubmit)}
-          noValidate
-        >
-          <Input
-            label="E-posta"
-            type="email"
-            placeholder="ornek@turkcellbank.com"
-            error={errors.email?.message}
-            disabled={isSubmitting}
-            {...register('email')}
-          />
-
-          <Input
-            label="Şifre"
-            type="password"
-            placeholder="••••••••"
-            error={errors.password?.message}
-            disabled={isSubmitting}
-            {...register('password')}
-          />
-
-          <div className="login-options">
-            <Checkbox label="Beni hatırla" disabled={isSubmitting} />
-            <Link className="login-link" to="/forgot-password">
-              Şifremi unuttum
-            </Link>
-          </div>
-
-          <Button type="submit" variant="primary" size="lg" loading={isSubmitting}>
-            Giriş Yap
-          </Button>
-        </form>
-
-        <p className="login-footer">
-          Hesabınız yok mu?{' '}
-          <Link className="login-link" to="/register">
-            Kayıt olun
-          </Link>
-        </p>
-      </div>
-    </div>
+        <Button type="submit" variant="primary" size="lg" loading={isSubmitting}>
+          Giriş Yap
+        </Button>
+      </form>
+    </AuthLayout>
   )
 }

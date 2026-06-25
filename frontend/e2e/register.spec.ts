@@ -60,7 +60,8 @@ test.describe('Kayıt akışı', () => {
 
   test('register sayfasından login sayfasına geçiş yapılır', async ({ page }) => {
     await page.goto('/register')
-    await page.getByRole('link', { name: 'Giriş yapın' }).click()
+    // Üstteki segment toggle ile giriş sekmesine geç
+    await page.getByRole('tab', { name: 'Giriş Yap' }).click()
     await expect(page).toHaveURL(/\/login$/)
   })
 })

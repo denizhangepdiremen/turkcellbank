@@ -1,0 +1,257 @@
+/* Giriş / Kayıt ekranlarının ortak stilleri.
+   Üstte tam genişlikte markalı şerit, altta iki sütunlu gövde
+   (solda tanıtım + özellikler, sağda form kartı).
+   Sayfa düzeni için okunaklı semantic class isimleri kullanıldı. */
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 55%, #eef2ff 100%);
+}
+
+/* ---------- Marka logosu (ikon + yazı) ---------- */
+.bank-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.bank-logo-text {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ---------- Üst marka şeridi ---------- */
+.auth-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2.5rem;
+  background: linear-gradient(90deg, #4f46e5 0%, #4338ca 100%);
+  border-bottom: 1px solid #3730a3;
+}
+
+/* Şeritteki marka adı büyük ve belirgin dursun (dashboard üst bar gibi) */
+.auth-topbar .bank-logo {
+  gap: 0.7rem;
+}
+
+.auth-topbar .bank-logo-text {
+  font-size: 1.6rem;
+}
+
+.auth-topbar-tag {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #c7d2fe; /* indigo-200 */
+  letter-spacing: 0.01em;
+}
+
+/* ---------- Gövde ---------- */
+/* İçerik üstten hizalanır (align-items: flex-start) — form yüksekliği
+   değişse de toggle yerinde kalır, ortada zıplama olmaz. */
+.auth-body {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: clamp(2rem, 6vh, 4.5rem) 1.5rem 3rem;
+}
+
+.auth-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  align-items: start;
+  gap: clamp(2rem, 6vw, 5rem);
+  width: 100%;
+  max-width: 980px;
+}
+
+/* ---------- Sol: tanıtım + özellikler ---------- */
+.auth-intro {
+  padding-top: 0.5rem;
+}
+
+.auth-intro-title {
+  font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: #1e293b; /* slate-800 */
+  margin: 0 0 0.85rem;
+}
+
+.auth-intro-lead {
+  margin: 0 0 2rem;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #475569; /* slate-600 */
+  max-width: 30rem;
+}
+
+.auth-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.auth-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  padding: 0.95rem 1.1rem;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0; /* slate-200 */
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(30, 27, 75, 0.05);
+}
+
+.auth-feature-icon {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+}
+
+.auth-feature-text strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.auth-feature-desc {
+  display: block;
+  font-size: 0.85rem;
+  color: #64748b; /* slate-500 */
+  margin-top: 0.15rem;
+}
+
+/* ---------- Sağ: form kartı ---------- */
+.auth-panel {
+  display: flex;
+  justify-content: center;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 2rem 2.25rem 2.25rem;
+  background-color: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 18px 45px rgba(30, 27, 75, 0.12);
+}
+
+/* Giriş / Kayıt segment kontrolü */
+.auth-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  background-color: #f1f5f9; /* slate-100 */
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.auth-switch-tab {
+  text-align: center;
+  padding: 0.6rem 0.5rem;
+  border-radius: 9px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #64748b; /* slate-500 */
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.auth-switch-tab:hover {
+  color: #4f46e5;
+}
+
+.auth-switch-tab.is-active {
+  background-color: #ffffff;
+  color: #4f46e5; /* indigo-600 */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.auth-card-head {
+  margin-bottom: 1.25rem;
+}
+
+.auth-card-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #1e293b; /* slate-800 */
+  margin: 0;
+}
+
+.auth-card-subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+/* "Beni hatırla" + "Şifremi unuttum" satırı */
+.auth-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.auth-link {
+  color: #4f46e5;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+}
+
+.auth-alert {
+  margin-bottom: 1rem;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 860px) {
+  .auth-topbar {
+    padding: 0.85rem 1.5rem;
+  }
+
+  .auth-topbar-tag {
+    display: none;
+  }
+
+  .auth-body {
+    align-items: center;
+    padding: 2rem 1.25rem;
+  }
+
+  .auth-grid {
+    grid-template-columns: 1fr;
+    max-width: 420px;
+  }
+
+  /* Mobilde tanıtım sütununu gizle — sadece form kalsın */
+  .auth-intro {
+    display: none;
+  }
+}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '../../components/Button'
@@ -10,7 +10,7 @@ import { register as registerUser } from '../../api/authApi'
 import { registerSchema, type RegisterFormValues } from '../../lib/validation'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
-import './Register.css'
+import { AuthLayout } from '../auth/AuthLayout'
 
 /**
  * Register ekranı — gerçek backend'e bağlı.
@@ -52,78 +52,60 @@ export function Register() {
   }
 
   return (
-    <div className="register-page">
-      <div className="register-card">
-        <div className="register-header">
-          <h1 className="register-brand">TurkcellBank</h1>
-          <p className="register-subtitle">Yeni hesap oluşturun</p>
+    <AuthLayout title="Hesabınızı oluşturun" subtitle="Dakikalar içinde TurkcellBank müşterisi olun">
+      {serverError && (
+        <div className="auth-alert">
+          <Alert variant="error">{serverError}</Alert>
         </div>
+      )}
 
-        {serverError && (
-          <div style={{ marginBottom: '1rem' }}>
-            <Alert variant="error">{serverError}</Alert>
-          </div>
-        )}
+      <form className="auth-form" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <Input
+          label="Ad Soyad"
+          placeholder="Adınızı ve soyadınızı girin"
+          error={errors.fullName?.message}
+          disabled={isSubmitting}
+          {...register('fullName')}
+        />
 
-        <form
-          className="register-form"
-          onSubmit={handleSubmit(onSubmit)}
-          noValidate
-        >
-          <Input
-            label="Ad Soyad"
-            placeholder="Adınızı ve soyadınızı girin"
-            error={errors.fullName?.message}
-            disabled={isSubmitting}
-            {...register('fullName')}
-          />
+        <Input
+          label="E-posta"
+          type="email"
+          placeholder="ornek@turkcellbank.com"
+          error={errors.email?.message}
+          disabled={isSubmitting}
+          {...register('email')}
+        />
 
-          <Input
-            label="E-posta"
-            type="email"
-            placeholder="ornek@turkcellbank.com"
-            error={errors.email?.message}
-            disabled={isSubmitting}
-            {...register('email')}
-          />
+        <Input
+          label="Şifre"
+          type="password"
+          placeholder="En az 6 karakter"
+          error={errors.password?.message}
+          disabled={isSubmitting}
+          {...register('password')}
+        />
 
-          <Input
-            label="Şifre"
-            type="password"
-            placeholder="En az 6 karakter"
-            error={errors.password?.message}
-            disabled={isSubmitting}
-            {...register('password')}
-          />
+        <Input
+          label="Şifre (Tekrar)"
+          type="password"
+          placeholder="Şifrenizi tekrar girin"
+          error={errors.confirmPassword?.message}
+          disabled={isSubmitting}
+          {...register('confirmPassword')}
+        />
 
-          <Input
-            label="Şifre (Tekrar)"
-            type="password"
-            placeholder="Şifrenizi tekrar girin"
-            error={errors.confirmPassword?.message}
-            disabled={isSubmitting}
-            {...register('confirmPassword')}
-          />
+        <Checkbox
+          label="Kullanım koşullarını ve gizlilik politikasını kabul ediyorum"
+          error={errors.acceptedTerms?.message}
+          disabled={isSubmitting}
+          {...register('acceptedTerms')}
+        />
 
-          <Checkbox
-            label="Kullanım koşullarını ve gizlilik politikasını kabul ediyorum"
-            error={errors.acceptedTerms?.message}
-            disabled={isSubmitting}
-            {...register('acceptedTerms')}
-          />
-
-          <Button type="submit" variant="primary" size="lg" loading={isSubmitting}>
-            Kayıt Ol
-          </Button>
-        </form>
-
-        <p className="register-footer">
-          Zaten hesabınız var mı?{' '}
-          <Link className="register-link" to="/login">
-            Giriş yapın
-          </Link>
-        </p>
-      </div>
-    </div>
+        <Button type="submit" variant="primary" size="lg" loading={isSubmitting}>
+          Kayıt Ol
+        </Button>
+      </form>
+    </AuthLayout>
   )
 }
