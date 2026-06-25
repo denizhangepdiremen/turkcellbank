@@ -148,6 +148,34 @@ export interface PendingTransfer {
   createdAt: string
 }
 
+// Onay geçmişi (karara bağlanmış kayıtlar — "Geçmiş" sekmesi).
+export interface LoanHistory {
+  id: string
+  applicantName: string
+  applicantEmail: string
+  amount: number
+  termMonths: number
+  status: 'Approved' | 'Rejected'
+  decidedByName: string
+  decidedByRole: string
+  decisionNote: string
+  decidedAt: string | null
+  createdAt: string
+}
+export interface TransferHistory {
+  id: string
+  customerName: string
+  fromIban: string
+  toIban: string
+  amount: number
+  description: string | null
+  status: 'Approved' | 'Rejected'
+  decidedByName: string
+  decisionNote: string
+  decidedAt: string | null
+  createdAt: string
+}
+
 // Organizasyon görünümü (yönetici panelleri).
 export interface OrgMember {
   fullName: string

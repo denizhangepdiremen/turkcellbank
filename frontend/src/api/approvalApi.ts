@@ -4,8 +4,10 @@ import type {
   ApiResponse,
   Card,
   Loan,
+  LoanHistory,
   PendingLoan,
   PendingTransfer,
+  TransferHistory,
 } from '../lib/types'
 
 // Yetkili kredi onay işlemleri (şube/il müdürü/direktör).
@@ -35,6 +37,13 @@ export async function rejectLoan(id: string, note?: string) {
   return data
 }
 
+// Karara bağlanmış krediler (onay/ret geçmişi)
+export async function getLoanHistory() {
+  const { data } =
+    await apiClient.get<ApiResponse<LoanHistory[]>>('/api/approvals/loans/history')
+  return data
+}
+
 // --- Yüksek tutarlı havale onayı (şube müdürü) ---
 export async function getPendingTransfers() {
   const { data } =
@@ -53,6 +62,12 @@ export async function rejectTransfer(id: string, note?: string) {
     `/api/approvals/transfers/${id}/reject`,
     { note },
   )
+  return data
+}
+// Karara bağlanmış havaleler (onay/ret geçmişi)
+export async function getTransferHistory() {
+  const { data } =
+    await apiClient.get<ApiResponse<TransferHistory[]>>('/api/approvals/transfers/history')
   return data
 }
 

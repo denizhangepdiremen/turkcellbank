@@ -15,6 +15,7 @@ public interface ILoanService
 
     // --- Yetkili onay (şube/il müdürü/direktör) ---
     Task<List<PendingLoanDto>> GetPendingApprovalsAsync();
+    Task<List<LoanHistoryDto>> GetDecidedAsync(); // kendi bandımda karara bağlananlar
     Task<LoanDto> ApproveAsync(Guid id, string? note);
     Task<LoanDto> RejectAsync(Guid id, string? note);
 }

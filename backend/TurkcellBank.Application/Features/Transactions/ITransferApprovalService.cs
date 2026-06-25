@@ -13,6 +13,7 @@ public interface ITransferApprovalService
 
     // Şube müdürü onay kuyruğu
     Task<List<PendingTransferDto>> GetPendingAsync();
+    Task<List<TransferHistoryDto>> GetDecidedAsync(); // karara bağlananlar — "Geçmiş"
     Task<TransactionDto> ApproveAsync(Guid id, string? note);
     Task RejectAsync(Guid id, string? note);
 }

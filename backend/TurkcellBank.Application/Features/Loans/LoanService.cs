@@ -247,6 +247,43 @@ public class LoanService : ILoanService
             CanApprove: role is not null && l.RequiredApproverRole == role)).ToList();
     }
 
+    // Kendi bandımda karara bağlanmış (onaylanan/reddedilen) krediler — "Geçmiş" sekmesi.
+    // kim (kararı veren yetkilinin adı) / ne zaman / gerekçe ile birlikte döner.
+    public async Task<List<LoanHistoryDto>> GetDecidedAsync()
+    {
+        var role = ParseRole(_currentUser.Role);
+        var all = await _loans.GetAllWithUserAsync();
+        var decided = all
+            .Where(l => l.Status is LoanStatus.Approved or LoanStatus.Rejected)
+            .Where(l => role is not null && l.RequiredApproverRole == role)
+            .OrderByDescending(l => l.DecidedAt ?? l.CreatedAt)
+            .ToList();
+
+        // Kararı veren yetkililerin adlarını topluca çöz (N+1 önle)
+        var deciderNames = new Dictionary<Guid, string>();
+        foreach (var id in decided.Where(l => l.DecidedByUserId.HasValue)
+                     .Select(l => l.DecidedByUserId!.Value).Distinct())
+        {
+            var u = await _users.GetByIdAsync(id);
+            if (u is not null) deciderNames[id] = u.FullName;
+        }
+
+        return decided.Select(l => new LoanHistoryDto(
+            l.Id,
+            l.User?.FullName ?? "—",
+            l.User?.Email ?? "—",
+            l.Amount,
+            l.TermMonths,
+            l.Status.ToString(),
+            l.DecidedByUserId is Guid did && deciderNames.TryGetValue(did, out var n)
+                ? n
+                : (string.IsNullOrEmpty(l.DecidedBy) ? "—" : l.DecidedBy),
+            l.DecidedBy,
+            l.DecisionNote,
+            l.DecidedAt,
+            l.CreatedAt)).ToList();
+    }
+
     public async Task<LoanDto> PayInstallmentAsync(Guid loanId, Guid accountId)
     {
         var loan = await _loans.GetByIdAsync(loanId);

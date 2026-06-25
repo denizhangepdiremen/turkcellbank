@@ -15,6 +15,7 @@ public class TransferApprovalService : ITransferApprovalService
     private readonly IOperationContext _ctx;
     private readonly IAuditLogger _audit;
     private readonly Notifications.INotificationService _notifications;
+    private readonly IUserRepository _users;
 
     public TransferApprovalService(
         IPendingTransferRepository pending,
@@ -23,7 +24,8 @@ public class TransferApprovalService : ITransferApprovalService
         ICurrentUserService currentUser,
         IOperationContext ctx,
         IAuditLogger audit,
-        Notifications.INotificationService notifications)
+        Notifications.INotificationService notifications,
+        IUserRepository users)
     {
         _pending = pending;
         _accounts = accounts;
@@ -32,6 +34,7 @@ public class TransferApprovalService : ITransferApprovalService
         _ctx = ctx;
         _audit = audit;
         _notifications = notifications;
+        _users = users;
     }
 
     // Şube çalışanı tarafından (impersonate edilmiş bağlamda) çağrılır.
@@ -68,6 +71,38 @@ public class TransferApprovalService : ITransferApprovalService
             t.ToIban,
             t.Amount,
             t.Description,
+            t.CreatedAt)).ToList();
+    }
+
+    // Karara bağlanmış (onaylanan/reddedilen) havaleler — "Geçmiş" sekmesi.
+    public async Task<List<TransferHistoryDto>> GetDecidedAsync()
+    {
+        var approved = await _pending.GetByStatusWithCustomerAsync(TransferStatus.Approved);
+        var rejected = await _pending.GetByStatusWithCustomerAsync(TransferStatus.Rejected);
+        var decided = approved.Concat(rejected)
+            .OrderByDescending(t => t.DecidedAt ?? t.CreatedAt)
+            .ToList();
+
+        // Kararı veren şube müdürlerinin adlarını topluca çöz (N+1 önle)
+        var deciderNames = new Dictionary<Guid, string>();
+        foreach (var id in decided.Where(t => t.DecidedByUserId.HasValue)
+                     .Select(t => t.DecidedByUserId!.Value).Distinct())
+        {
+            var u = await _users.GetByIdAsync(id);
+            if (u is not null) deciderNames[id] = u.FullName;
+        }
+
+        return decided.Select(t => new TransferHistoryDto(
+            t.Id,
+            t.Customer?.FullName ?? "—",
+            t.FromIban,
+            t.ToIban,
+            t.Amount,
+            t.Description,
+            t.Status.ToString(),
+            t.DecidedByUserId is Guid did && deciderNames.TryGetValue(did, out var n) ? n : "—",
+            t.DecisionNote,
+            t.DecidedAt,
             t.CreatedAt)).ToList();
     }
 

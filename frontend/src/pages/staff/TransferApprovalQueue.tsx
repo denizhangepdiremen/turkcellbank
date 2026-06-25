@@ -8,6 +8,7 @@ import { Modal } from '../../components/Modal'
 import { getPendingTransfers, approveTransfer, rejectTransfer } from '../../api/approvalApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import type { PendingTransfer } from '../../lib/types'
+import { ApprovalHistory, ApprovalViewTabs } from './ApprovalHistory'
 import './LoanApprovalQueue.css'
 
 const formatTL = (n: number) =>
@@ -22,6 +23,7 @@ export function TransferApprovalQueue() {
   const { data, isLoading } = useQuery({ queryKey: ['pending-transfers'], queryFn: getPendingTransfers })
   const transfers = data?.data ?? []
 
+  const [view, setView] = useState<'pending' | 'history'>('pending')
   const [decision, setDecision] = useState<{ t: PendingTransfer; action: Action } | null>(null)
   const [note, setNote] = useState('')
 
@@ -37,17 +39,18 @@ export function TransferApprovalQueue() {
     onError: (err) => toast.error(getApiErrorMessage(err, 'İşlem başarısız.')),
   })
 
-  if (isLoading) {
-    return <Card><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
-  }
-  if (transfers.length === 0) {
-    return <Card><CardContent><div className="approval-empty">Onay bekleyen havale yok.</div></CardContent></Card>
-  }
-
   return (
     <>
-      <div className="approval-list">
-        {transfers.map((t) => (
+      <ApprovalViewTabs view={view} onChange={setView} pendingCount={transfers.length} />
+      {view === 'history' ? (
+        <ApprovalHistory kind="transfers" />
+      ) : isLoading ? (
+        <Card><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
+      ) : transfers.length === 0 ? (
+        <Card><CardContent><div className="approval-empty">Onay bekleyen havale yok.</div></CardContent></Card>
+      ) : (
+        <div className="approval-list">
+          {transfers.map((t) => (
           <Card key={t.id}>
             <CardContent>
               <div className="approval-card">
@@ -69,8 +72,9 @@ export function TransferApprovalQueue() {
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <Modal
         open={!!decision}

@@ -43,6 +43,14 @@ public class ApprovalsController : ControllerBase
         return Ok(ApiResponse<List<PendingLoanDto>>.SuccessResponse(loans));
     }
 
+    /// <summary>Karara bağlanmış krediler (onay/ret geçmişi). GET /api/approvals/loans/history</summary>
+    [HttpGet("loans/history")]
+    public async Task<IActionResult> LoanHistory()
+    {
+        var loans = await _loanService.GetDecidedAsync();
+        return Ok(ApiResponse<List<LoanHistoryDto>>.SuccessResponse(loans));
+    }
+
     /// <summary>Krediyi onayla. POST /api/approvals/loans/{id}/approve</summary>
     [HttpPost("loans/{id:guid}/approve")]
     public async Task<IActionResult> Approve(Guid id, [FromBody] ApprovalDecisionRequest? request)
@@ -67,6 +75,14 @@ public class ApprovalsController : ControllerBase
     {
         var transfers = await _transferApproval.GetPendingAsync();
         return Ok(ApiResponse<List<PendingTransferDto>>.SuccessResponse(transfers));
+    }
+
+    /// <summary>Karara bağlanmış havaleler (onay/ret geçmişi). GET /api/approvals/transfers/history</summary>
+    [HttpGet("transfers/history")]
+    public async Task<IActionResult> TransferHistory()
+    {
+        var transfers = await _transferApproval.GetDecidedAsync();
+        return Ok(ApiResponse<List<TransferHistoryDto>>.SuccessResponse(transfers));
     }
 
     /// <summary>Havaleyi onayla (gerçekleştir). POST /api/approvals/transfers/{id}/approve</summary>

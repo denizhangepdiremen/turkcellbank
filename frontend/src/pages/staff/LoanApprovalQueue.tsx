@@ -10,6 +10,7 @@ import { getPendingLoans, approveLoan, rejectLoan } from '../../api/approvalApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { roleLabel } from '../../lib/roles'
 import type { PendingLoan } from '../../lib/types'
+import { ApprovalHistory, ApprovalViewTabs } from './ApprovalHistory'
 import './LoanApprovalQueue.css'
 
 const formatTL = (n: number) =>
@@ -33,6 +34,8 @@ export function LoanApprovalQueue() {
   })
   const loans = data?.data ?? []
 
+  // Görünüm: bekleyen kuyruğu / karara bağlanmışların geçmişi
+  const [view, setView] = useState<'pending' | 'history'>('pending')
   // Karar modalı durumu
   const [decision, setDecision] = useState<{ loan: PendingLoan; action: Action } | null>(null)
   const [note, setNote] = useState('')
@@ -54,43 +57,35 @@ export function LoanApprovalQueue() {
     setDecision({ loan, action })
   }
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent>
-          <div className="approval-skeletons">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (isError) {
-    return (
-      <Card>
-        <CardContent>
-          <div className="approval-empty">Onay kuyruğu yüklenemedi.</div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (loans.length === 0) {
-    return (
-      <Card>
-        <CardContent>
-          <div className="approval-empty">Şu an onay bekleyen kredi başvurusu yok.</div>
-        </CardContent>
-      </Card>
-    )
-  }
-
   return (
     <>
-      <div className="approval-list">
-        {loans.map((loan) => (
+      <ApprovalViewTabs view={view} onChange={setView} pendingCount={loans.length} />
+      {view === 'history' ? (
+        <ApprovalHistory kind="loans" />
+      ) : isLoading ? (
+        <Card>
+          <CardContent>
+            <div className="approval-skeletons">
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      ) : isError ? (
+        <Card>
+          <CardContent>
+            <div className="approval-empty">Onay kuyruğu yüklenemedi.</div>
+          </CardContent>
+        </Card>
+      ) : loans.length === 0 ? (
+        <Card>
+          <CardContent>
+            <div className="approval-empty">Şu an onay bekleyen kredi başvurusu yok.</div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="approval-list">
+          {loans.map((loan) => (
           <Card key={loan.id}>
             <CardContent>
               <div className="approval-card">
@@ -144,8 +139,9 @@ export function LoanApprovalQueue() {
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Karar (onay/red) modalı — yetkili notu */}
       <Modal
