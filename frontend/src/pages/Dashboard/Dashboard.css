@@ -34,15 +34,50 @@
   font-weight: 500;
 }
 
+.dashboard-header-button {
+  color: #ffffff;
+  border-radius: 0.5rem;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease;
+}
+
+.dashboard-header-button:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.dashboard-header-button:active {
+  transform: translateY(1px);
+}
+
+.dashboard-header-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.28);
+}
+
+.dashboard-header-button--outline {
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.dashboard-header-button--outline:hover {
+  border-color: rgba(255, 255, 255, 0.95);
+}
+
 /* Bildirim zili */
 .dashboard-bell {
   position: relative;
-  background: transparent;
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  background-color: transparent;
+  border: 1px solid transparent;
   cursor: pointer;
-  font-size: 1.1rem;
-  line-height: 1;
-  padding: 0.25rem;
+  padding: 0;
 }
 .dashboard-bell-badge {
   position: absolute;
@@ -571,6 +606,7 @@
 
 .dashboard-tx-row:first-child {
   border-top: none;
+  padding-top: 0;
 }
 
 .dashboard-tx-desc {
@@ -590,7 +626,22 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.25rem;
+  gap: 0.12rem;
+}
+
+.dashboard-tx-receipt {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.dashboard-tx-receipt:hover {
+  background-color: transparent;
+  text-decoration: underline;
 }
 
 /* Ödeme planında ödenmiş taksit etiketi */

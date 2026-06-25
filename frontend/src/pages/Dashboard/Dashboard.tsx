@@ -911,11 +911,24 @@ export function Dashboard() {
           <span className="dashboard-username">{user?.fullName}</span>
           <button
             type="button"
-            className="dashboard-bell"
+            className="dashboard-bell dashboard-header-button"
             onClick={openNotifications}
             aria-label="Bildirimler"
           >
-            🔔
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M10.3 21a1.9 1.9 0 0 0 3.4 0" />
+              <path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+            </svg>
             {unreadCount > 0 && (
               <span className="dashboard-bell-badge">{unreadCount}</span>
             )}
@@ -923,7 +936,7 @@ export function Dashboard() {
           <Button
             variant="ghost"
             size="sm"
-            className="text-white hover:bg-white/15"
+            className="dashboard-header-button text-white"
             onClick={openProfile}
           >
             Profil
@@ -931,7 +944,7 @@ export function Dashboard() {
           <Button
             variant="outline"
             size="sm"
-            className="border-white/70 text-white hover:bg-white/15"
+            className="dashboard-header-button dashboard-header-button--outline text-white"
             onClick={handleLogout}
           >
             Çıkış
@@ -1225,7 +1238,12 @@ export function Dashboard() {
                         {tx.description ? ` · ${tx.description}` : ''}
                         {tx.channel === 'Branch' ? ' · Şube' : ''}
                       </p>
-                      <Button size="sm" variant="ghost" onClick={() => openReceipt(tx, accountIban)}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="dashboard-tx-receipt"
+                        onClick={() => openReceipt(tx, accountIban)}
+                      >
                         Dekont
                       </Button>
                     </div>
