@@ -7,6 +7,7 @@ import {
   loginAsAdmin,
   applyForLoan,
   openAccount,
+  openStaffTab,
 } from './helpers'
 
 // Sprint 5: müşteri bildirimi + denetim kaydı. Backend gerektirir (5099).
@@ -40,6 +41,7 @@ test.describe('Sprint 5 — bildirim ve denetim kaydı', () => {
 
     // 2) Şube müdürü onaylar
     await loginViaUi(page, STAFF.branchManager.email, STAFF_PASSWORD)
+    await openStaffTab(page, 'Kredi Onayları')
     const card = page.locator('.approval-card', { hasText: tag }).first()
     await card.getByRole('button', { name: 'Onayla' }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Onayla' }).click()

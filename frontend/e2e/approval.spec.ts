@@ -7,6 +7,7 @@ import {
   loginViaUi,
   applyForLoan,
   openTab,
+  openStaffTab,
 } from './helpers'
 
 // Tutar bazlı kredi onay workflow'u (Sprint 2). Backend gerektirir (5099).
@@ -54,6 +55,7 @@ test.describe('Kredi onay workflow', () => {
     // 2) Şube müdürü kuyrukta bu başvuruyu (meslek etiketiyle) bulur ve onaylar
     await loginViaUi(page, STAFF.branchManager.email, STAFF_PASSWORD)
     await expect(page).toHaveURL(/\/sube-muduru$/)
+    await openStaffTab(page, 'Kredi Onayları')
 
     const card = page.locator('.approval-card', { hasText: tag }).first()
     await expect(card).toBeVisible()
@@ -83,6 +85,7 @@ test.describe('Kredi onay workflow', () => {
     // İl müdürü kuyruğu görür ama şube bandını onaylayamaz
     await loginViaUi(page, STAFF.provincialManager.email, STAFF_PASSWORD)
     await expect(page).toHaveURL(/\/il-muduru$/)
+    await openStaffTab(page, 'Kredi Onayları')
     await expect(
       page.getByText(/Şube Müdürü yetkisindedir — görüntüleme/).first(),
     ).toBeVisible()

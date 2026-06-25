@@ -16,9 +16,9 @@ export function DirectorPanel() {
     >
       <StaffTabs
         tabs={[
+          { id: 'org', label: 'Tüm Banka', content: <OrgTeamView /> },
           { id: 'loans', label: 'Kredi Onayları', content: <LoanApprovalQueue /> },
           { id: 'customers', label: 'Müşteri Hesapları', content: <ManagedCustomers /> },
-          { id: 'org', label: 'Tüm Banka', content: <OrgTeamView /> },
         ]}
       />
     </StaffShell>

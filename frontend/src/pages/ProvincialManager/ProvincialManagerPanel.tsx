@@ -16,9 +16,9 @@ export function ProvincialManagerPanel() {
     >
       <StaffTabs
         tabs={[
+          { id: 'org', label: 'İlim', content: <OrgTeamView /> },
           { id: 'loans', label: 'Kredi Onayları', content: <LoanApprovalQueue /> },
           { id: 'customers', label: 'Müşteri Hesapları', content: <ManagedCustomers /> },
-          { id: 'org', label: 'İlim', content: <OrgTeamView /> },
         ]}
       />
     </StaffShell>

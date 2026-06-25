@@ -19,11 +19,11 @@ export function BranchManagerPanel() {
     >
       <StaffTabs
         tabs={[
+          { id: 'org', label: 'Şubem', content: <OrgTeamView /> },
           { id: 'loans', label: 'Kredi Onayları', content: <LoanApprovalQueue /> },
           { id: 'transfers', label: 'Yüksek Havale', content: <TransferApprovalQueue /> },
           { id: 'cards', label: 'Kart Onayları', content: <CardApprovalQueue /> },
           { id: 'customers', label: 'Müşteri Hesapları', content: <ManagedCustomers /> },
-          { id: 'org', label: 'Şubem', content: <OrgTeamView /> },
         ]}
       />
     </StaffShell>
