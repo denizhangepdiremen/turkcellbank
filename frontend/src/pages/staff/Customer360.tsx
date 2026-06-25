@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react'
+import toast from 'react-hot-toast'
 import { Card, CardContent } from '../../components/Card'
 import { Badge } from '../../components/Badge'
+import { Button } from '../../components/Button'
 import { formatIban } from '../../lib/format'
+import { openTransactionReceipt } from '../../lib/transactionReceipt'
 import type { Account, AdminCard, Loan, Transaction } from '../../lib/types'
 
 const formatTL = (n: number) =>
@@ -41,11 +44,13 @@ function txTypeLabel(type: string) {
 }
 
 export function Customer360({
+  customerName,
   accounts,
   cards,
   loans,
   recentTransactions,
 }: {
+  customerName: string
   accounts: Account[]
   cards: AdminCard[]
   loans: Loan[]
@@ -129,6 +134,20 @@ export function Customer360({
                   {trDate(tx.createdAt)}
                   {tx.description ? ` · ${tx.description}` : ''}
                 </p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const ok = openTransactionReceipt({
+                      transaction: tx,
+                      customerName,
+                      accountIban: tx.accountIban,
+                    })
+                    if (!ok) toast.error('Açılır pencere engellendi. Lütfen pop-up iznine bakın.')
+                  }}
+                >
+                  Dekont
+                </Button>
               </div>
               <span className={tx.direction === 'In' ? 'customer360-amount in' : 'customer360-amount out'}>
                 {tx.direction === 'In' ? '+' : '-'}{formatTL(tx.amount)}

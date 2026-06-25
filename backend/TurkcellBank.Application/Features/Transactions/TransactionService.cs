@@ -60,7 +60,7 @@ public class TransactionService : ITransactionService
         };
         await _transactions.AddAsync(tx); // hesabın yeni bakiyesini de kaydeder
 
-        return new TransactionDto(tx.Id, tx.Type.ToString(), "In", tx.Amount, null, tx.Description, tx.Channel.ToString(), tx.CreatedAt);
+        return new TransactionDto(tx.Id, tx.Type.ToString(), "In", tx.Amount, null, account.Iban, tx.Description, tx.Channel.ToString(), tx.CreatedAt);
     }
 
     public async Task<TransactionDto> TransferAsync(TransferRequest request)
@@ -114,7 +114,7 @@ public class TransactionService : ITransactionService
         // Tek SaveChanges: iki bakiye + işlem birlikte (atomik)
         await _transactions.AddAsync(tx);
 
-        return new TransactionDto(tx.Id, tx.Type.ToString(), "Out", tx.Amount, to.Iban, tx.Description, tx.Channel.ToString(), tx.CreatedAt);
+        return new TransactionDto(tx.Id, tx.Type.ToString(), "Out", tx.Amount, to.Iban, from.Iban, tx.Description, tx.Channel.ToString(), tx.CreatedAt);
     }
 
     public async Task<List<TransactionDto>> GetHistoryAsync(Guid accountId)
@@ -131,7 +131,7 @@ public class TransactionService : ITransactionService
             var direction = isOutgoing ? "Out" : "In";
             var counterparty = isOutgoing ? t.ToIban : t.FromIban; // deposit'te FromIban null
             return new TransactionDto(
-                t.Id, t.Type.ToString(), direction, t.Amount, counterparty, t.Description, t.Channel.ToString(), t.CreatedAt);
+                t.Id, t.Type.ToString(), direction, t.Amount, counterparty, account.Iban, t.Description, t.Channel.ToString(), t.CreatedAt);
         }).ToList();
     }
 

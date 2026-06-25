@@ -181,7 +181,8 @@ public class ManagerService : IManagerService
         var isOutgoing = t.FromAccountId.HasValue && accountIds.Contains(t.FromAccountId.Value);
         var direction = isOutgoing ? "Out" : "In";
         var counterparty = isOutgoing ? t.ToIban : t.FromIban;
+        var accountIban = isOutgoing ? t.FromIban : t.ToIban;
         return new TransactionDto(
-            t.Id, t.Type.ToString(), direction, t.Amount, counterparty, t.Description, t.Channel.ToString(), t.CreatedAt);
+            t.Id, t.Type.ToString(), direction, t.Amount, counterparty, accountIban, t.Description, t.Channel.ToString(), t.CreatedAt);
     }
 }

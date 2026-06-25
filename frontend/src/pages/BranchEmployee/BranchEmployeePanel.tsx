@@ -113,6 +113,7 @@ export function BranchEmployeePanel() {
               </div>
 
               <Customer360
+                customerName={customer.fullName}
                 accounts={customer.accounts}
                 cards={customer.cards ?? []}
                 loans={customer.loans ?? []}

@@ -41,6 +41,7 @@ export interface Transaction {
   direction: 'In' | 'Out' // gelen / giden (o hesabın bakışıyla)
   amount: number
   counterpartyIban: string | null
+  accountIban: string | null
   description: string | null
   channel: 'Internet' | 'Branch' // şube çalışanı adına yaptıysa "Branch"
   createdAt: string

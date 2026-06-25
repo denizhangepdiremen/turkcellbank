@@ -363,6 +363,10 @@
   line-height: 1.35;
 }
 
+.customer360-row button {
+  margin-top: 0.25rem;
+}
+
 .customer360-amount {
   flex-shrink: 0;
   font-size: 0.88rem;

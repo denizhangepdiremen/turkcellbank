@@ -40,6 +40,7 @@ import type {
   Transaction,
 } from '../../lib/types'
 import { openCardStatement } from '../../lib/cardStatement'
+import { openTransactionReceipt } from '../../lib/transactionReceipt'
 import './Dashboard.css'
 
 const accountTypeOptions = [
@@ -592,7 +593,7 @@ export function Dashboard() {
   })
 
   // Birleşik liste: her işlemi ait olduğu hesabın IBAN'ı ile etiketle, tarihe göre sırala
-  type HistoryRow = Transaction & { accountIban?: string }
+  type HistoryRow = Transaction & { accountIban?: string | null }
   const mergedHistory: HistoryRow[] = isAllAccounts
     ? balanceAccounts
         .flatMap((a, i) =>
@@ -796,6 +797,15 @@ export function Dashboard() {
     })
     if (!ok) toast.error('Açılır pencere engellendi. Lütfen pop-up iznine bakın.')
     setStatementCard(null)
+  }
+
+  function openReceipt(tx: HistoryRow, accountIban?: string | null) {
+    const ok = openTransactionReceipt({
+      transaction: tx,
+      customerName: user?.fullName ?? '',
+      accountIban,
+    })
+    if (!ok) toast.error('Açılır pencere engellendi. Lütfen pop-up iznine bakın.')
   }
 
   const [payOpen, setPayOpen] = useState(false)
@@ -1201,7 +1211,7 @@ export function Dashboard() {
 
                   return (
                   <div key={tx.id} className="dashboard-tx-row">
-                    <div>
+                    <div className="dashboard-tx-main">
                       <p className="dashboard-tx-desc">
                         <span>{txTitle(tx)}</span>
                         {isAllAccounts && tx.accountIban && (
@@ -1215,6 +1225,9 @@ export function Dashboard() {
                         {tx.description ? ` · ${tx.description}` : ''}
                         {tx.channel === 'Branch' ? ' · Şube' : ''}
                       </p>
+                      <Button size="sm" variant="ghost" onClick={() => openReceipt(tx, accountIban)}>
+                        Dekont
+                      </Button>
                     </div>
                     <div className="dashboard-tx-right">
                       <span
