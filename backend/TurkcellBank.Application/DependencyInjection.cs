@@ -6,6 +6,9 @@ using TurkcellBank.Application.Features.Accounts.Validators;
 using TurkcellBank.Application.Features.Auth;
 using TurkcellBank.Application.Features.Auth.Dtos;
 using TurkcellBank.Application.Features.Auth.Validators;
+using TurkcellBank.Application.Features.SavedRecipients;
+using TurkcellBank.Application.Features.SavedRecipients.Dtos;
+using TurkcellBank.Application.Features.SavedRecipients.Validators;
 using TurkcellBank.Application.Features.Transactions;
 using TurkcellBank.Application.Features.Transactions.Dtos;
 using TurkcellBank.Application.Features.Transactions.Validators;
@@ -35,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<Features.Notifications.INotificationService, Features.Notifications.NotificationService>();
         services.AddScoped<Features.Payments.IPaymentService, Features.Payments.PaymentService>();
         services.AddScoped<Features.Cards.ICardService, Features.Cards.CardService>();
+        services.AddScoped<ISavedRecipientService, SavedRecipientService>();
 
         // Validator'lar
         services.AddScoped<IValidator<RegisterRequest>, RegisterRequestValidator>();
@@ -47,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<IValidator<Features.Loans.Dtos.LoanApplicationRequest>, Features.Loans.Validators.LoanApplicationRequestValidator>();
         services.AddScoped<IValidator<Features.Payments.Dtos.PaymentRequest>, Features.Payments.Validators.PaymentRequestValidator>();
         services.AddScoped<IValidator<Features.Cards.Dtos.CreateCardRequest>, Features.Cards.Validators.CreateCardRequestValidator>();
+        services.AddScoped<IValidator<CreateSavedRecipientRequest>, CreateSavedRecipientRequestValidator>();
 
         return services;
     }

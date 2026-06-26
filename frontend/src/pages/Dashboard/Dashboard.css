@@ -639,6 +639,53 @@
   font-weight: 600;
 }
 
+/* Kayıtlı alıcı satırları */
+.dashboard-recipient-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-recipient-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0;
+  border-top: 1px solid #f3f4f6;
+}
+
+.dashboard-recipient-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.dashboard-recipient-name {
+  margin: 0;
+  color: #111827;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.dashboard-recipient-iban {
+  margin: 0.15rem 0 0;
+  color: #475569;
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-recipient-note {
+  margin: 0.15rem 0 0;
+  color: #6b7280;
+  font-size: 0.78rem;
+}
+
+.dashboard-recipient-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 .dashboard-tx-receipt:hover {
   background-color: transparent;
   text-decoration: underline;
@@ -1067,6 +1114,17 @@
 /* Modal içi alanlar arası boşluk */
 .dashboard-modal-field {
   margin-bottom: 1rem;
+}
+
+.dashboard-save-recipient {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+  padding: 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #f9fafb;
 }
 
 /* Profil modalı */

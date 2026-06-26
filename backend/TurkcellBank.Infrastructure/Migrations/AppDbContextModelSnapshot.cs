@@ -579,6 +579,40 @@ namespace TurkcellBank.Infrastructure.Migrations
                     b.ToTable("ReferenceCreditRecords");
                 });
 
+            modelBuilder.Entity("TurkcellBank.Domain.Entities.SavedRecipient", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Iban")
+                        .IsRequired()
+                        .HasMaxLength(34)
+                        .HasColumnType("character varying(34)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Iban")
+                        .IsUnique();
+
+                    b.ToTable("SavedRecipients");
+                });
+
             modelBuilder.Entity("TurkcellBank.Domain.Entities.Transaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -761,6 +795,17 @@ namespace TurkcellBank.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("TurkcellBank.Domain.Entities.SavedRecipient", b =>
+                {
+                    b.HasOne("TurkcellBank.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("TurkcellBank.Domain.Entities.User", b =>

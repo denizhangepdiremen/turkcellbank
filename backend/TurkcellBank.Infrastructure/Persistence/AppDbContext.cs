@@ -26,6 +26,7 @@ public class AppDbContext : DbContext
     public DbSet<PendingTransfer> PendingTransfers => Set<PendingTransfer>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<SavedRecipient> SavedRecipients => Set<SavedRecipient>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,6 +76,22 @@ public class AppDbContext : DbContext
 
             // İl bazlı sorgu (il müdürü kapsamı) için index
             entity.HasIndex(b => b.City);
+        });
+
+        // --- SavedRecipient (kayıtlı alıcı) tablosu kuralları ---
+        modelBuilder.Entity<SavedRecipient>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.Name).IsRequired().HasMaxLength(80);
+            entity.Property(r => r.Iban).IsRequired().HasMaxLength(34);
+            entity.Property(r => r.Note).HasMaxLength(50);
+
+            entity.HasIndex(r => new { r.UserId, r.Iban }).IsUnique();
+
+            entity.HasOne(r => r.User)
+                .WithMany()
+                .HasForeignKey(r => r.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // --- Account tablosu kuralları ---

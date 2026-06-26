@@ -50,6 +50,14 @@ export interface Transaction {
   createdAt: string
 }
 
+export interface SavedRecipient {
+  id: string
+  name: string
+  iban: string
+  note: string | null
+  createdAt: string
+}
+
 export type CardStatus = 'Pending' | 'Approved' | 'Rejected' | 'Blocked'
 
 // Yönetici müşteri arama sonucu (banka bloğu işlemleri için)

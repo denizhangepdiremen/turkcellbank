@@ -12,6 +12,7 @@ import { Spinner } from '../../components/Spinner'
 import { Skeleton } from '../../components/Skeleton'
 import { Alert } from '../../components/Alert'
 import { Checkbox } from '../../components/Checkbox'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { useAuth } from '../../context/AuthContext'
 import {
   getAccounts,
@@ -26,6 +27,7 @@ import { deposit, transfer, getHistory } from '../../api/transactionApi'
 import { applyLoan, getMyLoans, getLoanDetail, payInstallment } from '../../api/loanApi'
 import { pay, getMyPayments } from '../../api/paymentApi'
 import { createCard, getMyCards, setCardOnlineShopping } from '../../api/cardApi'
+import { createRecipient, deleteRecipient, getRecipients } from '../../api/recipientApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { digitsOnly, formatIban, formatIbanInput, normalizeIban } from '../../lib/format'
@@ -37,6 +39,7 @@ import type {
   Loan,
   LoanStatus,
   PaymentStatus,
+  SavedRecipient,
   Transaction,
 } from '../../lib/types'
 import { openCardStatement } from '../../lib/cardStatement'
@@ -560,6 +563,15 @@ export function Dashboard() {
   const [toIban, setToIban] = useState('')
   const [transferAmount, setTransferAmount] = useState('')
   const [transferDesc, setTransferDesc] = useState('')
+  const [selectedRecipientId, setSelectedRecipientId] = useState('')
+  const [saveRecipientAfterTransfer, setSaveRecipientAfterTransfer] = useState(false)
+  const [recipientNameAfterTransfer, setRecipientNameAfterTransfer] = useState('')
+
+  const [recipientOpen, setRecipientOpen] = useState(false)
+  const [recipientName, setRecipientName] = useState('')
+  const [recipientIban, setRecipientIban] = useState('')
+  const [recipientNote, setRecipientNote] = useState('')
+  const [deleteRecipientTarget, setDeleteRecipientTarget] = useState<SavedRecipient | null>(null)
 
   // Hesap kapatma (bakiye aktarımı + bağlı kart silme) ve dondurma onayları
   const [closeTarget, setCloseTarget] = useState<Account | null>(null)
@@ -627,8 +639,52 @@ export function Dashboard() {
       refresh()
       setTransferOpen(false)
       toast.success('Transfer başarılı.')
+      if (saveRecipientAfterTransfer && recipientNameAfterTransfer.trim()) {
+        saveRecipientMutation.mutate({
+          name: recipientNameAfterTransfer.trim(),
+          iban: normalizeIban(toIban),
+          note: transferDesc || undefined,
+        })
+      }
+      setSaveRecipientAfterTransfer(false)
+      setRecipientNameAfterTransfer('')
+      setSelectedRecipientId('')
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Transfer başarısız.')),
+  })
+
+  const { data: recipientsData, isLoading: recipientsLoading } = useQuery({
+    queryKey: ['recipients'],
+    queryFn: getRecipients,
+  })
+  const recipients = recipientsData?.data ?? []
+  const selectedRecipient = recipients.find((r) => r.id === selectedRecipientId)
+  const normalizedTransferIban = normalizeIban(toIban)
+  const transferIbanAlreadySaved = recipients.some((r) => r.iban === normalizedTransferIban)
+  const showSaveRecipientOption =
+    normalizedTransferIban.length === 26 && !selectedRecipient && !transferIbanAlreadySaved
+
+  const saveRecipientMutation = useMutation({
+    mutationFn: createRecipient,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipients'] })
+      setRecipientOpen(false)
+      setRecipientName('')
+      setRecipientIban('')
+      setRecipientNote('')
+      toast.success('Alıcı kaydedildi.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Alıcı kaydedilemedi.')),
+  })
+
+  const deleteRecipientMutation = useMutation({
+    mutationFn: (id: string) => deleteRecipient(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipients'] })
+      setDeleteRecipientTarget(null)
+      toast.success('Alıcı silindi.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Alıcı silinemedi.')),
   })
 
   // --- İşlem geçmişi (seçili hesap ya da tüm hesaplar) ---
@@ -955,7 +1011,25 @@ export function Dashboard() {
     setToIban('')
     setTransferAmount('')
     setTransferDesc('')
+    setSelectedRecipientId('')
+    setSaveRecipientAfterTransfer(false)
+    setRecipientNameAfterTransfer('')
     setTransferOpen(true)
+  }
+
+  function openRecipientModal() {
+    setRecipientName('')
+    setRecipientIban('')
+    setRecipientNote('')
+    setRecipientOpen(true)
+  }
+
+  function submitRecipient() {
+    saveRecipientMutation.mutate({
+      name: recipientName,
+      iban: normalizeIban(recipientIban),
+      note: recipientNote || undefined,
+    })
   }
 
   // Bir hesaba bağlı kartlar (kapatma/dondurma uyarısında listelenir)
@@ -1260,6 +1334,64 @@ export function Dashboard() {
 
         {activeTab === 'transactions' && (
           <>
+        {/* Kayıtlı alıcılar */}
+        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+          <h2 className="dashboard-section-title">Kayıtlı Alıcılar</h2>
+          <Button size="sm" variant="primary" onClick={openRecipientModal}>
+            + Alıcı Ekle
+          </Button>
+        </div>
+
+        <Card>
+          <CardContent>
+            {recipientsLoading ? (
+              <ListSkeleton />
+            ) : recipients.length === 0 ? (
+              <div className="dashboard-state">Henüz kayıtlı alıcınız yok.</div>
+            ) : (
+              <div className="dashboard-recipient-list">
+                {recipients.map((recipient) => (
+                  <div key={recipient.id} className="dashboard-recipient-row">
+                    <div>
+                      <p className="dashboard-recipient-name">{recipient.name}</p>
+                      <p className="dashboard-recipient-iban">{formatIban(recipient.iban)}</p>
+                      {recipient.note && (
+                        <p className="dashboard-recipient-note">{recipient.note}</p>
+                      )}
+                    </div>
+                    <div className="dashboard-recipient-actions">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setFromAccountId(activeAccounts[0]?.id ?? '')
+                          setSelectedRecipientId(recipient.id)
+                          setToIban(formatIbanInput(recipient.iban))
+                          setTransferAmount('')
+                          setTransferDesc(recipient.note ?? '')
+                          setSaveRecipientAfterTransfer(false)
+                          setRecipientNameAfterTransfer('')
+                          setTransferOpen(true)
+                        }}
+                        disabled={activeAccounts.length === 0}
+                      >
+                        Gönder
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleteRecipientTarget(recipient)}
+                      >
+                        Sil
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* İşlem geçmişi */}
         <div className="dashboard-history-head">
           <h2 className="dashboard-section-title">Son İşlemler</h2>
@@ -1794,6 +1926,36 @@ export function Dashboard() {
           </>
         }
       >
+        {recipients.length > 0 && (
+          <div className="dashboard-modal-field">
+            <Select
+              label="Kayıtlı alıcı"
+              value={selectedRecipientId || '__manual__'}
+              onChange={(e) => {
+                const value = e.target.value
+                if (value === '__manual__') {
+                  setSelectedRecipientId('')
+                  setToIban('')
+                  setTransferDesc('')
+                  return
+                }
+                const recipient = recipients.find((r) => r.id === value)
+                setSelectedRecipientId(value)
+                setToIban(formatIbanInput(recipient?.iban ?? ''))
+                setTransferDesc(recipient?.note ?? '')
+                setSaveRecipientAfterTransfer(false)
+                setRecipientNameAfterTransfer('')
+              }}
+              options={[
+                { value: '__manual__', label: 'Manuel IBAN gir' },
+                ...recipients.map((recipient) => ({
+                  value: recipient.id,
+                  label: `${recipient.name} · ...${recipient.iban.slice(-4)}`,
+                })),
+              ]}
+            />
+          </div>
+        )}
         <div className="dashboard-modal-field">
           <Input
             label="Alıcı IBAN"
@@ -1801,6 +1963,7 @@ export function Dashboard() {
             inputMode="numeric"
             maxLength={32}
             value={toIban}
+            disabled={!!selectedRecipient}
             onChange={(e) => setToIban(formatIbanInput(e.target.value))}
           />
         </div>
@@ -1822,7 +1985,90 @@ export function Dashboard() {
             onChange={(e) => setTransferDesc(e.target.value)}
           />
         </div>
+        {showSaveRecipientOption && (
+          <div className="dashboard-save-recipient">
+            <Checkbox
+              label="Bu alıcıyı kaydet"
+              checked={saveRecipientAfterTransfer}
+              onChange={(e) => setSaveRecipientAfterTransfer(e.target.checked)}
+            />
+            {saveRecipientAfterTransfer && (
+              <Input
+                label="Alıcı adı"
+                placeholder="Örn. Ev sahibi"
+                maxLength={80}
+                value={recipientNameAfterTransfer}
+                onChange={(e) => setRecipientNameAfterTransfer(e.target.value)}
+              />
+            )}
+          </div>
+        )}
       </Modal>
+
+      {/* --- Kayıtlı alıcı ekleme modalı --- */}
+      <Modal
+        open={recipientOpen}
+        onClose={() => setRecipientOpen(false)}
+        title="Kayıtlı Alıcı Ekle"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setRecipientOpen(false)}>
+              İptal
+            </Button>
+            <Button
+              variant="primary"
+              loading={saveRecipientMutation.isPending}
+              onClick={submitRecipient}
+            >
+              Kaydet
+            </Button>
+          </>
+        }
+      >
+        <div className="dashboard-modal-field">
+          <Input
+            label="Alıcı adı"
+            placeholder="Örn. Ayşe Yılmaz"
+            maxLength={80}
+            value={recipientName}
+            onChange={(e) => setRecipientName(e.target.value)}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Input
+            label="IBAN"
+            placeholder="TR12 3456 7890 1234 5678 9012 34"
+            inputMode="numeric"
+            maxLength={32}
+            value={recipientIban}
+            onChange={(e) => setRecipientIban(formatIbanInput(e.target.value))}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Input
+            label="Not (opsiyonel)"
+            placeholder="Örn. Kira"
+            maxLength={50}
+            value={recipientNote}
+            onChange={(e) => setRecipientNote(e.target.value)}
+          />
+        </div>
+      </Modal>
+
+      <ConfirmDialog
+        open={!!deleteRecipientTarget}
+        title="Alıcı silinsin mi?"
+        message={
+          deleteRecipientTarget
+            ? `${deleteRecipientTarget.name} kayıtlı alıcılarınızdan kaldırılacak.`
+            : ''
+        }
+        confirmLabel="Sil"
+        confirmVariant="destructive"
+        loading={deleteRecipientMutation.isPending}
+        onConfirm={() => deleteRecipientTarget && deleteRecipientMutation.mutate(deleteRecipientTarget.id)}
+        onClose={() => setDeleteRecipientTarget(null)}
+      />
 
       {/* --- Bildirimler modalı --- */}
       <Modal
