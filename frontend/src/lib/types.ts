@@ -14,6 +14,8 @@ export interface User {
   email: string
   role: string
   city?: string | null // sadece personelde dolu (müşteri/admin için null)
+  dailyTransferLimit?: number | null // müşterinin günlük internet havale limiti (null = limitsiz)
+  createdAt?: string // üyelik tarihi
 }
 
 export interface AuthResponse {
@@ -68,6 +70,7 @@ export interface Card {
   expiryYear: number
   status: CardStatus
   accountIban: string
+  onlineShoppingEnabled: boolean
   createdAt: string
 }
 

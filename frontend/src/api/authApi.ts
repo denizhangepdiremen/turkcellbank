@@ -43,3 +43,21 @@ export async function updateProfile(fullName: string) {
   })
   return data
 }
+
+// Şifre değiştir (mevcut şifre doğrulanır).
+export async function changePassword(currentPassword: string, newPassword: string) {
+  const { data } = await apiClient.post<ApiResponse<string>>(
+    '/api/auth/change-password',
+    { currentPassword, newPassword },
+  )
+  return data
+}
+
+// Günlük internet havale limitini ayarla (null = limiti kaldır).
+export async function setTransferLimit(limit: number | null) {
+  const { data } = await apiClient.put<ApiResponse<User>>(
+    '/api/auth/transfer-limit',
+    { limit },
+  )
+  return data
+}

@@ -28,14 +28,20 @@ test.describe('Sprint 4 — yönetici onayları ve görünürlük', () => {
     await page.getByRole('button', { name: 'Ara' }).click()
     await expect(page.getByText(customer.name)).toBeVisible()
 
+    // Hesaplar, Customer360'ın "Hesaplar" panelinde listelenir
+    const accountsPanel = page
+      .locator('.customer360-grid > *')
+      .filter({ has: page.getByText('Hesaplar', { exact: true }) })
+    const accountIbans = accountsPanel.locator('.customer360-main')
     for (let i = 0; i < 2; i++) {
       await page.getByRole('button', { name: 'Hesap Aç' }).click()
       await page.getByRole('dialog').getByRole('button', { name: 'Aç' }).click()
       await expect(page.getByText('Hesap açıldı.')).toBeVisible()
       // Müşteri kartı yenilenip yeni hesabı gösterene kadar bekle
-      await expect(page.locator('.branch-account-iban')).toHaveCount(i + 1)
+      await expect(accountIbans).toHaveCount(i + 1)
     }
-    const ibans = await page.locator('.branch-account-iban').allTextContents()
+    // IBAN'lar formatlı (boşluklu) gösterilir; havale için sadeleştir
+    const ibans = (await accountIbans.allTextContents()).map((s) => s.replace(/\s/g, ''))
 
     // İlk hesaba 2M yatır (modallarda ilk hesap varsayılan seçili)
     await page.getByRole('button', { name: 'Para Yatır' }).click()

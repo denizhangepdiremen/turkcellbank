@@ -14,3 +14,12 @@ export async function getMyCards() {
   const { data } = await apiClient.get<ApiResponse<Card[]>>('/api/cards')
   return data
 }
+
+// Kartın internet alışverişini aç/kapat
+export async function setCardOnlineShopping(cardId: string, enabled: boolean) {
+  const { data } = await apiClient.post<ApiResponse<Card>>(
+    `/api/cards/${cardId}/online-shopping`,
+    { enabled },
+  )
+  return data
+}

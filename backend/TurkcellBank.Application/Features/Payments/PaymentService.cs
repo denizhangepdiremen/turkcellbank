@@ -50,6 +50,10 @@ public class PaymentService : IPaymentService
         if (card.Status != CardStatus.Approved)
             throw new BusinessException("Kartınız henüz onaylı değil.");
 
+        // 2b) İnternet alışverişi açık mı? (müşteri Güvenlik Merkezi'nden kapatmış olabilir)
+        if (!card.OnlineShoppingEnabled)
+            throw new BusinessException("Kartınızda internet alışverişi kapalı. Güvenlik Merkezi'nden açabilirsiniz.");
+
         // 3) Bağlı hesap (tracked)
         var account = await _accounts.GetByIdAsync(card.AccountId);
         if (account is null)

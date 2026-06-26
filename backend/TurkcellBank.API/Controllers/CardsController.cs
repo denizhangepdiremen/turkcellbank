@@ -34,4 +34,16 @@ public class CardsController : ControllerBase
         var cards = await _cardService.GetMyCardsAsync();
         return Ok(ApiResponse<List<CardDto>>.SuccessResponse(cards));
     }
+
+    /// <summary>Kartın internet alışverişini aç/kapat. POST /api/cards/{id}/online-shopping</summary>
+    [HttpPost("{id:guid}/online-shopping")]
+    public async Task<IActionResult> SetOnlineShopping(Guid id, [FromBody] SetOnlineShoppingRequest request)
+    {
+        var card = await _cardService.SetOnlineShoppingAsync(id, request.Enabled);
+        var msg = request.Enabled ? "İnternet alışverişi açıldı." : "İnternet alışverişi kapatıldı.";
+        return Ok(ApiResponse<CardDto>.SuccessResponse(card, msg));
+    }
 }
+
+/// <summary>Kart internet alışverişi aç/kapat isteği.</summary>
+public record SetOnlineShoppingRequest(bool Enabled);

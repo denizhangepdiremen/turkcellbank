@@ -139,6 +139,19 @@ public class CardService : ICardService
     public Task<CardDto> ApproveAsync(Guid id) => DecideAsync(id, CardStatus.Approved);
     public Task<CardDto> RejectAsync(Guid id) => DecideAsync(id, CardStatus.Rejected);
 
+    // Müşteri kartının internet alışverişini açar/kapatır (sadece kendi kartı).
+    public async Task<CardDto> SetOnlineShoppingAsync(Guid id, bool enabled)
+    {
+        var card = await _cards.GetByIdAsync(id);
+        if (card is null || card.UserId != _ctx.ActingUserId)
+            throw new NotFoundException("Kart bulunamadı.");
+
+        card.OnlineShoppingEnabled = enabled;
+        await _cards.SaveChangesAsync();
+
+        return MapCard(card, card.Account?.Iban ?? "—");
+    }
+
     private async Task<CardDto> DecideAsync(Guid id, CardStatus decision)
     {
         var card = await _cards.GetByIdAsync(id)
@@ -162,5 +175,5 @@ public class CardService : ICardService
 
     private static CardDto MapCard(Card c, string accountIban) =>
         new(c.Id, CardHelper.Mask(c.CardNumber), c.ExpiryMonth, c.ExpiryYear,
-            c.Status.ToString(), accountIban, c.CreatedAt);
+            c.Status.ToString(), accountIban, c.OnlineShoppingEnabled, c.CreatedAt);
 }

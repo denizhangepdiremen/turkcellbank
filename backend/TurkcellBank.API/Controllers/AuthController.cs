@@ -60,4 +60,22 @@ public class AuthController : ControllerBase
         var user = await _authService.UpdateProfileAsync(request);
         return Ok(ApiResponse<UserDto>.SuccessResponse(user, "Profil güncellendi."));
     }
+
+    /// <summary>Şifre değiştir. POST /api/auth/change-password</summary>
+    [Authorize]
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request)
+    {
+        await _authService.ChangePasswordAsync(request);
+        return Ok(ApiResponse<string>.SuccessResponse("ok", "Şifreniz güncellendi."));
+    }
+
+    /// <summary>Günlük havale limitini ayarla. PUT /api/auth/transfer-limit</summary>
+    [Authorize]
+    [HttpPut("transfer-limit")]
+    public async Task<IActionResult> SetTransferLimit(SetTransferLimitRequest request)
+    {
+        var user = await _authService.SetTransferLimitAsync(request);
+        return Ok(ApiResponse<UserDto>.SuccessResponse(user, "Havale limiti güncellendi."));
+    }
 }

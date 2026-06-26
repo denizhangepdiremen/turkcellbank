@@ -15,6 +15,7 @@ public class TransactionService : ITransactionService
 {
     private readonly IAccountRepository _accounts;
     private readonly ITransactionRepository _transactions;
+    private readonly IUserRepository _users;
     private readonly IOperationContext _ctx;
     private readonly TransferOptions _transferOptions;
     private readonly IValidator<DepositRequest> _depositValidator;
@@ -23,6 +24,7 @@ public class TransactionService : ITransactionService
     public TransactionService(
         IAccountRepository accounts,
         ITransactionRepository transactions,
+        IUserRepository users,
         IOperationContext ctx,
         TransferOptions transferOptions,
         IValidator<DepositRequest> depositValidator,
@@ -30,6 +32,7 @@ public class TransactionService : ITransactionService
     {
         _accounts = accounts;
         _transactions = transactions;
+        _users = users;
         _ctx = ctx;
         _transferOptions = transferOptions;
         _depositValidator = depositValidator;
@@ -77,6 +80,24 @@ public class TransactionService : ITransactionService
 
         var from = await _accounts.GetByIdAsync(request.FromAccountId);
         EnsureOwnedAndActive(from);
+
+        // Günlük internet havale limiti — yalnızca müşterinin kendi online havalelerine
+        // uygulanır (şube kanalı ve yüksek tutar onay akışı hariç).
+        if (_ctx.Channel == Channel.Internet)
+        {
+            var owner = await _users.GetByIdAsync(_ctx.ActingUserId);
+            if (owner?.DailyTransferLimit is decimal limit)
+            {
+                var startOfDayUtc = DateTime.UtcNow.Date;
+                var ownAccountIds = (await _accounts.GetByUserIdAsync(_ctx.ActingUserId))
+                    .Select(a => a.Id).ToList();
+                var todayTotal = await _transactions.SumInternetTransfersAsync(ownAccountIds, startOfDayUtc);
+                if (todayTotal + request.Amount > limit)
+                    throw new BusinessException(
+                        $"Günlük havale limitiniz ({limit:N0} TL) aşılıyor. Bugün kullanılan: {todayTotal:N0} TL. " +
+                        "Limiti Güvenlik Merkezi'nden değiştirebilirsiniz.");
+            }
+        }
 
         var toIban = request.ToIban.Replace(" ", "").ToUpperInvariant();
         var to = await _accounts.GetByIbanAsync(toIban);

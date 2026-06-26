@@ -7,6 +7,7 @@ public interface ICardService
     // --- Müşteri ---
     Task<CardDto> CreateAsync(CreateCardRequest request);
     Task<List<CardDto>> GetMyCardsAsync();
+    Task<CardDto> SetOnlineShoppingAsync(Guid id, bool enabled);
 
     // --- Admin (teknik, salt-okunur) ---
     Task<List<AdminCardDto>> GetAllCardsAsync();

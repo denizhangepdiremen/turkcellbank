@@ -14,4 +14,10 @@ public interface ITransactionRepository
 
     /// <summary>Bir hesabın işlem geçmişi (gönderdiği + aldığı), yeniden eskiye.</summary>
     Task<List<Transaction>> GetByAccountIdAsync(Guid accountId);
+
+    /// <summary>
+    /// Verilen hesaplardan belirtilen andan beri yapılan INTERNET kanalı havalelerinin
+    /// toplam tutarı (günlük havale limiti kontrolü için).
+    /// </summary>
+    Task<decimal> SumInternetTransfersAsync(IReadOnlyCollection<Guid> fromAccountIds, DateTime sinceUtc);
 }

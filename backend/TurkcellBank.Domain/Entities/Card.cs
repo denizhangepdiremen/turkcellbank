@@ -26,6 +26,9 @@ public class Card
 
     public CardStatus Status { get; set; } = CardStatus.Pending;
 
+    // İnternet/e-ticaret alışverişi açık mı? (müşteri Güvenlik Merkezi'nden kapatabilir)
+    public bool OnlineShoppingEnabled { get; set; } = true;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? DecidedAt { get; set; }
 

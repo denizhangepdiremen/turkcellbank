@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<IValidator<RegisterRequest>, RegisterRequestValidator>();
         services.AddScoped<IValidator<LoginRequest>, LoginRequestValidator>();
         services.AddScoped<IValidator<UpdateProfileRequest>, UpdateProfileRequestValidator>();
+        services.AddScoped<IValidator<ChangePasswordRequest>, ChangePasswordRequestValidator>();
         services.AddScoped<IValidator<CreateAccountRequest>, CreateAccountRequestValidator>();
         services.AddScoped<IValidator<DepositRequest>, DepositRequestValidator>();
         services.AddScoped<IValidator<TransferRequest>, TransferRequestValidator>();

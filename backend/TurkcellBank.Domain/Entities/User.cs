@@ -34,6 +34,10 @@ public class User
     // İl müdürü görünürlüğü ve raporlamada bu alan kullanılır.
     public string? City { get; set; }
 
+    // Günlük internet havale limiti (müşteri Güvenlik Merkezi'nden ayarlar).
+    // null = limit yok. Sadece Internet kanalı havalelerine uygulanır.
+    public decimal? DailyTransferLimit { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // İlişki: bir kullanıcının birden çok hesabı olabilir.

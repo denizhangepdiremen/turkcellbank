@@ -52,6 +52,9 @@ public class AppDbContext : DbContext
             // Personel görev ili (opsiyonel; sadece personelde dolu)
             entity.Property(u => u.City).HasMaxLength(80);
 
+            // Günlük internet havale limiti (opsiyonel; para hassasiyeti)
+            entity.Property(u => u.DailyTransferLimit).HasPrecision(18, 2);
+
             // Personelin bağlı olduğu şube (opsiyonel). Şube silinince personel
             // silinmesin (Restrict) — personel verisi şubeden bağımsız korunur.
             entity.HasOne(u => u.Branch)
@@ -203,6 +206,8 @@ public class AppDbContext : DbContext
             entity.Property(c => c.Cvv).IsRequired().HasMaxLength(4);
             entity.Property(c => c.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(c => c.Channel).HasConversion<string>().HasMaxLength(10);
+            // İnternet alışverişi varsayılan açık (mevcut kartlar da açık başlar)
+            entity.Property(c => c.OnlineShoppingEnabled).HasDefaultValue(true);
 
             // Sahibi: kullanıcı silinince kartları da silinsin
             entity.HasOne(c => c.User)

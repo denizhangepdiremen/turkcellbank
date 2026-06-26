@@ -20,12 +20,12 @@ import {
   freezeAccount,
   reactivateAccount,
 } from '../../api/accountApi'
-import { updateProfile } from '../../api/authApi'
+import { updateProfile, changePassword, setTransferLimit } from '../../api/authApi'
 import { getNotifications, markAllNotificationsRead } from '../../api/notificationApi'
 import { deposit, transfer, getHistory } from '../../api/transactionApi'
 import { applyLoan, getMyLoans, getLoanDetail, payInstallment } from '../../api/loanApi'
 import { pay, getMyPayments } from '../../api/paymentApi'
-import { createCard, getMyCards } from '../../api/cardApi'
+import { createCard, getMyCards, setCardOnlineShopping } from '../../api/cardApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { digitsOnly, formatIban, formatIbanInput, normalizeIban } from '../../lib/format'
@@ -379,6 +379,7 @@ const DASHBOARD_TABS = [
   { id: 'loans', label: 'Krediler' },
   { id: 'cards', label: 'Kartlar' },
   { id: 'payments', label: 'Ödemeler' },
+  { id: 'security', label: 'Güvenlik' },
 ] as const
 type DashboardTab = (typeof DASHBOARD_TABS)[number]['id']
 
@@ -404,7 +405,9 @@ export function Dashboard() {
       if (raw) {
         const arr = JSON.parse(raw) as DashboardTab[]
         const valid = arr.filter((id) => DASHBOARD_TABS.some((t) => t.id === id))
-        if (valid.length > 0) return valid
+        if (valid.length > 0) {
+          return valid.includes('security') ? valid : [...valid, 'security']
+        }
       }
     } catch {
       /* bozuk kayıt -> varsayılana dön */
@@ -446,6 +449,59 @@ export function Dashboard() {
     setProfileName(user?.fullName ?? '')
     setProfileOpen(true)
   }
+
+  // --- Şifre değiştir (Güvenlik Merkezi) ---
+  const [pwOpen, setPwOpen] = useState(false)
+  const [currentPw, setCurrentPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  // Yeni şifre iki kez girilir; eşleşmezse uyarı gösterilir (yazım hatası kilidini önler)
+  const pwMismatch = confirmPw.length > 0 && newPw !== confirmPw
+  const changePwMutation = useMutation({
+    mutationFn: () => changePassword(currentPw, newPw),
+    onSuccess: () => {
+      setPwOpen(false)
+      setCurrentPw('')
+      setNewPw('')
+      setConfirmPw('')
+      toast.success('Şifreniz güncellendi.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Şifre değiştirilemedi.')),
+  })
+
+  // Şifre değiştir modalını açar (hem Güvenlik Merkezi hem Profilim'den çağrılır)
+  function openPasswordModal() {
+    setCurrentPw('')
+    setNewPw('')
+    setConfirmPw('')
+    setProfileOpen(false)
+    setPwOpen(true)
+  }
+
+  // --- Kart internet alışverişi aç/kapat (Güvenlik Merkezi) ---
+  const [cardShopOpen, setCardShopOpen] = useState(false)
+  const cardShopMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      setCardOnlineShopping(id, enabled),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['cards'] })
+      toast.success(res.data?.onlineShoppingEnabled ? 'İnternet alışverişi açıldı.' : 'İnternet alışverişi kapatıldı.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'İşlem başarısız.')),
+  })
+
+  // --- Günlük havale limiti (Güvenlik Merkezi) ---
+  const [limitOpen, setLimitOpen] = useState(false)
+  const [limitInput, setLimitInput] = useState('')
+  const limitMutation = useMutation({
+    mutationFn: (limit: number | null) => setTransferLimit(limit),
+    onSuccess: (res) => {
+      if (res.data) updateUser(res.data)
+      setLimitOpen(false)
+      toast.success('Havale limiti güncellendi.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Limit güncellenemedi.')),
+  })
 
   // --- Bildirimler ---
   const [notifOpen, setNotifOpen] = useState(false)
@@ -843,6 +899,26 @@ export function Dashboard() {
     setThreeDS('')
     setPayOpen(true)
   }
+
+  const frozenAccounts = accounts.filter((a) => a.isFrozen)
+  const blockedCards = cards.filter((c) => c.status === 'Blocked')
+  const pendingCards = cards.filter((c) => c.status === 'Pending')
+  const failedPayments = payments.filter((p) => p.status === 'Failed')
+  const securityIssueCount = frozenAccounts.length + blockedCards.length + failedPayments.length
+  const securityNotifications = notifications
+    .filter((n) => {
+      const text = `${n.title} ${n.body}`.toLocaleLowerCase('tr-TR')
+      return ['güven', 'şifre', 'blok', 'dondur', 'kart', 'havale', 'redded'].some((key) =>
+        text.includes(key),
+      )
+    })
+    .slice(0, 4)
+  const securityLevel =
+    securityIssueCount === 0
+      ? { label: 'Güvenli', variant: 'success' as const, desc: 'Hesap ve kartlarınızda kritik uyarı görünmüyor.' }
+      : securityIssueCount <= 2
+        ? { label: 'Kontrol Gerekli', variant: 'warning' as const, desc: 'İncelemeniz gereken güvenlik kayıtları var.' }
+        : { label: 'Riskli', variant: 'error' as const, desc: 'Birden fazla güvenlik uyarısı bulunuyor.' }
 
   function handleLogout() {
     logout()
@@ -1483,6 +1559,158 @@ export function Dashboard() {
         </Card>
           </>
         )}
+
+        {activeTab === 'security' && (
+          <>
+        {/* Güvenlik Merkezi */}
+        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+          <h2 className="dashboard-section-title">Güvenlik Merkezi</h2>
+        </div>
+
+        <div className="dashboard-security-summary">
+          <Card className="dashboard-security-hero">
+            <CardContent>
+              <div className="dashboard-security-hero-head">
+                <div className="dashboard-security-shield" aria-hidden="true">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+                    <path d="m9 12 2 2 4-5" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="dashboard-security-title">Genel Güvenlik Durumu</p>
+                  <p className="dashboard-security-sub">{securityLevel.desc}</p>
+                </div>
+              </div>
+              <Badge variant={securityLevel.variant}>{securityLevel.label}</Badge>
+            </CardContent>
+          </Card>
+
+          <div className="dashboard-security-kpis">
+            <div className="dashboard-security-kpi">
+              <span>{frozenAccounts.length}</span>
+              <p>Dondurulmuş hesap</p>
+            </div>
+            <div className="dashboard-security-kpi">
+              <span>{blockedCards.length}</span>
+              <p>Bloke kart</p>
+            </div>
+            <div className="dashboard-security-kpi">
+              <span>{failedPayments.length}</span>
+              <p>Başarısız ödeme</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="dashboard-security-grid">
+          <Card>
+            <CardContent>
+              <p className="dashboard-security-card-title">Hesap Güvenliği</p>
+              {accounts.length === 0 ? (
+                <p className="dashboard-security-empty">Görüntülenecek hesap yok.</p>
+              ) : (
+                <div className="dashboard-security-list">
+                  {accounts.map((account) => (
+                    <div key={account.id} className="dashboard-security-row">
+                      <div>
+                        <p className="dashboard-security-main">...{account.iban.slice(-4)}</p>
+                        <p className="dashboard-security-sub">
+                          {account.accountType}
+                          {account.freezeType === 'Bank' ? ' · Banka bloğu' : ''}
+                        </p>
+                      </div>
+                      <Badge variant={account.isFrozen ? 'warning' : 'success'}>
+                        {account.isFrozen ? 'Dondurulmuş' : 'Aktif'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <p className="dashboard-security-card-title">Kart Güvenliği</p>
+              {cards.length === 0 ? (
+                <p className="dashboard-security-empty">Görüntülenecek kart yok.</p>
+              ) : (
+                <div className="dashboard-security-list">
+                  {cards.map((card) => (
+                    <div key={card.id} className="dashboard-security-row">
+                      <div>
+                        <p className="dashboard-security-main">{card.maskedCardNumber}</p>
+                        <p className="dashboard-security-sub">Hesap ...{card.accountIban.slice(-4)}</p>
+                      </div>
+                      <Badge variant={cardBadgeVariant(card.status)}>
+                        {cardLabel(card.status)}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <p className="dashboard-security-card-title">Güvenlik Aksiyonları</p>
+              <div className="dashboard-security-actions">
+                <button type="button" onClick={openPasswordModal}>
+                  <span>Şifre değiştir</span>
+                  <strong>Hesap parolanızı güncelleyin</strong>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLimitInput(user?.dailyTransferLimit ? String(user.dailyTransferLimit) : '')
+                    setLimitOpen(true)
+                  }}
+                >
+                  <span>Günlük havale limiti</span>
+                  <strong>
+                    {user?.dailyTransferLimit
+                      ? `${user.dailyTransferLimit.toLocaleString('tr-TR')} ₺ / gün`
+                      : 'Limit tanımlı değil'}
+                  </strong>
+                </button>
+                <button type="button" onClick={() => setCardShopOpen(true)}>
+                  <span>Kart internet alışverişi</span>
+                  <strong>
+                    {approvedCards.filter((c) => c.onlineShoppingEnabled).length}/{approvedCards.length} kart açık
+                  </strong>
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <p className="dashboard-security-card-title">Son Güvenlik Bildirimleri</p>
+              {securityNotifications.length === 0 ? (
+                <p className="dashboard-security-empty">Güvenlik bildirimi bulunmuyor.</p>
+              ) : (
+                <div className="dashboard-security-list">
+                  {securityNotifications.map((notification) => (
+                    <div key={notification.id} className="dashboard-security-event">
+                      <p className="dashboard-security-main">{notification.title}</p>
+                      <p className="dashboard-security-sub">{notification.body}</p>
+                      <span>{trDate(notification.createdAt)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {pendingCards.length > 0 && (
+          <div className="dashboard-security-note">
+            {pendingCards.length} kart başvurunuz onay sürecinde. Onaylanana kadar ödeme işlemlerinde kullanılamaz.
+          </div>
+        )}
+          </>
+        )}
         </div>
       </div>
 
@@ -1632,6 +1860,7 @@ export function Dashboard() {
             <Button
               variant="primary"
               loading={profileMutation.isPending}
+              disabled={!profileName.trim() || profileName.trim() === user?.fullName}
               onClick={() => profileMutation.mutate()}
             >
               Kaydet
@@ -1639,6 +1868,62 @@ export function Dashboard() {
           </>
         }
       >
+        {/* Profil başlığı: baş harf avatarı + ad + rol rozeti */}
+        <div className="dashboard-profile-head">
+          <div className="dashboard-profile-avatar" aria-hidden="true">
+            {(user?.fullName ?? '?')
+              .split(' ')
+              .filter(Boolean)
+              .slice(0, 2)
+              .map((w) => w[0])
+              .join('')
+              .toUpperCase()}
+          </div>
+          <div>
+            <p className="dashboard-profile-name">{user?.fullName}</p>
+            <Badge variant="info">Bireysel Müşteri</Badge>
+          </div>
+        </div>
+
+        {/* Hesap özeti */}
+        <div className="dashboard-profile-stats">
+          <div className="dashboard-profile-stat">
+            <span>{accounts.length}</span>
+            <p>Hesap</p>
+          </div>
+          <div className="dashboard-profile-stat">
+            <span>{balanceVisible ? formatTL(accounts.reduce((s, a) => s + a.balance, 0)) : '₺*****'}</span>
+            <p>Toplam bakiye</p>
+          </div>
+          <div className="dashboard-profile-stat">
+            <span>{cards.length}</span>
+            <p>Kart</p>
+          </div>
+        </div>
+
+        {/* Bilgi satırları */}
+        <div className="dashboard-profile-info">
+          <div className="dashboard-profile-info-row">
+            <span>E-posta</span>
+            <strong>{user?.email}</strong>
+          </div>
+          {user?.createdAt && (
+            <div className="dashboard-profile-info-row">
+              <span>Üyelik tarihi</span>
+              <strong>{new Date(user.createdAt).toLocaleDateString('tr-TR')}</strong>
+            </div>
+          )}
+          <div className="dashboard-profile-info-row">
+            <span>Günlük havale limiti</span>
+            <strong>
+              {user?.dailyTransferLimit
+                ? `${user.dailyTransferLimit.toLocaleString('tr-TR')} ₺`
+                : 'Limitsiz'}
+            </strong>
+          </div>
+        </div>
+
+        {/* Düzenlenebilir ad + güvenlik */}
         <div className="dashboard-modal-field">
           <Input
             label="Ad Soyad"
@@ -1647,6 +1932,148 @@ export function Dashboard() {
             onChange={(e) => setProfileName(e.target.value)}
           />
         </div>
+        <div className="dashboard-profile-security">
+          <span>Güvenlik</span>
+          <Button variant="outline" size="sm" onClick={openPasswordModal}>
+            Şifre Değiştir
+          </Button>
+        </div>
+      </Modal>
+
+      {/* --- Şifre değiştir modalı --- */}
+      <Modal
+        open={pwOpen}
+        onClose={() => setPwOpen(false)}
+        title="Şifre Değiştir"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setPwOpen(false)}>
+              İptal
+            </Button>
+            <Button
+              variant="primary"
+              loading={changePwMutation.isPending}
+              disabled={!currentPw || newPw.length < 6 || newPw !== confirmPw}
+              onClick={() => changePwMutation.mutate()}
+            >
+              Güncelle
+            </Button>
+          </>
+        }
+      >
+        <div className="dashboard-modal-field">
+          <Input
+            label="Mevcut şifre"
+            type="password"
+            placeholder="••••••••"
+            value={currentPw}
+            onChange={(e) => setCurrentPw(e.target.value)}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Input
+            label="Yeni şifre"
+            type="password"
+            placeholder="En az 6 karakter"
+            value={newPw}
+            onChange={(e) => setNewPw(e.target.value)}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Input
+            label="Yeni şifre (tekrar)"
+            type="password"
+            placeholder="Yeni şifreyi tekrar girin"
+            value={confirmPw}
+            onChange={(e) => setConfirmPw(e.target.value)}
+            error={pwMismatch ? 'Şifreler eşleşmiyor.' : undefined}
+          />
+        </div>
+      </Modal>
+
+      {/* --- Günlük havale limiti modalı --- */}
+      <Modal
+        open={limitOpen}
+        onClose={() => setLimitOpen(false)}
+        title="Günlük Havale Limiti"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setLimitOpen(false)}>
+              İptal
+            </Button>
+            {user?.dailyTransferLimit != null && (
+              <Button
+                variant="outline"
+                loading={limitMutation.isPending && limitMutation.variables === null}
+                onClick={() => limitMutation.mutate(null)}
+              >
+                Limiti Kaldır
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              loading={limitMutation.isPending && limitMutation.variables !== null}
+              disabled={!limitInput || Number(limitInput) <= 0}
+              onClick={() => limitMutation.mutate(Number(limitInput))}
+            >
+              Kaydet
+            </Button>
+          </>
+        }
+      >
+        <p className="dashboard-modal-hint">
+          İnternet bankacılığından yapılan günlük havale toplamı bu tutarı aşamaz.
+          Boş bırakıp “Limiti Kaldır” ile limiti kaldırabilirsiniz.
+        </p>
+        <div className="dashboard-modal-field">
+          <Input
+            label="Günlük limit (₺)"
+            type="number"
+            placeholder="Örn. 50000"
+            value={limitInput}
+            onChange={(e) => setLimitInput(e.target.value)}
+          />
+        </div>
+      </Modal>
+
+      {/* --- Kart internet alışverişi modalı --- */}
+      <Modal
+        open={cardShopOpen}
+        onClose={() => setCardShopOpen(false)}
+        title="Kart İnternet Alışverişi"
+        footer={
+          <Button variant="primary" onClick={() => setCardShopOpen(false)}>
+            Kapat
+          </Button>
+        }
+      >
+        <p className="dashboard-modal-hint">
+          Kapatılan kartla internet/e-ticaret ödemesi yapılamaz. İstediğinizde tekrar açabilirsiniz.
+        </p>
+        {approvedCards.length === 0 ? (
+          <p className="dashboard-security-empty">Onaylı kartınız bulunmuyor.</p>
+        ) : (
+          <div className="dashboard-cardshop-list">
+            {approvedCards.map((card) => (
+              <div key={card.id} className="dashboard-cardshop-row">
+                <div>
+                  <p className="dashboard-security-main">{card.maskedCardNumber}</p>
+                  <p className="dashboard-security-sub">Hesap ...{card.accountIban.slice(-4)}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant={card.onlineShoppingEnabled ? 'outline' : 'primary'}
+                  loading={cardShopMutation.isPending && cardShopMutation.variables?.id === card.id}
+                  onClick={() =>
+                    cardShopMutation.mutate({ id: card.id, enabled: !card.onlineShoppingEnabled })
+                  }
+                >
+                  {card.onlineShoppingEnabled ? 'Kapat' : 'Aç'}
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
       </Modal>
 
       {/* --- Kredi başvuru modalı --- */}

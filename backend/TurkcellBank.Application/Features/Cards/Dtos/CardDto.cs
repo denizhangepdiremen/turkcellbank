@@ -8,6 +8,7 @@ public record CardDto(
     int ExpiryYear,
     string Status,
     string AccountIban,
+    bool OnlineShoppingEnabled,
     DateTime CreatedAt);
 
 /// <summary>Admin listesi için: kart sahibiyle birlikte.</summary>

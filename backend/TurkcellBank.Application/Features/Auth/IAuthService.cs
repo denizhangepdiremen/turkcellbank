@@ -16,4 +16,10 @@ public interface IAuthService
 
     // Profil güncelleme (şimdilik Ad Soyad)
     Task<UserDto> UpdateProfileAsync(UpdateProfileRequest request);
+
+    // Giriş yapan kullanıcının şifresini değiştirir (mevcut şifre doğrulanır)
+    Task ChangePasswordAsync(ChangePasswordRequest request);
+
+    // Günlük internet havale limitini ayarlar (null = limitsiz)
+    Task<UserDto> SetTransferLimitAsync(SetTransferLimitRequest request);
 }

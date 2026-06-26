@@ -20,6 +20,7 @@ public class AuthService : IAuthService
     private readonly IValidator<RegisterRequest> _registerValidator;
     private readonly IValidator<LoginRequest> _loginValidator;
     private readonly IValidator<UpdateProfileRequest> _updateProfileValidator;
+    private readonly IValidator<ChangePasswordRequest> _changePasswordValidator;
 
     public AuthService(
         IUserRepository users,
@@ -28,7 +29,8 @@ public class AuthService : IAuthService
         ICurrentUserService currentUser,
         IValidator<RegisterRequest> registerValidator,
         IValidator<LoginRequest> loginValidator,
-        IValidator<UpdateProfileRequest> updateProfileValidator)
+        IValidator<UpdateProfileRequest> updateProfileValidator,
+        IValidator<ChangePasswordRequest> changePasswordValidator)
     {
         _users = users;
         _passwordHasher = passwordHasher;
@@ -37,6 +39,7 @@ public class AuthService : IAuthService
         _registerValidator = registerValidator;
         _loginValidator = loginValidator;
         _updateProfileValidator = updateProfileValidator;
+        _changePasswordValidator = changePasswordValidator;
     }
 
     public async Task<UserDto> RegisterAsync(RegisterRequest request)
@@ -74,7 +77,7 @@ public class AuthService : IAuthService
         await _users.AddAsync(user);
 
         // 5) Güvenli DTO dön (hash vb. hassas veri dışarı çıkmaz)
-        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City);
+        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City, user.CreatedAt, user.DailyTransferLimit);
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request)
@@ -99,7 +102,7 @@ public class AuthService : IAuthService
 
         // 3) Token üret ve cevabı oluştur
         var (token, expiresAt) = _tokenService.GenerateToken(user);
-        var userDto = new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City);
+        var userDto = new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City, user.CreatedAt, user.DailyTransferLimit);
 
         return new AuthResponse(token, expiresAt, userDto);
     }
@@ -108,7 +111,7 @@ public class AuthService : IAuthService
     {
         var user = await _users.GetByIdAsync(_currentUser.UserId)
             ?? throw new NotFoundException("Kullanıcı bulunamadı.");
-        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City);
+        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City, user.CreatedAt, user.DailyTransferLimit);
     }
 
     public async Task<UserDto> UpdateProfileAsync(UpdateProfileRequest request)
@@ -126,6 +129,40 @@ public class AuthService : IAuthService
         user.FullName = request.FullName.Trim();
         await _users.SaveChangesAsync();
 
-        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City);
+        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City, user.CreatedAt, user.DailyTransferLimit);
+    }
+
+    public async Task ChangePasswordAsync(ChangePasswordRequest request)
+    {
+        var validation = await _changePasswordValidator.ValidateAsync(request);
+        if (!validation.IsValid)
+        {
+            var messages = validation.Errors.Select(e => e.ErrorMessage).ToList();
+            throw new Common.Exceptions.ValidationException(messages);
+        }
+
+        var user = await _users.GetByIdAsync(_currentUser.UserId)
+            ?? throw new NotFoundException("Kullanıcı bulunamadı.");
+
+        // Mevcut şifre doğru mu? (yanlışsa yeni şifre kabul edilmez)
+        if (!_passwordHasher.Verify(request.CurrentPassword, user.PasswordHash))
+            throw new BusinessException("Mevcut şifre hatalı.");
+
+        user.PasswordHash = _passwordHasher.Hash(request.NewPassword);
+        await _users.SaveChangesAsync();
+    }
+
+    public async Task<UserDto> SetTransferLimitAsync(SetTransferLimitRequest request)
+    {
+        if (request.Limit is <= 0)
+            throw new BusinessException("Limit pozitif bir tutar olmalı (veya limiti kaldırmak için boş bırakın).");
+
+        var user = await _users.GetByIdAsync(_currentUser.UserId)
+            ?? throw new NotFoundException("Kullanıcı bulunamadı.");
+
+        user.DailyTransferLimit = request.Limit;
+        await _users.SaveChangesAsync();
+
+        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City, user.CreatedAt, user.DailyTransferLimit);
     }
 }

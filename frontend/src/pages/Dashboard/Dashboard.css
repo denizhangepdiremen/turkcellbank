@@ -673,6 +673,199 @@
   justify-content: flex-end;
 }
 
+/* Güvenlik Merkezi */
+.dashboard-security-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.8fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard-security-hero .card-content,
+.dashboard-security-hero > div {
+  height: 100%;
+}
+
+.dashboard-security-hero .p-5 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dashboard-security-hero-head {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.dashboard-security-shield {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #4f46e5;
+  background-color: #eef2ff;
+}
+
+.dashboard-security-title,
+.dashboard-security-card-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.dashboard-security-sub {
+  margin: 0.18rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.dashboard-security-kpis {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.6rem;
+}
+
+.dashboard-security-kpi {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background-color: #ffffff;
+}
+
+.dashboard-security-kpi span {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #4f46e5;
+}
+
+.dashboard-security-kpi p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+  text-align: right;
+}
+
+.dashboard-security-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.dashboard-security-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.dashboard-security-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid #f1f5f9;
+}
+
+.dashboard-security-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.dashboard-security-main {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.dashboard-security-empty {
+  margin: 0.75rem 0 0;
+  color: #94a3b8;
+  font-size: 0.88rem;
+}
+
+.dashboard-security-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.dashboard-security-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.65rem;
+  background-color: #f8fafc;
+  color: #1e293b;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.dashboard-security-actions button:hover {
+  background-color: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.dashboard-security-actions button:active {
+  transform: translateY(1px);
+}
+
+.dashboard-security-actions span {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.dashboard-security-actions strong {
+  font-size: 0.76rem;
+  color: #64748b;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dashboard-security-event {
+  padding: 0.55rem 0;
+  border-top: 1px solid #f1f5f9;
+}
+
+.dashboard-security-event:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.dashboard-security-event span {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.dashboard-security-note {
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid #fde68a;
+  border-radius: 0.75rem;
+  background-color: #fffbeb;
+  color: #92400e;
+  font-size: 0.88rem;
+}
+
 /* Hesap kapatma/dondurma modalı metni */
 .dashboard-close-lead {
   margin: 0 0 1rem;
@@ -874,6 +1067,121 @@
 /* Modal içi alanlar arası boşluk */
 .dashboard-modal-field {
   margin-bottom: 1rem;
+}
+
+/* Profil modalı */
+.dashboard-profile-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.dashboard-profile-avatar {
+  flex-shrink: 0;
+  width: 3.25rem;
+  height: 3.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+  color: #fff;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.dashboard-profile-name {
+  margin: 0 0 0.35rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+.dashboard-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+.dashboard-profile-stat {
+  text-align: center;
+  padding: 0.75rem 0.5rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.6rem;
+}
+.dashboard-profile-stat span {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #4f46e5;
+}
+.dashboard-profile-stat p {
+  margin: 0.15rem 0 0;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+.dashboard-profile-info {
+  margin-bottom: 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.6rem;
+  overflow: hidden;
+}
+.dashboard-profile-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+.dashboard-profile-info-row:last-child {
+  border-bottom: none;
+}
+.dashboard-profile-info-row span {
+  color: #64748b;
+}
+.dashboard-profile-info-row strong {
+  color: #1e293b;
+  font-weight: 600;
+}
+.dashboard-profile-security {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+}
+.dashboard-profile-security span {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* Modal açıklama metni (güvenlik aksiyonları) */
+.dashboard-modal-hint {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #64748b; /* slate-500 */
+}
+
+/* Kart internet alışverişi modalı listesi */
+.dashboard-cardshop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.dashboard-cardshop-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.75rem;
+  background-color: #f8fafc; /* slate-50 */
+  border: 1px solid #e2e8f0;
+  border-radius: 0.6rem;
 }
 
 /* Kredi satırı */
@@ -1110,6 +1418,22 @@
   /* Hesap kartları tek sütuna düşsün */
   .dashboard-accounts {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-security-summary,
+  .dashboard-security-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-security-hero .p-5,
+  .dashboard-security-row,
+  .dashboard-security-actions button {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dashboard-security-actions strong {
+    white-space: normal;
   }
 
   /* Üst bar dar ekranda taşmasın, alt alta geçsin */
