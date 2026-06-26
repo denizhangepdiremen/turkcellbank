@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { API } from './helpers'
+import { API, testNationalIdFor } from './helpers'
 
 // Kayıt (register) akışı — backend gerektirir.
 // Her test benzersiz e-posta kullanır ki tekrarlı çalışmalarda çakışma olmasın.
@@ -11,6 +11,7 @@ test.describe('Kayıt akışı', () => {
 
     await page.getByLabel('Ad Soyad').fill('Test Kullanıcı')
     await page.getByLabel('E-posta', { exact: true }).fill(uniqueEmail)
+    await page.getByLabel('TC Kimlik No').fill(testNationalIdFor(uniqueEmail))
     await page.getByLabel('Şifre', { exact: true }).fill('parola123')
     await page.getByLabel('Şifre (Tekrar)').fill('parola123')
     await page.getByRole('checkbox').check()
@@ -26,7 +27,12 @@ test.describe('Kayıt akışı', () => {
     const { request } = await import('@playwright/test')
     const ctx = await request.newContext()
     await ctx.post(`${API}/api/auth/register`, {
-      data: { fullName: 'Dup Test', email: 'e2e-dup@turkcellbank.com', password: 'parola123' },
+      data: {
+        fullName: 'Dup Test',
+        email: 'e2e-dup@turkcellbank.com',
+        nationalId: testNationalIdFor('e2e-dup@turkcellbank.com'),
+        password: 'parola123',
+      },
     })
     await ctx.dispose()
 
@@ -34,6 +40,7 @@ test.describe('Kayıt akışı', () => {
     await page.goto('/register')
     await page.getByLabel('Ad Soyad').fill('Dup Test')
     await page.getByLabel('E-posta', { exact: true }).fill('e2e-dup@turkcellbank.com')
+    await page.getByLabel('TC Kimlik No').fill(testNationalIdFor('e2e-dup-ui@turkcellbank.com'))
     await page.getByLabel('Şifre', { exact: true }).fill('parola123')
     await page.getByLabel('Şifre (Tekrar)').fill('parola123')
     await page.getByRole('checkbox').check()
@@ -49,6 +56,7 @@ test.describe('Kayıt akışı', () => {
 
     await page.getByLabel('Ad Soyad').fill('Test Kullanıcı')
     await page.getByLabel('E-posta', { exact: true }).fill('test@test.com')
+    await page.getByLabel('TC Kimlik No').fill(testNationalIdFor('test@test.com'))
     await page.getByLabel('Şifre', { exact: true }).fill('parola123')
     await page.getByLabel('Şifre (Tekrar)').fill('farkli456')
     await page.getByRole('checkbox').check()

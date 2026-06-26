@@ -12,6 +12,9 @@ public interface IUserRepository
     // Bu e-posta sistemde kayıtlı mı?
     Task<bool> EmailExistsAsync(string email);
 
+    // Bu TC kimlik no sistemde kayıtlı mı?
+    Task<bool> NationalIdExistsAsync(string nationalId);
+
     // E-postaya göre kullanıcıyı getir (giriş için). Yoksa null döner.
     Task<User?> GetByEmailAsync(string email);
 

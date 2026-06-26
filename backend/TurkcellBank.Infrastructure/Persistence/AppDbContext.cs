@@ -43,8 +43,9 @@ public class AppDbContext : DbContext
 
             entity.Property(u => u.PasswordHash).IsRequired();
 
-            // TC kimlik no (opsiyonel; kredi başvurusunda doldurulur)
-            entity.Property(u => u.NationalId).HasMaxLength(11);
+            // TC kimlik no kayıt sırasında alınır ve benzersizdir.
+            entity.Property(u => u.NationalId).IsRequired().HasMaxLength(11);
+            entity.HasIndex(u => u.NationalId).IsUnique();
 
             // enum'u veritabanında okunabilir metin olarak sakla ("Customer", "BranchManager"...)
             entity.Property(u => u.Role).HasConversion<string>().HasMaxLength(30);

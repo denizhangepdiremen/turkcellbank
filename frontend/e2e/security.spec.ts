@@ -8,6 +8,7 @@ import {
   openTab,
   openStaffTab,
   applyForCard,
+  testNationalIdFor,
 } from './helpers'
 
 // Güvenlik Merkezi aksiyonları (backend gerektirir 5099).
@@ -17,7 +18,7 @@ import {
 async function registerAndLogin(page: Page, email: string, password: string) {
   const ctx = await request.newContext()
   await ctx.post(`${API}/api/auth/register`, {
-    data: { fullName: 'Güvenlik Test', email, password },
+    data: { fullName: 'Güvenlik Test', email, nationalId: testNationalIdFor(email), password },
   })
   await ctx.dispose()
   await loginViaUi(page, email, password)

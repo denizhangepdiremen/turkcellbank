@@ -30,6 +30,7 @@ export function Register() {
     defaultValues: {
       fullName: '',
       email: '',
+      nationalId: '',
       password: '',
       confirmPassword: '',
       acceptedTerms: false,
@@ -42,6 +43,7 @@ export function Register() {
       await registerUser({
         fullName: values.fullName,
         email: values.email,
+        nationalId: values.nationalId,
         password: values.password,
       })
       // Başarılı: login ekranına git, orada başarı mesajı göster
@@ -75,6 +77,20 @@ export function Register() {
           error={errors.email?.message}
           disabled={isSubmitting}
           {...register('email')}
+        />
+
+        <Input
+          label="TC Kimlik No"
+          inputMode="numeric"
+          maxLength={11}
+          placeholder="11 haneli TC kimlik numaranız"
+          error={errors.nationalId?.message}
+          disabled={isSubmitting}
+          {...register('nationalId')}
+          onChange={(e) => {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 11)
+            register('nationalId').onChange(e)
+          }}
         />
 
         <Input

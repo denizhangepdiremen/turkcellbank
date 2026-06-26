@@ -61,19 +61,20 @@ public class LoanService : ILoanService
             throw new Common.Exceptions.ValidationException(
                 validation.Errors.Select(e => e.ErrorMessage).ToList());
 
-        var nationalId = request.NationalId.Trim();
         var profession = request.Profession.Trim();
+
+        var user = await _users.GetByIdAsync(_ctx.ActingUserId)
+            ?? throw new NotFoundException("Kullanıcı bulunamadı.");
+
+        var nationalId = user.NationalId.Trim();
+        if (string.IsNullOrWhiteSpace(nationalId))
+            throw new BusinessException("Kullanıcının TC kimlik numarası kayıtlı değil.");
+
+        if (!string.Equals(request.NationalId.Trim(), nationalId, StringComparison.Ordinal))
+            throw new BusinessException("Kredi başvurusu yalnızca kayıtlı TC kimlik numaranızla yapılabilir.");
 
         // Kredinin yatırılacağı hesap müşteriye ait, aktif ve dondurulmamış olmalı
         var disburseAccount = await GetDisbursableAccountAsync(request.DisbursementAccountId);
-
-        // TC kimlik no'yu (işlem sahibi) müşteriye bir kez kaydet
-        var user = await _users.GetByIdAsync(_ctx.ActingUserId);
-        if (user is not null && string.IsNullOrWhiteSpace(user.NationalId))
-        {
-            user.NationalId = nationalId;
-            await _users.SaveChangesAsync();
-        }
 
         // 1) Referans nüfustan benzer profilleri çek (değerlendirme bağlamı):
         //    önce gelir bandından geniş aday havuzu (index'li, hızlı), sonra

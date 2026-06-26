@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { usePageTitle } from '../../lib/usePageTitle'
@@ -339,6 +339,10 @@ function LoanModal({ open, onClose, customerId, nationalId, accountOptions, onDo
   const [term, setTerm] = useState('12')
   const [accountId, setAccountId] = useState('') // kredinin yatırılacağı hesap
 
+  useEffect(() => {
+    if (open) setTc(nationalId)
+  }, [nationalId, open])
+
   const m = useMutation({
     mutationFn: () =>
       branchApi.applyLoan(customerId, {
@@ -372,7 +376,7 @@ function LoanModal({ open, onClose, customerId, nationalId, accountOptions, onDo
       }
     >
       <div className="branch-loan-grid">
-        <Input label="TC Kimlik No" value={tc} onChange={(e) => setTc(e.target.value)} />
+        <Input label="TC Kimlik No" inputMode="numeric" maxLength={11} value={tc} disabled onChange={(e) => setTc(e.target.value)} />
         <Input label="Yaş" type="number" value={age} onChange={(e) => setAge(e.target.value)} />
         <Select label="Medeni Hal" options={[{ value: 'Single', label: 'Bekâr' }, { value: 'Married', label: 'Evli' }]} value={marital} onChange={(e) => setMarital(e.target.value as 'Single' | 'Married')} />
         <Input label="Çocuk Sayısı" type="number" value={children} onChange={(e) => setChildren(e.target.value)} />

@@ -663,6 +663,7 @@ namespace TurkcellBank.Infrastructure.Migrations
                         .HasColumnType("character varying(150)");
 
                     b.Property<string>("NationalId")
+                        .IsRequired()
                         .HasMaxLength(11)
                         .HasColumnType("character varying(11)");
 
@@ -680,6 +681,9 @@ namespace TurkcellBank.Infrastructure.Migrations
                     b.HasIndex("BranchId");
 
                     b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("NationalId")
                         .IsUnique();
 
                     b.ToTable("Users");

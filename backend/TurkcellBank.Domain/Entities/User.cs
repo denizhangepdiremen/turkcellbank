@@ -19,9 +19,8 @@ public class User
 
     public UserRole Role { get; set; } = UserRole.Customer;
 
-    // TC kimlik no (11 hane). Kredi başvurusunda alınır; bir kez kaydedilip
-    // sonraki başvurularda tekrar kullanılır. Kayıt anında boş olabilir.
-    public string? NationalId { get; set; }
+    // TC kimlik no (11 hane). Kayıt sırasında alınır ve sistemde benzersizdir.
+    public string NationalId { get; set; } = string.Empty;
 
     // --- Personel alanları (sadece banka çalışanları için doldurulur) ---
     // Müşteri ve admin için bunlar boştur. Personel bankacılık ürünü tutmaz.

@@ -3,17 +3,26 @@ import { expect, request, type Page } from '@playwright/test'
 // Backend-gerektiren E2E testleri için ortak yardımcılar.
 export const API = 'http://localhost:5099'
 
+type TestUser = {
+  name: string
+  email: string
+  password: string
+  nationalId?: string
+}
+
 // Giriş/hesap testleri için dummy müşteri
-export const DUMMY = {
+export const DUMMY: TestUser = {
   name: 'E2E Test',
   email: 'e2e@turkcellbank.com',
+  nationalId: testNationalIdFor('e2e@turkcellbank.com'),
   password: 'parola123',
 }
 
 // Transfer testleri için ikinci dummy müşteri
-export const DUMMY2 = {
+export const DUMMY2: TestUser = {
   name: 'E2E Alıcı',
   email: 'e2e2@turkcellbank.com',
+  nationalId: testNationalIdFor('e2e2@turkcellbank.com'),
   password: 'parola456',
 }
 
@@ -33,14 +42,35 @@ export const STAFF = {
   director: { email: 'direktor@turkcellbank.com', home: /\/direktor$/, heading: 'Direktör Paneli' },
 } as const
 
+function generateValidTc(baseNine: number) {
+  const s = String(baseNine % 1_000_000_000).padStart(9, '0').replace(/^0/, '1')
+  const d = s.split('').map(Number)
+  const oddSum = d[0] + d[2] + d[4] + d[6] + d[8]
+  const evenSum = d[1] + d[3] + d[5] + d[7]
+  const tenth = ((oddSum * 7 - evenSum) % 10 + 10) % 10
+  const eleventh = (oddSum + evenSum + tenth) % 10
+  return `${s}${tenth}${eleventh}`
+}
+
+export function testNationalIdFor(seed: string) {
+  let hash = 0
+  for (const ch of seed) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
+  return generateValidTc(800_000_000 + (hash % 100_000_000))
+}
+
 /**
  * Dummy kullanıcıyı (yoksa) oluşturur. Zaten kayıtlıysa backend 400 döner;
  * bu beklenen bir durumdur (testler tekrar tekrar çalışabilsin diye yok sayılır).
  */
-export async function ensureRegistered(user = DUMMY) {
+export async function ensureRegistered(user: TestUser = DUMMY) {
   const ctx = await request.newContext()
   await ctx.post(`${API}/api/auth/register`, {
-    data: { fullName: user.name, email: user.email, password: user.password },
+    data: {
+      fullName: user.name,
+      email: user.email,
+      nationalId: user.nationalId ?? testNationalIdFor(user.email),
+      password: user.password,
+    },
   })
   await ctx.dispose()
 }
@@ -124,7 +154,7 @@ export async function applyForLoan(
   await page.getByRole('button', { name: '+ Kredi Başvur' }).click()
 
   const dialog = page.getByRole('dialog')
-  await dialog.getByLabel('TC Kimlik No').fill(opts.tc ?? '12345678950')
+  await expect(dialog.getByLabel('TC Kimlik No')).toHaveValue(/\d{11}/)
   await dialog.getByLabel('Yaş').fill(opts.age ?? '35')
   await dialog.getByLabel('Medeni Hal').selectOption(opts.marital ?? 'Single')
   await dialog.getByLabel('Çocuk Sayısı').fill(opts.children ?? '0')
@@ -164,4 +194,3 @@ export async function loginAsAdmin(page: Page) {
   await loginViaUi(page, ADMIN.email, ADMIN.password)
   await page.waitForURL(/\/admin$/)
 }
-

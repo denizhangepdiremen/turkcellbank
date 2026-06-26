@@ -25,6 +25,7 @@ test.describe('Auth & yönlendirme', () => {
     await page.getByRole('button', { name: 'Kayıt Ol' }).click()
     await expect(page.getByText('Ad Soyad en az 3 karakter olmalı.')).toBeVisible()
     await expect(page.getByText('E-posta zorunludur.')).toBeVisible()
+    await expect(page.getByText('TC kimlik numarası zorunludur.')).toBeVisible()
     await expect(page.getByText('Şifre en az 6 karakter olmalı.')).toBeVisible()
     await expect(page.getByText('Şifreyi tekrar girin.')).toBeVisible()
     await expect(page.getByText('Devam etmek için koşulları kabul etmelisiniz.')).toBeVisible()

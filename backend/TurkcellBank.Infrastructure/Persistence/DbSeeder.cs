@@ -54,6 +54,7 @@ public static class DbSeeder
             Id = Guid.NewGuid(),
             FullName = "Sistem Admin",
             Email = email,
+            NationalId = GenerateValidTc(600000000L),
             PasswordHash = passwordHasher.Hash(password),
             Role = UserRole.Admin,
             CreatedAt = DateTime.UtcNow,
@@ -100,6 +101,9 @@ public static class DbSeeder
 
         var branches = new List<Branch>();
         var staff = new List<User>();
+        var staffTcSeed = 700000000L;
+
+        string NextStaffTc() => GenerateValidTc(staffTcSeed++);
 
         void AddStaffIfMissing(User u)
         {
@@ -134,6 +138,7 @@ public static class DbSeeder
                     Id = Guid.NewGuid(),
                     FullName = $"{district} Şube Müdürü",
                     Email = $"mudur.{slug}@turkcellbank.com",
+                    NationalId = NextStaffTc(),
                     PasswordHash = passwordHash,
                     Role = UserRole.BranchManager,
                     BranchId = branch.Id,
@@ -149,6 +154,7 @@ public static class DbSeeder
                         Id = Guid.NewGuid(),
                         FullName = $"{district} Çalışan {n}",
                         Email = $"calisan{n}.{slug}@turkcellbank.com",
+                        NationalId = NextStaffTc(),
                         PasswordHash = passwordHash,
                         Role = UserRole.BranchEmployee,
                         BranchId = branch.Id,
@@ -164,6 +170,7 @@ public static class DbSeeder
                 Id = Guid.NewGuid(),
                 FullName = $"{city} İl Müdürü",
                 Email = $"ilmudur.{citySlug}@turkcellbank.com",
+                NationalId = NextStaffTc(),
                 PasswordHash = passwordHash,
                 Role = UserRole.ProvincialManager,
                 City = city,
@@ -177,6 +184,7 @@ public static class DbSeeder
             Id = Guid.NewGuid(),
             FullName = "Genel Direktör",
             Email = "direktor@turkcellbank.com",
+            NationalId = NextStaffTc(),
             PasswordHash = passwordHash,
             Role = UserRole.Director,
             CreatedAt = DateTime.UtcNow,

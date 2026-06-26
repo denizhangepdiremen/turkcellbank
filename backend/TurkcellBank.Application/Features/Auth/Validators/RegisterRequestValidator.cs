@@ -1,4 +1,5 @@
 using FluentValidation;
+using TurkcellBank.Application.Common;
 using TurkcellBank.Application.Features.Auth.Dtos;
 
 namespace TurkcellBank.Application.Features.Auth.Validators;
@@ -18,6 +19,10 @@ public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("E-posta zorunludur.")
             .EmailAddress().WithMessage("Geçerli bir e-posta adresi girin.");
+
+        RuleFor(x => x.NationalId)
+            .NotEmpty().WithMessage("TC kimlik numarası zorunludur.")
+            .Must(TcKimlikValidator.IsValid).WithMessage("TC kimlik numarası 11 haneli olmalı.");
 
         RuleFor(x => x.Password)
             .NotEmpty().WithMessage("Şifre zorunludur.")

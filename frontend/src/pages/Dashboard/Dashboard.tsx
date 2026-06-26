@@ -676,6 +676,7 @@ export function Dashboard() {
 
   const [loanOpen, setLoanOpen] = useState(false)
   const [loanNationalId, setLoanNationalId] = useState('')
+  const registeredNationalId = user?.nationalId ?? ''
   const [loanAge, setLoanAge] = useState('')
   const [loanMarital, setLoanMarital] = useState<'Single' | 'Married'>('Single')
   const [loanChildren, setLoanChildren] = useState('0')
@@ -717,7 +718,7 @@ export function Dashboard() {
   })
 
   function openLoanApply() {
-    setLoanNationalId('')
+    setLoanNationalId(registeredNationalId)
     setLoanAge('')
     setLoanMarital('Single')
     setLoanChildren('0')
@@ -2098,8 +2099,9 @@ export function Dashboard() {
             label="TC Kimlik No"
             inputMode="numeric"
             maxLength={11}
-            placeholder="11 haneli"
+            placeholder="Kayıtlı TC kimlik numaranız"
             value={loanNationalId}
+            disabled
             onChange={(e) => setLoanNationalId(digitsOnly(e.target.value))}
           />
         </div>

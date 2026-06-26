@@ -12,6 +12,7 @@ export interface User {
   id: string
   fullName: string
   email: string
+  nationalId: string
   role: string
   city?: string | null // sadece personelde dolu (müşteri/admin için null)
   dailyTransferLimit?: number | null // müşterinin günlük internet havale limiti (null = limitsiz)

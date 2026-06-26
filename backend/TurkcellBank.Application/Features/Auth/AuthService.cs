@@ -55,11 +55,17 @@ public class AuthService : IAuthService
 
         // E-postayı normalize et (boşlukları temizle, küçük harfe çevir)
         var email = request.Email.Trim().ToLowerInvariant();
+        var nationalId = request.NationalId.Trim();
 
         // 2) E-posta zaten kayıtlı mı?
         if (await _users.EmailExistsAsync(email))
         {
             throw new BusinessException("Bu e-posta adresi zaten kayıtlı.");
+        }
+
+        if (await _users.NationalIdExistsAsync(nationalId))
+        {
+            throw new BusinessException("Bu TC kimlik numarası zaten kayıtlı.");
         }
 
         // 3) Kullanıcıyı oluştur — şifre BCrypt ile hash'lenir (düz metin saklanmaz)
@@ -68,6 +74,7 @@ public class AuthService : IAuthService
             Id = Guid.NewGuid(),
             FullName = request.FullName.Trim(),
             Email = email,
+            NationalId = nationalId,
             PasswordHash = _passwordHasher.Hash(request.Password),
             Role = UserRole.Customer, // yeni kullanıcı her zaman müşteri
             CreatedAt = DateTime.UtcNow,
@@ -77,7 +84,7 @@ public class AuthService : IAuthService
         await _users.AddAsync(user);
 
         // 5) Güvenli DTO dön (hash vb. hassas veri dışarı çıkmaz)
-        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City, user.CreatedAt, user.DailyTransferLimit);
+        return MapUser(user);
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request)
@@ -102,7 +109,7 @@ public class AuthService : IAuthService
 
         // 3) Token üret ve cevabı oluştur
         var (token, expiresAt) = _tokenService.GenerateToken(user);
-        var userDto = new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City, user.CreatedAt, user.DailyTransferLimit);
+        var userDto = MapUser(user);
 
         return new AuthResponse(token, expiresAt, userDto);
     }
@@ -111,7 +118,7 @@ public class AuthService : IAuthService
     {
         var user = await _users.GetByIdAsync(_currentUser.UserId)
             ?? throw new NotFoundException("Kullanıcı bulunamadı.");
-        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City, user.CreatedAt, user.DailyTransferLimit);
+        return MapUser(user);
     }
 
     public async Task<UserDto> UpdateProfileAsync(UpdateProfileRequest request)
@@ -129,7 +136,7 @@ public class AuthService : IAuthService
         user.FullName = request.FullName.Trim();
         await _users.SaveChangesAsync();
 
-        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City, user.CreatedAt, user.DailyTransferLimit);
+        return MapUser(user);
     }
 
     public async Task ChangePasswordAsync(ChangePasswordRequest request)
@@ -163,6 +170,10 @@ public class AuthService : IAuthService
         user.DailyTransferLimit = request.Limit;
         await _users.SaveChangesAsync();
 
-        return new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.City, user.CreatedAt, user.DailyTransferLimit);
+        return MapUser(user);
     }
+
+    private static UserDto MapUser(User user) =>
+        new(user.Id, user.FullName, user.Email, user.NationalId ?? string.Empty, user.Role.ToString(),
+            user.City, user.CreatedAt, user.DailyTransferLimit);
 }

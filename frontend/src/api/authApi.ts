@@ -4,6 +4,7 @@ import type { ApiResponse, AuthResponse, User } from '../lib/types'
 export interface RegisterPayload {
   fullName: string
   email: string
+  nationalId: string
   password: string
 }
 
