@@ -29,6 +29,7 @@ public class AppDbContext : DbContext
     public DbSet<SavedRecipient> SavedRecipients => Set<SavedRecipient>();
     public DbSet<BillPayment> BillPayments => Set<BillPayment>();
     public DbSet<PaymentOrder> PaymentOrders => Set<PaymentOrder>();
+    public DbSet<TimeDeposit> TimeDeposits => Set<TimeDeposit>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -140,6 +141,27 @@ public class AppDbContext : DbContext
             entity.HasOne(o => o.User)
                 .WithMany()
                 .HasForeignKey(o => o.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- TimeDeposit (vadeli mevduat) tablosu kuralları ---
+        modelBuilder.Entity<TimeDeposit>(entity =>
+        {
+            entity.HasKey(d => d.Id);
+            entity.Property(d => d.Principal).HasPrecision(18, 2);
+            entity.Property(d => d.AnnualRate).HasPrecision(9, 4);
+            entity.Property(d => d.GrossInterest).HasPrecision(18, 2);
+            entity.Property(d => d.WithholdingTax).HasPrecision(18, 2);
+            entity.Property(d => d.NetInterest).HasPrecision(18, 2);
+            entity.Property(d => d.Status).HasConversion<string>().HasMaxLength(20);
+
+            entity.HasIndex(d => d.UserId);
+            // Arka plan vade sorgusu için
+            entity.HasIndex(d => new { d.Status, d.MaturityDate });
+
+            entity.HasOne(d => d.User)
+                .WithMany()
+                .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

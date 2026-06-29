@@ -17,6 +17,8 @@ const txTypeLabel = (type: Transaction['type']) => {
   if (type === 'LoanDisbursement') return 'Kredi Kullandırımı'
   if (type === 'LoanRepayment') return 'Kredi Taksiti'
   if (type === 'BillPayment') return 'Fatura Ödemesi'
+  if (type === 'TimeDepositOpen') return 'Vadeli Mevduat Açılışı'
+  if (type === 'TimeDepositMaturity') return 'Vadeli Mevduat Getirisi'
   return type
 }
 

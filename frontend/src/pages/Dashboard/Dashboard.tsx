@@ -35,6 +35,12 @@ import {
   setPaymentOrderActive,
   deletePaymentOrder,
 } from '../../api/paymentOrderApi'
+import {
+  getTimeDepositProducts,
+  getMyTimeDeposits,
+  openTimeDeposit,
+  closeTimeDeposit,
+} from '../../api/timeDepositApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { digitsOnly, formatIban, formatIbanInput, normalizeIban } from '../../lib/format'
@@ -45,7 +51,7 @@ import type {
   Card as BankCard,
   CardStatus,
   Loan,
-  PaymentOrder,
+  TimeDeposit,
   LoanStatus,
   PaymentStatus,
   SavedRecipient,
@@ -103,6 +109,8 @@ const txTitle = (tx: Transaction) => {
   if (tx.type === 'LoanDisbursement') return 'Kredi Kullandırımı'
   if (tx.type === 'LoanRepayment') return 'Kredi Taksiti'
   if (tx.type === 'BillPayment') return `Fatura${tx.description ? ` · ${tx.description}` : ''}`
+  if (tx.type === 'TimeDepositOpen') return 'Vadeli Mevduat Açılışı'
+  if (tx.type === 'TimeDepositMaturity') return 'Vadeli Mevduat Getirisi'
   return tx.direction === 'Out'
     ? `Transfer → ${tx.counterpartyIban}`
     : `Transfer ← ${tx.counterpartyIban}`
@@ -394,6 +402,7 @@ const DASHBOARD_TABS = [
   { id: 'payments', label: 'Ödemeler' },
   { id: 'bills', label: 'Faturalar' },
   { id: 'orders', label: 'Talimatlar' },
+  { id: 'deposits', label: 'Vadeli Mevduat' },
   { id: 'security', label: 'Güvenlik' },
 ] as const
 type DashboardTab = (typeof DASHBOARD_TABS)[number]['id']
@@ -1127,6 +1136,77 @@ export function Dashboard() {
     (orderType === 'AutoBill'
       ? orderBillerCode !== '' && orderSubscriberNo.length >= 6
       : normalizeIban(orderTargetIban).length === 26 && Number(orderAmount) > 0)
+
+  // --- Vadeli mevduat ---
+  const { data: depositProductsData } = useQuery({
+    queryKey: ['time-deposit-products'],
+    queryFn: getTimeDepositProducts,
+    staleTime: Infinity,
+  })
+  const depositProducts = depositProductsData?.data ?? []
+
+  const { data: myDepositsData, isLoading: depositsLoading } = useQuery({
+    queryKey: ['time-deposits'],
+    queryFn: getMyTimeDeposits,
+  })
+  const myDeposits = myDepositsData?.data ?? []
+
+  const [timeDepositOpen, setTimeDepositOpen] = useState(false)
+  const [timeDepositAccountId, setTimeDepositAccountId] = useState('')
+  const [depositPrincipal, setDepositPrincipal] = useState('')
+  const [depositTerm, setDepositTerm] = useState('')
+  const [closeDepositTarget, setCloseDepositTarget] = useState<TimeDeposit | null>(null)
+
+  const selectedDepositProduct = depositProducts.find(
+    (p) => String(p.termDays) === depositTerm,
+  )
+
+  // Açılış öncesi net getiri önizlemesi (backend ile aynı basit faiz formülü)
+  const depositPreview = useMemo(() => {
+    const principal = Number(depositPrincipal)
+    if (!selectedDepositProduct || !(principal > 0)) return null
+    const gross =
+      Math.round(principal * selectedDepositProduct.annualRate * selectedDepositProduct.termDays / 365 * 100) / 100
+    const withholding = Math.round(gross * 0.075 * 100) / 100
+    const net = gross - withholding
+    return { gross, withholding, net, total: principal + net }
+  }, [depositPrincipal, selectedDepositProduct])
+
+  const openDepositMutation = useMutation({
+    mutationFn: () =>
+      openTimeDeposit({
+        sourceAccountId: timeDepositAccountId,
+        principal: Number(depositPrincipal),
+        termDays: Number(depositTerm),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['time-deposits'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      setTimeDepositOpen(false)
+      toast.success('Vadeli mevduat açıldı.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Vadeli mevduat açılamadı.')),
+  })
+
+  const closeDepositMutation = useMutation({
+    mutationFn: (id: string) => closeTimeDeposit(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['time-deposits'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      setCloseDepositTarget(null)
+      toast.success('Vadeli mevduat bozuldu; anapara hesabınıza döndü.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Mevduat bozulamadı.')),
+  })
+
+  function openDepositCreate() {
+    setTimeDepositAccountId(activeAccounts[0]?.id ?? '')
+    setDepositPrincipal('')
+    setDepositTerm(depositProducts[0] ? String(depositProducts[0].termDays) : '')
+    setTimeDepositOpen(true)
+  }
 
   const frozenAccounts = accounts.filter((a) => a.isFrozen)
   const blockedCards = cards.filter((c) => c.status === 'Blocked')
@@ -1983,6 +2063,80 @@ export function Dashboard() {
                       Sil
                     </Button>
                   </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+          </>
+        )}
+
+        {activeTab === 'deposits' && (
+          <>
+        {/* Vadeli Mevduat */}
+        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+          <h2 className="dashboard-section-title">Vadeli Mevduatlarım</h2>
+          <Button size="sm" variant="primary" onClick={openDepositCreate}>
+            + Yeni Vadeli Hesap
+          </Button>
+        </div>
+
+        <Alert variant="info">
+          Anaparanız vade boyunca bağlanır; vade sonunda anapara + net faiz (stopaj
+          düşülmüş) hesabınıza otomatik döner. Vadeden önce bozarsanız faiz işlemez.
+        </Alert>
+
+        <Card>
+          <CardContent>
+            {depositsLoading ? (
+              <ListSkeleton />
+            ) : myDeposits.length === 0 ? (
+              <div className="dashboard-state">Henüz vadeli mevduatınız yok.</div>
+            ) : (
+              myDeposits.map((d) => (
+                <div key={d.id} className="dashboard-order-row">
+                  <div className="dashboard-order-main">
+                    <p className="dashboard-loan-amount">
+                      {formatTL(d.principal)}{' '}
+                      <Badge
+                        variant={
+                          d.status === 'Matured'
+                            ? 'success'
+                            : d.status === 'ClosedEarly'
+                              ? 'neutral'
+                              : 'info'
+                        }
+                      >
+                        {d.status === 'Matured'
+                          ? 'Vade doldu'
+                          : d.status === 'ClosedEarly'
+                            ? 'Erken bozuldu'
+                            : 'Vade sürüyor'}
+                      </Badge>
+                    </p>
+                    <p className="dashboard-loan-sub">
+                      {d.termDays} gün · %{(d.annualRate * 100).toFixed(0)} yıllık · Hesap ...
+                      {d.sourceIban.slice(-4)}
+                    </p>
+                    <p className="dashboard-loan-sub">
+                      {d.status === 'Active'
+                        ? `Vade: ${new Date(d.maturityDate).toLocaleDateString('tr-TR')} · Net faiz ${formatTL(d.netInterest)} · Ele geçecek ${formatTL(d.maturityAmount)}`
+                        : d.status === 'Matured'
+                          ? `${new Date(d.closedAt ?? d.maturityDate).toLocaleDateString('tr-TR')} · Net faiz ${formatTL(d.netInterest)} · İade ${formatTL(d.maturityAmount)}`
+                          : `${new Date(d.closedAt ?? d.maturityDate).toLocaleDateString('tr-TR')} · Faizsiz · Anapara ${formatTL(d.principal)} iade edildi`}
+                    </p>
+                  </div>
+                  {d.status === 'Active' && (
+                    <div className="dashboard-order-actions">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setCloseDepositTarget(d)}
+                      >
+                        Boz
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -3256,6 +3410,124 @@ export function Dashboard() {
               />
             </div>
           </>
+        )}
+      </Modal>
+
+      {/* --- Vadeli mevduat açma modalı --- */}
+      <Modal
+        open={timeDepositOpen}
+        onClose={() => setTimeDepositOpen(false)}
+        title="Yeni Vadeli Mevduat"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setTimeDepositOpen(false)}>
+              İptal
+            </Button>
+            <Button
+              variant="primary"
+              loading={openDepositMutation.isPending}
+              disabled={
+                activeAccounts.length === 0 ||
+                !depositTerm ||
+                Number(depositPrincipal) < 1000
+              }
+              onClick={() => openDepositMutation.mutate()}
+            >
+              Vadeli Hesap Aç
+            </Button>
+          </>
+        }
+      >
+        {activeAccounts.length === 0 ? (
+          <Alert variant="warning">
+            Vadeli mevduat açmak için aktif bir hesabınız olmalı.
+          </Alert>
+        ) : (
+          <>
+            <div className="dashboard-modal-field">
+              <Select
+                label="Vade"
+                options={depositProducts.map((p) => ({
+                  value: String(p.termDays),
+                  label: `${p.label} · %${(p.annualRate * 100).toFixed(0)} yıllık`,
+                }))}
+                value={depositTerm}
+                onChange={(e) => setDepositTerm(e.target.value)}
+              />
+            </div>
+            <div className="dashboard-modal-field">
+              <Input
+                label="Anapara (₺)"
+                type="number"
+                placeholder="En az 1.000"
+                value={depositPrincipal}
+                onChange={(e) => setDepositPrincipal(e.target.value)}
+              />
+            </div>
+            <div className="dashboard-modal-field">
+              <Select
+                label="Anaparanın çekileceği hesap"
+                options={activeAccounts.map((a) => ({
+                  value: a.id,
+                  label: `${a.accountType} · ...${a.iban.slice(-4)} · ${formatTL(a.balance)}`,
+                }))}
+                value={timeDepositAccountId}
+                onChange={(e) => setTimeDepositAccountId(e.target.value)}
+              />
+            </div>
+
+            {depositPreview && (
+              <div className="dashboard-bill-summary">
+                <div className="dashboard-bill-summary-row">
+                  <span>Brüt faiz</span>
+                  <span>{formatTL(depositPreview.gross)}</span>
+                </div>
+                <div className="dashboard-bill-summary-row">
+                  <span>Stopaj (%7,5)</span>
+                  <span>-{formatTL(depositPreview.withholding)}</span>
+                </div>
+                <div className="dashboard-bill-summary-row">
+                  <span>Net faiz</span>
+                  <span>{formatTL(depositPreview.net)}</span>
+                </div>
+                <div className="dashboard-bill-summary-row">
+                  <span>Vade sonu toplam</span>
+                  <strong>{formatTL(depositPreview.total)}</strong>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </Modal>
+
+      {/* --- Vadeli mevduat erken bozma onayı --- */}
+      <Modal
+        open={closeDepositTarget !== null}
+        onClose={() => setCloseDepositTarget(null)}
+        title="Vadeli Mevduatı Boz"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setCloseDepositTarget(null)}>
+              Vazgeç
+            </Button>
+            <Button
+              variant="destructive"
+              loading={closeDepositMutation.isPending}
+              onClick={() =>
+                closeDepositTarget && closeDepositMutation.mutate(closeDepositTarget.id)
+              }
+            >
+              Bozmayı Onayla
+            </Button>
+          </>
+        }
+      >
+        {closeDepositTarget && (
+          <p style={{ margin: 0, color: '#374151', fontSize: '0.9rem' }}>
+            <strong>{formatTL(closeDepositTarget.principal)}</strong> tutarındaki vadeli
+            mevduatı vadesinden önce bozuyorsunuz. <strong>Faiz işlemez</strong>; yalnızca
+            anapara hesabınıza geri yatar. Devam edilsin mi?
+          </p>
         )}
       </Modal>
 

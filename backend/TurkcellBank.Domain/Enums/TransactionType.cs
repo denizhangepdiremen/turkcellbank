@@ -10,4 +10,6 @@ public enum TransactionType
     LoanDisbursement,  // kredi kullandırımı (hesaba giriş)
     LoanRepayment,     // kredi taksiti ödemesi (hesaptan çıkış)
     BillPayment,       // fatura ödemesi (hesaptan çıkış)
+    TimeDepositOpen,   // vadeli mevduat açılışı (hesaptan çıkış — anapara kilitlenir)
+    TimeDepositMaturity, // vadeli mevduat dönüşü (hesaba giriş — anapara + net faiz)
 }

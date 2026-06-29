@@ -45,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<ISavedRecipientRepository, SavedRecipientRepository>();
         services.AddScoped<IBillPaymentRepository, BillPaymentRepository>();
         services.AddScoped<IPaymentOrderRepository, PaymentOrderRepository>();
+        services.AddScoped<ITimeDepositRepository, TimeDepositRepository>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, JwtTokenService>();
 

@@ -40,7 +40,16 @@ export interface Account {
 
 export interface Transaction {
   id: string
-  type: 'Deposit' | 'Transfer' | 'Payment' | 'Refund' | 'LoanDisbursement' | 'LoanRepayment' | 'BillPayment'
+  type:
+    | 'Deposit'
+    | 'Transfer'
+    | 'Payment'
+    | 'Refund'
+    | 'LoanDisbursement'
+    | 'LoanRepayment'
+    | 'BillPayment'
+    | 'TimeDepositOpen'
+    | 'TimeDepositMaturity'
   direction: 'In' | 'Out' // gelen / giden (o hesabın bakışıyla)
   amount: number
   counterpartyIban: string | null
@@ -112,6 +121,33 @@ export interface PaymentOrder {
   targetName: string | null // RecurringTransfer
   amount: number | null // RecurringTransfer
   createdAt: string
+}
+
+export type TimeDepositStatus = 'Active' | 'Matured' | 'ClosedEarly'
+
+// Sunulan vadeli mevduat ürünü (vade + yıllık brüt faiz oranı).
+export interface TimeDepositProduct {
+  termDays: number
+  annualRate: number // 0.45 = %45
+  label: string
+}
+
+// Vadeli mevduat hesabı.
+export interface TimeDeposit {
+  id: string
+  sourceAccountId: string
+  sourceIban: string
+  principal: number
+  annualRate: number
+  termDays: number
+  grossInterest: number
+  withholdingTax: number
+  netInterest: number
+  maturityAmount: number // anapara + net faiz
+  status: TimeDepositStatus
+  openedAt: string
+  maturityDate: string
+  closedAt: string | null
 }
 
 export type CardStatus = 'Pending' | 'Approved' | 'Rejected' | 'Blocked'
