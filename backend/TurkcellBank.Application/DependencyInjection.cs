@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<Features.Payments.IPaymentService, Features.Payments.PaymentService>();
         services.AddScoped<Features.Cards.ICardService, Features.Cards.CardService>();
         services.AddScoped<ISavedRecipientService, SavedRecipientService>();
+        services.AddScoped<Features.Bills.IBillService, Features.Bills.BillService>();
 
         // Validator'lar
         services.AddScoped<IValidator<RegisterRequest>, RegisterRequestValidator>();
@@ -52,6 +53,8 @@ public static class DependencyInjection
         services.AddScoped<IValidator<Features.Payments.Dtos.PaymentRequest>, Features.Payments.Validators.PaymentRequestValidator>();
         services.AddScoped<IValidator<Features.Cards.Dtos.CreateCardRequest>, Features.Cards.Validators.CreateCardRequestValidator>();
         services.AddScoped<IValidator<CreateSavedRecipientRequest>, CreateSavedRecipientRequestValidator>();
+        services.AddScoped<IValidator<Features.Bills.Dtos.BillInquiryRequest>, Features.Bills.Validators.BillInquiryRequestValidator>();
+        services.AddScoped<IValidator<Features.Bills.Dtos.PayBillRequest>, Features.Bills.Validators.PayBillRequestValidator>();
 
         return services;
     }

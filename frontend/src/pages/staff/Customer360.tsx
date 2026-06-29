@@ -40,6 +40,7 @@ function txTypeLabel(type: string) {
   if (type === 'Refund') return 'İade'
   if (type === 'LoanDisbursement') return 'Kredi Kullandırımı'
   if (type === 'LoanRepayment') return 'Kredi Taksiti'
+  if (type === 'BillPayment') return 'Fatura Ödemesi'
   return type
 }
 

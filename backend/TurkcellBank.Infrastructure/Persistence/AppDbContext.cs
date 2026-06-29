@@ -27,6 +27,7 @@ public class AppDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<SavedRecipient> SavedRecipients => Set<SavedRecipient>();
+    public DbSet<BillPayment> BillPayments => Set<BillPayment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -91,6 +92,28 @@ public class AppDbContext : DbContext
             entity.HasOne(r => r.User)
                 .WithMany()
                 .HasForeignKey(r => r.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- BillPayment (fatura ödeme) tablosu kuralları ---
+        modelBuilder.Entity<BillPayment>(entity =>
+        {
+            entity.HasKey(b => b.Id);
+            entity.Property(b => b.Category).HasConversion<string>().HasMaxLength(20);
+            entity.Property(b => b.BillerCode).IsRequired().HasMaxLength(40);
+            entity.Property(b => b.BillerName).IsRequired().HasMaxLength(60);
+            entity.Property(b => b.SubscriberNo).IsRequired().HasMaxLength(20);
+            entity.Property(b => b.Period).IsRequired().HasMaxLength(7); // "YYYY-MM"
+            entity.Property(b => b.Amount).HasPrecision(18, 2);
+            entity.Property(b => b.Channel).HasConversion<string>().HasMaxLength(10);
+
+            entity.HasIndex(b => b.UserId);
+            // Aynı (kurum + abone no + dönem) tek kez ödenir
+            entity.HasIndex(b => new { b.BillerCode, b.SubscriberNo, b.Period }).IsUnique();
+
+            entity.HasOne(b => b.User)
+                .WithMany()
+                .HasForeignKey(b => b.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

@@ -40,7 +40,7 @@ export interface Account {
 
 export interface Transaction {
   id: string
-  type: 'Deposit' | 'Transfer' | 'Payment' | 'Refund' | 'LoanDisbursement' | 'LoanRepayment'
+  type: 'Deposit' | 'Transfer' | 'Payment' | 'Refund' | 'LoanDisbursement' | 'LoanRepayment' | 'BillPayment'
   direction: 'In' | 'Out' // gelen / giden (o hesabın bakışıyla)
   amount: number
   counterpartyIban: string | null
@@ -55,6 +55,39 @@ export interface SavedRecipient {
   name: string
   iban: string
   note: string | null
+  createdAt: string
+}
+
+export type BillCategory = 'Elektrik' | 'Su' | 'Dogalgaz' | 'Telefon' | 'Internet'
+
+// Fatura ödenebilen kurum (katalog).
+export interface Biller {
+  code: string
+  name: string
+  category: BillCategory
+}
+
+// Fatura sorgulama sonucu.
+export interface BillInquiry {
+  billerCode: string
+  billerName: string
+  category: BillCategory
+  subscriberNo: string
+  period: string // "YYYY-MM"
+  amount: number
+  dueDate: string
+  isPaid: boolean // true ise bu dönem zaten ödenmiş
+}
+
+// Ödenmiş fatura kaydı (müşteri geçmişi).
+export interface BillPaymentRecord {
+  id: string
+  billerName: string
+  category: BillCategory
+  subscriberNo: string
+  period: string
+  amount: number
+  accountIban: string | null
   createdAt: string
 }
 

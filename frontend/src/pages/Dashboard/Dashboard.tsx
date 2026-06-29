@@ -28,12 +28,14 @@ import { applyLoan, getMyLoans, getLoanDetail, payInstallment } from '../../api/
 import { pay, getMyPayments } from '../../api/paymentApi'
 import { createCard, getMyCards, setCardOnlineShopping } from '../../api/cardApi'
 import { createRecipient, deleteRecipient, getRecipients } from '../../api/recipientApi'
+import { getBillers, inquireBill, payBill, getMyBills } from '../../api/billApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { digitsOnly, formatIban, formatIbanInput, normalizeIban } from '../../lib/format'
 import type {
   Account,
   AccountType,
+  BillInquiry,
   Card as BankCard,
   CardStatus,
   Loan,
@@ -93,6 +95,7 @@ const txTitle = (tx: Transaction) => {
   if (tx.type === 'Refund') return 'POS İade'
   if (tx.type === 'LoanDisbursement') return 'Kredi Kullandırımı'
   if (tx.type === 'LoanRepayment') return 'Kredi Taksiti'
+  if (tx.type === 'BillPayment') return `Fatura${tx.description ? ` · ${tx.description}` : ''}`
   return tx.direction === 'Out'
     ? `Transfer → ${tx.counterpartyIban}`
     : `Transfer ← ${tx.counterpartyIban}`
@@ -382,6 +385,7 @@ const DASHBOARD_TABS = [
   { id: 'loans', label: 'Krediler' },
   { id: 'cards', label: 'Kartlar' },
   { id: 'payments', label: 'Ödemeler' },
+  { id: 'bills', label: 'Faturalar' },
   { id: 'security', label: 'Güvenlik' },
 ] as const
 type DashboardTab = (typeof DASHBOARD_TABS)[number]['id']
@@ -409,7 +413,10 @@ export function Dashboard() {
         const arr = JSON.parse(raw) as DashboardTab[]
         const valid = arr.filter((id) => DASHBOARD_TABS.some((t) => t.id === id))
         if (valid.length > 0) {
-          return valid.includes('security') ? valid : [...valid, 'security']
+          // Kayıttan sonra eklenen yeni sekmeler (örn. Faturalar) de görünsün:
+          // eksik varsayılan sekmeleri sona ekle.
+          const missing = DASHBOARD_TABS.map((t) => t.id).filter((id) => !valid.includes(id))
+          return [...valid, ...missing]
         }
       }
     } catch {
@@ -955,6 +962,78 @@ export function Dashboard() {
     setPayDesc('')
     setThreeDS('')
     setPayOpen(true)
+  }
+
+  // --- Fatura ödeme ---
+  const { data: billersData } = useQuery({
+    queryKey: ['billers'],
+    queryFn: getBillers,
+    staleTime: Infinity, // katalog sabit, tekrar çekme
+  })
+  const billers = useMemo(() => billersData?.data ?? [], [billersData?.data])
+
+  const { data: myBillsData, isLoading: billsLoading } = useQuery({
+    queryKey: ['bills'],
+    queryFn: getMyBills,
+  })
+  const myBills = myBillsData?.data ?? []
+  const [billVisible, setBillVisible] = useState(PAGE_SIZE)
+
+  const BILL_CATEGORIES: { value: string; label: string }[] = [
+    { value: 'Elektrik', label: 'Elektrik' },
+    { value: 'Su', label: 'Su' },
+    { value: 'Dogalgaz', label: 'Doğalgaz' },
+    { value: 'Telefon', label: 'Telefon / GSM' },
+    { value: 'Internet', label: 'İnternet' },
+  ]
+
+  const [billOpen, setBillOpen] = useState(false)
+  const [billCategory, setBillCategory] = useState('Elektrik')
+  const [billerCode, setBillerCode] = useState('')
+  const [subscriberNo, setSubscriberNo] = useState('')
+  const [billInquiry, setBillInquiry] = useState<BillInquiry | null>(null)
+  const [billAccountId, setBillAccountId] = useState('')
+
+  // Seçili kategorinin kurumları
+  const categoryBillers = useMemo(
+    () => billers.filter((b) => b.category === billCategory),
+    [billers, billCategory],
+  )
+
+  const inquireMutation = useMutation({
+    mutationFn: () => inquireBill({ billerCode, subscriberNo }),
+    onSuccess: (res) => {
+      if (res.data) setBillInquiry(res.data)
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Fatura sorgulanamadı.')),
+  })
+
+  const payBillMutation = useMutation({
+    mutationFn: () => payBill({ billerCode, subscriberNo, accountId: billAccountId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bills'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      setBillOpen(false)
+      toast.success('Fatura ödendi.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Fatura ödenemedi.')),
+  })
+
+  function openBillPay() {
+    setBillCategory('Elektrik')
+    setBillerCode('')
+    setSubscriberNo('')
+    setBillInquiry(null)
+    setBillAccountId(activeAccounts[0]?.id ?? '')
+    setBillOpen(true)
+  }
+
+  // Kategori değişince kurum seçimini ve sorgu sonucunu sıfırla
+  function changeBillCategory(category: string) {
+    setBillCategory(category)
+    setBillerCode('')
+    setBillInquiry(null)
   }
 
   const frozenAccounts = accounts.filter((a) => a.isFrozen)
@@ -1681,6 +1760,55 @@ export function Dashboard() {
                       size="sm"
                       variant="ghost"
                       onClick={() => setPayVisible((v) => v + PAGE_SIZE)}
+                    >
+                      Daha fazla göster
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+          </>
+        )}
+
+        {activeTab === 'bills' && (
+          <>
+        {/* Fatura Ödeme */}
+        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+          <h2 className="dashboard-section-title">Faturalarım</h2>
+          <Button size="sm" variant="primary" onClick={openBillPay}>
+            + Fatura Öde
+          </Button>
+        </div>
+
+        <Card>
+          <CardContent>
+            {billsLoading ? (
+              <ListSkeleton />
+            ) : myBills.length === 0 ? (
+              <div className="dashboard-state">Henüz ödenmiş faturanız yok.</div>
+            ) : (
+              <>
+                {myBills.slice(0, billVisible).map((b) => (
+                  <div key={b.id} className="dashboard-loan-row">
+                    <div>
+                      <p className="dashboard-loan-amount">
+                        {formatTL(b.amount)} · {b.billerName}
+                      </p>
+                      <p className="dashboard-loan-sub">
+                        {trDate(b.createdAt)} · Abone {b.subscriberNo} · Dönem {b.period}
+                      </p>
+                    </div>
+                    <Badge variant="success">Ödendi</Badge>
+                  </div>
+                ))}
+                {myBills.length > billVisible && (
+                  <div className="dashboard-loadmore">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setBillVisible((v) => v + PAGE_SIZE)}
                     >
                       Daha fazla göster
                     </Button>
@@ -2720,6 +2848,115 @@ export function Dashboard() {
             </div>
           </>
         )}
+      </Modal>
+
+      {/* --- Fatura ödeme modalı (sorgula -> öde) --- */}
+      <Modal
+        open={billOpen}
+        onClose={() => setBillOpen(false)}
+        title="Fatura Öde"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setBillOpen(false)}>
+              İptal
+            </Button>
+            {billInquiry && !billInquiry.isPaid ? (
+              <Button
+                variant="primary"
+                loading={payBillMutation.isPending}
+                disabled={!billAccountId || activeAccounts.length === 0}
+                onClick={() => payBillMutation.mutate()}
+              >
+                {formatTL(billInquiry.amount)} Öde
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                loading={inquireMutation.isPending}
+                disabled={!billerCode || subscriberNo.length < 6}
+                onClick={() => inquireMutation.mutate()}
+              >
+                Sorgula
+              </Button>
+            )}
+          </>
+        }
+      >
+        <div className="dashboard-modal-field">
+          <Select
+            label="Kurum Türü"
+            options={BILL_CATEGORIES}
+            value={billCategory}
+            onChange={(e) => changeBillCategory(e.target.value)}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Select
+            label="Kurum"
+            options={[
+              { value: '', label: 'Kurum seçiniz…' },
+              ...categoryBillers.map((b) => ({ value: b.code, label: b.name })),
+            ]}
+            value={billerCode}
+            onChange={(e) => {
+              setBillerCode(e.target.value)
+              setBillInquiry(null)
+            }}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Input
+            label="Abone / Tesisat No"
+            placeholder="Örn. 1002003004"
+            value={subscriberNo}
+            onChange={(e) => {
+              setSubscriberNo(digitsOnly(e.target.value, 20))
+              setBillInquiry(null)
+            }}
+          />
+        </div>
+
+        {billInquiry &&
+          (billInquiry.isPaid ? (
+            <Alert variant="success">
+              {billInquiry.billerName} · {billInquiry.period} dönemi faturası zaten
+              ödenmiş. Borç bulunmuyor.
+            </Alert>
+          ) : (
+            <>
+              <div className="dashboard-bill-summary">
+                <div className="dashboard-bill-summary-row">
+                  <span>Güncel borç</span>
+                  <strong>{formatTL(billInquiry.amount)}</strong>
+                </div>
+                <div className="dashboard-bill-summary-row">
+                  <span>Son ödeme tarihi</span>
+                  <span>{new Date(billInquiry.dueDate).toLocaleDateString('tr-TR')}</span>
+                </div>
+                <div className="dashboard-bill-summary-row">
+                  <span>Dönem</span>
+                  <span>{billInquiry.period}</span>
+                </div>
+              </div>
+              {activeAccounts.length === 0 ? (
+                <Alert variant="warning">
+                  Fatura ödemek için aktif bir hesabınız olmalı.
+                </Alert>
+              ) : (
+                <div className="dashboard-modal-field">
+                  <Select
+                    label="Ödenecek hesap"
+                    options={activeAccounts.map((a) => ({
+                      value: a.id,
+                      label: `${a.accountType} · ...${a.iban.slice(-4)} · ${formatTL(a.balance)}`,
+                    }))}
+                    value={billAccountId}
+                    onChange={(e) => setBillAccountId(e.target.value)}
+                  />
+                </div>
+              )}
+            </>
+          ))}
       </Modal>
 
       {/* --- Kart açma modalı --- */}

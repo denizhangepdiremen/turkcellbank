@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<ISavedRecipientRepository, SavedRecipientRepository>();
+        services.AddScoped<IBillPaymentRepository, BillPaymentRepository>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, JwtTokenService>();
 

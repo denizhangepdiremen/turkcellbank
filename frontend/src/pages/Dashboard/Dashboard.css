@@ -1116,6 +1116,29 @@
   margin-bottom: 1rem;
 }
 
+/* Fatura sorgu sonucu özet kutusu */
+.dashboard-bill-summary {
+  margin: 0.25rem 0 1rem;
+  padding: 0.85rem 1rem;
+  background: #eef2ff; /* indigo-50 */
+  border: 1px solid #c7d2fe; /* indigo-200 */
+  border-radius: 0.6rem;
+}
+
+.dashboard-bill-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.9rem;
+  color: #4b5563;
+  padding: 0.2rem 0;
+}
+
+.dashboard-bill-summary-row strong {
+  font-size: 1.15rem;
+  color: #3730a3; /* indigo-800 */
+}
+
 .dashboard-save-recipient {
   display: flex;
   flex-direction: column;
