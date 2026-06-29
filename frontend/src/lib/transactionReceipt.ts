@@ -70,7 +70,7 @@ export function openTransactionReceipt({
     <div class="meta-row"><span>Müşteri</span><span>${esc(customerName)}</span></div>
     <div class="meta-row"><span>İşlem No</span><span>${esc(transaction.id)}</span></div>
     <div class="meta-row"><span>İşlem Tarihi</span><span>${trDate(transaction.createdAt)}</span></div>
-    <div class="meta-row"><span>Kanal</span><span>${transaction.channel === 'Branch' ? 'Şube' : 'İnternet'}</span></div>
+    <div class="meta-row"><span>Kanal</span><span>${transaction.channel === 'Branch' ? 'Şube' : transaction.channel === 'Automatic' ? 'Otomatik' : 'İnternet'}</span></div>
     <div class="meta-row"><span>Hesap</span><span>${iban ? esc(iban) : '-'}</span></div>
     <div class="meta-row"><span>${counterpartyLabel}</span><span>${transaction.counterpartyIban ? esc(transaction.counterpartyIban) : '-'}</span></div>
   </div>

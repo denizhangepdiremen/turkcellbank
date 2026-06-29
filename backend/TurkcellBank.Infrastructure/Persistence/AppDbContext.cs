@@ -28,6 +28,7 @@ public class AppDbContext : DbContext
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<SavedRecipient> SavedRecipients => Set<SavedRecipient>();
     public DbSet<BillPayment> BillPayments => Set<BillPayment>();
+    public DbSet<PaymentOrder> PaymentOrders => Set<PaymentOrder>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -114,6 +115,31 @@ public class AppDbContext : DbContext
             entity.HasOne(b => b.User)
                 .WithMany()
                 .HasForeignKey(b => b.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- PaymentOrder (düzenli ödeme talimatı) tablosu kuralları ---
+        modelBuilder.Entity<PaymentOrder>(entity =>
+        {
+            entity.HasKey(o => o.Id);
+            entity.Property(o => o.Type).HasConversion<string>().HasMaxLength(20);
+            entity.Property(o => o.Name).IsRequired().HasMaxLength(60);
+            entity.Property(o => o.Category).HasConversion<string>().HasMaxLength(20);
+            entity.Property(o => o.BillerCode).HasMaxLength(40);
+            entity.Property(o => o.BillerName).HasMaxLength(60);
+            entity.Property(o => o.SubscriberNo).HasMaxLength(20);
+            entity.Property(o => o.TargetIban).HasMaxLength(34);
+            entity.Property(o => o.TargetName).HasMaxLength(60);
+            entity.Property(o => o.Amount).HasPrecision(18, 2);
+            entity.Property(o => o.LastStatus).HasMaxLength(60);
+
+            entity.HasIndex(o => o.UserId);
+            // Arka plan çalıştırıcının vade sorgusu için
+            entity.HasIndex(o => new { o.IsActive, o.NextRunDate });
+
+            entity.HasOne(o => o.User)
+                .WithMany()
+                .HasForeignKey(o => o.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

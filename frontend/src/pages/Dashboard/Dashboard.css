@@ -1116,6 +1116,30 @@
   margin-bottom: 1rem;
 }
 
+/* Düzenli ödeme talimatı satırı */
+.dashboard-order-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.dashboard-order-row:last-child {
+  border-bottom: none;
+}
+
+.dashboard-order-main {
+  min-width: 0;
+}
+
+.dashboard-order-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
 /* Fatura sorgu sonucu özet kutusu */
 .dashboard-bill-summary {
   margin: 0.25rem 0 1rem;

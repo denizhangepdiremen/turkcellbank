@@ -46,7 +46,7 @@ export interface Transaction {
   counterpartyIban: string | null
   accountIban: string | null
   description: string | null
-  channel: 'Internet' | 'Branch' // şube çalışanı adına yaptıysa "Branch"
+  channel: 'Internet' | 'Branch' | 'Automatic' // "Branch": şube adına; "Automatic": düzenli ödeme talimatı
   createdAt: string
 }
 
@@ -88,6 +88,29 @@ export interface BillPaymentRecord {
   period: string
   amount: number
   accountIban: string | null
+  createdAt: string
+}
+
+export type PaymentOrderType = 'AutoBill' | 'RecurringTransfer'
+
+// Düzenli ödeme talimatı (otomatik fatura veya düzenli havale).
+export interface PaymentOrder {
+  id: string
+  type: PaymentOrderType
+  name: string
+  sourceAccountId: string
+  sourceIban: string
+  dayOfMonth: number
+  nextRunDate: string
+  isActive: boolean
+  lastRunAt: string | null
+  lastStatus: string | null
+  category: BillCategory | null
+  billerName: string | null // AutoBill
+  subscriberNo: string | null // AutoBill
+  targetIban: string | null // RecurringTransfer
+  targetName: string | null // RecurringTransfer
+  amount: number | null // RecurringTransfer
   createdAt: string
 }
 

@@ -29,6 +29,12 @@ import { pay, getMyPayments } from '../../api/paymentApi'
 import { createCard, getMyCards, setCardOnlineShopping } from '../../api/cardApi'
 import { createRecipient, deleteRecipient, getRecipients } from '../../api/recipientApi'
 import { getBillers, inquireBill, payBill, getMyBills } from '../../api/billApi'
+import {
+  getPaymentOrders,
+  createPaymentOrder,
+  setPaymentOrderActive,
+  deletePaymentOrder,
+} from '../../api/paymentOrderApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { digitsOnly, formatIban, formatIbanInput, normalizeIban } from '../../lib/format'
@@ -39,6 +45,7 @@ import type {
   Card as BankCard,
   CardStatus,
   Loan,
+  PaymentOrder,
   LoanStatus,
   PaymentStatus,
   SavedRecipient,
@@ -386,6 +393,7 @@ const DASHBOARD_TABS = [
   { id: 'cards', label: 'Kartlar' },
   { id: 'payments', label: 'Ödemeler' },
   { id: 'bills', label: 'Faturalar' },
+  { id: 'orders', label: 'Talimatlar' },
   { id: 'security', label: 'Güvenlik' },
 ] as const
 type DashboardTab = (typeof DASHBOARD_TABS)[number]['id']
@@ -1036,6 +1044,90 @@ export function Dashboard() {
     setBillInquiry(null)
   }
 
+  // --- Düzenli ödeme talimatları ---
+  const { data: ordersData, isLoading: ordersLoading } = useQuery({
+    queryKey: ['payment-orders'],
+    queryFn: getPaymentOrders,
+  })
+  const orders = ordersData?.data ?? []
+
+  const [orderOpen, setOrderOpen] = useState(false)
+  const [orderType, setOrderType] = useState<'AutoBill' | 'RecurringTransfer'>('AutoBill')
+  const [orderName, setOrderName] = useState('')
+  const [orderAccountId, setOrderAccountId] = useState('')
+  const [orderDay, setOrderDay] = useState('1')
+  // AutoBill alanları
+  const [orderCategory, setOrderCategory] = useState('Elektrik')
+  const [orderBillerCode, setOrderBillerCode] = useState('')
+  const [orderSubscriberNo, setOrderSubscriberNo] = useState('')
+  // RecurringTransfer alanları
+  const [orderTargetIban, setOrderTargetIban] = useState('')
+  const [orderAmount, setOrderAmount] = useState('')
+
+  const orderCategoryBillers = useMemo(
+    () => billers.filter((b) => b.category === orderCategory),
+    [billers, orderCategory],
+  )
+
+  const createOrderMutation = useMutation({
+    mutationFn: () =>
+      createPaymentOrder({
+        type: orderType,
+        name: orderName.trim(),
+        sourceAccountId: orderAccountId,
+        dayOfMonth: Number(orderDay),
+        ...(orderType === 'AutoBill'
+          ? { billerCode: orderBillerCode, subscriberNo: orderSubscriberNo }
+          : { targetIban: normalizeIban(orderTargetIban), amount: Number(orderAmount) }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payment-orders'] })
+      setOrderOpen(false)
+      toast.success('Talimat oluşturuldu.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Talimat oluşturulamadı.')),
+  })
+
+  const toggleOrderMutation = useMutation({
+    mutationFn: (vars: { id: string; isActive: boolean }) =>
+      setPaymentOrderActive(vars.id, vars.isActive),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['payment-orders'] })
+      toast.success(res.message ?? 'Güncellendi.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'İşlem başarısız.')),
+  })
+
+  const deleteOrderMutation = useMutation({
+    mutationFn: (id: string) => deletePaymentOrder(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payment-orders'] })
+      toast.success('Talimat silindi.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Talimat silinemedi.')),
+  })
+
+  function openOrderCreate() {
+    setOrderType('AutoBill')
+    setOrderName('')
+    setOrderAccountId(activeAccounts[0]?.id ?? '')
+    setOrderDay('1')
+    setOrderCategory('Elektrik')
+    setOrderBillerCode('')
+    setOrderSubscriberNo('')
+    setOrderTargetIban('')
+    setOrderAmount('')
+    setOrderOpen(true)
+  }
+
+  // Talimat oluşturma butonu için basit doğrulama
+  const orderFormValid =
+    orderName.trim().length > 0 &&
+    orderAccountId !== '' &&
+    (orderType === 'AutoBill'
+      ? orderBillerCode !== '' && orderSubscriberNo.length >= 6
+      : normalizeIban(orderTargetIban).length === 26 && Number(orderAmount) > 0)
+
   const frozenAccounts = accounts.filter((a) => a.isFrozen)
   const blockedCards = cards.filter((c) => c.status === 'Blocked')
   const pendingCards = cards.filter((c) => c.status === 'Pending')
@@ -1525,6 +1617,7 @@ export function Dashboard() {
                         {trDate(tx.createdAt)}
                         {tx.description ? ` · ${tx.description}` : ''}
                         {tx.channel === 'Branch' ? ' · Şube' : ''}
+                        {tx.channel === 'Automatic' ? ' · Otomatik' : ''}
                       </p>
                       <Button
                         size="sm"
@@ -1815,6 +1908,83 @@ export function Dashboard() {
                   </div>
                 )}
               </>
+            )}
+          </CardContent>
+        </Card>
+          </>
+        )}
+
+        {activeTab === 'orders' && (
+          <>
+        {/* Düzenli Ödeme Talimatları */}
+        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+          <h2 className="dashboard-section-title">Düzenli Ödeme Talimatlarım</h2>
+          <Button size="sm" variant="primary" onClick={openOrderCreate}>
+            + Yeni Talimat
+          </Button>
+        </div>
+
+        <Alert variant="info">
+          Talimatlar her ayın belirlediğiniz gününde otomatik çalışır; fatura
+          ödenir veya havale gönderilir. Sonuç bildirim olarak iletilir.
+        </Alert>
+
+        <Card>
+          <CardContent>
+            {ordersLoading ? (
+              <ListSkeleton />
+            ) : orders.length === 0 ? (
+              <div className="dashboard-state">Henüz talimatınız yok.</div>
+            ) : (
+              orders.map((o) => (
+                <div key={o.id} className="dashboard-order-row">
+                  <div className="dashboard-order-main">
+                    <p className="dashboard-loan-amount">
+                      {o.name}{' '}
+                      <Badge variant="neutral">
+                        {o.type === 'AutoBill' ? 'Otomatik Fatura' : 'Düzenli Havale'}
+                      </Badge>{' '}
+                      {!o.isActive && <Badge variant="warning">Duraklatıldı</Badge>}
+                    </p>
+                    <p className="dashboard-loan-sub">
+                      {o.type === 'AutoBill'
+                        ? `${o.billerName} · Abone ${o.subscriberNo}`
+                        : `${formatTL(o.amount ?? 0)} → ...${(o.targetIban ?? '').slice(-4)}`}
+                    </p>
+                    <p className="dashboard-loan-sub">
+                      Her ayın {o.dayOfMonth}. günü · Kaynak ...{o.sourceIban.slice(-4)} · Sıradaki:{' '}
+                      {new Date(o.nextRunDate).toLocaleDateString('tr-TR')}
+                      {o.lastStatus ? ` · Son: ${o.lastStatus}` : ''}
+                    </p>
+                  </div>
+                  <div className="dashboard-order-actions">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      loading={
+                        toggleOrderMutation.isPending &&
+                        toggleOrderMutation.variables?.id === o.id
+                      }
+                      onClick={() =>
+                        toggleOrderMutation.mutate({ id: o.id, isActive: !o.isActive })
+                      }
+                    >
+                      {o.isActive ? 'Duraklat' : 'Etkinleştir'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      loading={
+                        deleteOrderMutation.isPending &&
+                        deleteOrderMutation.variables === o.id
+                      }
+                      onClick={() => deleteOrderMutation.mutate(o.id)}
+                    >
+                      Sil
+                    </Button>
+                  </div>
+                </div>
+              ))
             )}
           </CardContent>
         </Card>
@@ -2957,6 +3127,136 @@ export function Dashboard() {
               )}
             </>
           ))}
+      </Modal>
+
+      {/* --- Düzenli ödeme talimatı oluşturma modalı --- */}
+      <Modal
+        open={orderOpen}
+        onClose={() => setOrderOpen(false)}
+        title="Yeni Düzenli Ödeme Talimatı"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setOrderOpen(false)}>
+              İptal
+            </Button>
+            <Button
+              variant="primary"
+              loading={createOrderMutation.isPending}
+              disabled={!orderFormValid || activeAccounts.length === 0}
+              onClick={() => createOrderMutation.mutate()}
+            >
+              Talimat Oluştur
+            </Button>
+          </>
+        }
+      >
+        {activeAccounts.length === 0 ? (
+          <Alert variant="warning">
+            Talimat oluşturmak için aktif bir hesabınız olmalı.
+          </Alert>
+        ) : (
+          <>
+            <div className="dashboard-modal-field">
+              <Select
+                label="Talimat Tipi"
+                options={[
+                  { value: 'AutoBill', label: 'Otomatik Fatura Ödeme' },
+                  { value: 'RecurringTransfer', label: 'Düzenli Havale' },
+                ]}
+                value={orderType}
+                onChange={(e) =>
+                  setOrderType(e.target.value as 'AutoBill' | 'RecurringTransfer')
+                }
+              />
+            </div>
+            <div className="dashboard-modal-field">
+              <Input
+                label="Talimat Adı"
+                placeholder={orderType === 'AutoBill' ? 'Örn. Evin doğalgazı' : 'Örn. Ev kirası'}
+                value={orderName}
+                onChange={(e) => setOrderName(e.target.value)}
+              />
+            </div>
+
+            {orderType === 'AutoBill' ? (
+              <>
+                <div className="dashboard-modal-field">
+                  <Select
+                    label="Kurum Türü"
+                    options={BILL_CATEGORIES}
+                    value={orderCategory}
+                    onChange={(e) => {
+                      setOrderCategory(e.target.value)
+                      setOrderBillerCode('')
+                    }}
+                  />
+                </div>
+                <div className="dashboard-modal-field">
+                  <Select
+                    label="Kurum"
+                    options={[
+                      { value: '', label: 'Kurum seçiniz…' },
+                      ...orderCategoryBillers.map((b) => ({ value: b.code, label: b.name })),
+                    ]}
+                    value={orderBillerCode}
+                    onChange={(e) => setOrderBillerCode(e.target.value)}
+                  />
+                </div>
+                <div className="dashboard-modal-field">
+                  <Input
+                    label="Abone / Tesisat No"
+                    placeholder="Örn. 1002003004"
+                    value={orderSubscriberNo}
+                    onChange={(e) => setOrderSubscriberNo(digitsOnly(e.target.value, 20))}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="dashboard-modal-field">
+                  <Input
+                    label="Alıcı IBAN"
+                    placeholder="TR.. .. .. .."
+                    value={orderTargetIban}
+                    onChange={(e) => setOrderTargetIban(formatIbanInput(e.target.value))}
+                  />
+                </div>
+                <div className="dashboard-modal-field">
+                  <Input
+                    label="Tutar (₺)"
+                    type="number"
+                    placeholder="0"
+                    value={orderAmount}
+                    onChange={(e) => setOrderAmount(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="dashboard-modal-field">
+              <Select
+                label="Ödeme yapılacak hesap"
+                options={activeAccounts.map((a) => ({
+                  value: a.id,
+                  label: `${a.accountType} · ...${a.iban.slice(-4)} · ${formatTL(a.balance)}`,
+                }))}
+                value={orderAccountId}
+                onChange={(e) => setOrderAccountId(e.target.value)}
+              />
+            </div>
+            <div className="dashboard-modal-field">
+              <Select
+                label="Her ayın kaçında çalışsın"
+                options={Array.from({ length: 28 }, (_, i) => ({
+                  value: String(i + 1),
+                  label: `Her ayın ${i + 1}. günü`,
+                }))}
+                value={orderDay}
+                onChange={(e) => setOrderDay(e.target.value)}
+              />
+            </div>
+          </>
+        )}
       </Modal>
 
       {/* --- Kart açma modalı --- */}

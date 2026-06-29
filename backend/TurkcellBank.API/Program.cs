@@ -137,6 +137,9 @@ builder.Services.AddRateLimiter(options =>
 // Tek satırla; detaylar Infrastructure/DependencyInjection.cs içinde.
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// Düzenli ödeme talimatlarını periyodik çalıştıran arka plan servisi
+builder.Services.AddHostedService<TurkcellBank.API.Services.PaymentOrderWorker>();
+
 // --- JWT kimlik doğrulama ---
 // Gelen "Authorization: Bearer <token>" başlığındaki token'ı otomatik doğrular
 // (imza, süre, issuer, audience). Geçerliyse kullanıcıyı "giriş yapmış" sayar.

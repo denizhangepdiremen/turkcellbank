@@ -9,4 +9,5 @@ public enum Channel
 {
     Internet,
     Branch,
+    Automatic, // düzenli ödeme talimatı tarafından otomatik yapılan işlem
 }
