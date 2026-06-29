@@ -14,9 +14,12 @@ test.describe('Genel hesap işlemleri', () => {
   })
 
   test('panel sekmeleri görünür ve bölümler sekmeyle açılır', async ({ page }) => {
-    // Sekme butonları (üst menü)
-    for (const tab of ['Hesaplarım', 'İşlemler', 'Krediler', 'Kartlar', 'Ödemeler']) {
-      await expect(page.getByRole('button', { name: tab, exact: true })).toBeVisible()
+    // Üst grup menüsü görünür; alt sekmeler seçili gruba göre değişir.
+    for (const group of ['Günlük Bankacılık', 'Fatura & Talimat', 'Kredi, Kart, Mevduat', 'Güvenlik']) {
+      await expect(page.locator('.dashboard-tab-group').filter({ hasText: group })).toBeVisible()
+    }
+    for (const tab of ['Hesaplarım', 'İşlemler', 'Ödemeler']) {
+      await expect(page.locator('.dashboard-tab').filter({ hasText: tab })).toBeVisible()
     }
 
     // Varsayılan sekme: Hesaplarım bölümü görünür

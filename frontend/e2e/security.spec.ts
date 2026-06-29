@@ -33,7 +33,7 @@ test.describe('Güvenlik Merkezi', () => {
     await registerAndLogin(page, email, oldPw)
 
     // Güvenlik sekmesi → Şifre değiştir
-    await page.getByRole('button', { name: 'Güvenlik', exact: true }).click()
+    await openTab(page, 'Güvenlik')
     await page.getByRole('button', { name: /Şifre değiştir/ }).click()
 
     const dialog = page.getByRole('dialog')
@@ -59,7 +59,7 @@ test.describe('Güvenlik Merkezi', () => {
     const receiverIban = await openAccount(page)
 
     // Güvenlik → Günlük havale limiti = 100 ₺
-    await page.getByRole('button', { name: 'Güvenlik', exact: true }).click()
+    await openTab(page, 'Güvenlik')
     await page.getByRole('button', { name: /Günlük havale limiti/ }).click()
     const limitDialog = page.getByRole('dialog')
     await limitDialog.getByLabel('Günlük limit (₺)').fill('100')
@@ -99,7 +99,7 @@ test.describe('Güvenlik Merkezi', () => {
     // Müşteri: Güvenlik → Kart internet alışverişi → Kapat
     await loginViaUi(page, email, 'parola123')
     await expect(page).toHaveURL(/\/dashboard$/)
-    await page.getByRole('button', { name: 'Güvenlik', exact: true }).click()
+    await openTab(page, 'Güvenlik')
     await page.getByRole('button', { name: /Kart internet alışverişi/ }).click()
     const row = page.locator('.dashboard-cardshop-row').first()
     await expect(row).toBeVisible()

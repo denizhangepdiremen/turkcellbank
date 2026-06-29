@@ -83,12 +83,45 @@ export async function loginViaUi(page: Page, email: string, password: string) {
   await page.getByRole('button', { name: 'Giriş Yap' }).click()
 }
 
-/** Panel sekmeleri arasında geçiş (Hesaplarım/İşlemler/Krediler/Kartlar/Ödemeler). */
+type DashboardTabLabel =
+  | 'Hesaplarım'
+  | 'İşlemler'
+  | 'Krediler'
+  | 'Kartlar'
+  | 'Ödemeler'
+  | 'Faturalar'
+  | 'Talimatlar'
+  | 'Vadeli Mevduat'
+  | 'Güvenlik'
+
+const DASHBOARD_TAB_GROUP_BY_LABEL: Record<DashboardTabLabel, string> = {
+  Hesaplarım: 'Günlük Bankacılık',
+  İşlemler: 'Günlük Bankacılık',
+  Ödemeler: 'Günlük Bankacılık',
+  Faturalar: 'Fatura & Talimat',
+  Talimatlar: 'Fatura & Talimat',
+  Krediler: 'Kredi, Kart, Mevduat',
+  Kartlar: 'Kredi, Kart, Mevduat',
+  'Vadeli Mevduat': 'Kredi, Kart, Mevduat',
+  Güvenlik: 'Güvenlik',
+}
+
+/** Panel sekmeleri arasında geçiş. Üst grup kapalıysa önce ilgili grubu açar. */
 export async function openTab(
   page: Page,
-  label: 'Hesaplarım' | 'İşlemler' | 'Krediler' | 'Kartlar' | 'Ödemeler',
+  label: DashboardTabLabel,
 ) {
-  await page.getByRole('button', { name: label, exact: true }).click()
+  const tab = page.locator('.dashboard-tab').filter({ hasText: label })
+  if ((await tab.count()) === 0 || !(await tab.isVisible())) {
+    const group = page
+      .locator('.dashboard-tab-group')
+      .filter({ hasText: DASHBOARD_TAB_GROUP_BY_LABEL[label] })
+    await expect(group).toHaveCount(1)
+    await group.click()
+  }
+
+  await expect(tab).toHaveCount(1)
+  await tab.click()
 }
 
 // Personel panellerindeki (müdür/il müdürü/direktör) sekme çubuğu

@@ -407,6 +407,17 @@ const DASHBOARD_TABS = [
 ] as const
 type DashboardTab = (typeof DASHBOARD_TABS)[number]['id']
 
+const DASHBOARD_TAB_GROUPS = [
+  { id: 'daily', label: 'Günlük Bankacılık', tabs: ['accounts', 'transactions', 'payments'] },
+  { id: 'billing', label: 'Fatura & Talimat', tabs: ['bills', 'orders'] },
+  { id: 'products', label: 'Kredi, Kart, Mevduat', tabs: ['loans', 'cards', 'deposits'] },
+  { id: 'security', label: 'Güvenlik', tabs: ['security'] },
+] as const satisfies ReadonlyArray<{
+  id: string
+  label: string
+  tabs: readonly DashboardTab[]
+}>
+
 // Kullanıcının görmek istediği sekmeler localStorage'da saklanır (kişiselleştirme)
 const TABS_STORAGE_KEY = 'turkcellbank_dashboard_tabs'
 
@@ -457,6 +468,21 @@ export function Dashboard() {
 
     setVisibleTabs(next)
     if (!next.includes(activeTab)) setActiveTab(next[0])
+  }
+
+  const visibleDashboardTabs = DASHBOARD_TABS.filter((t) => visibleTabs.includes(t.id))
+  const visibleTabGroups = DASHBOARD_TAB_GROUPS.map((group) => ({
+    ...group,
+    tabs: group.tabs.filter((id) => visibleTabs.includes(id)),
+  })).filter((group) => group.tabs.length > 0)
+  const activeTabGroup =
+    visibleTabGroups.find((group) => group.tabs.includes(activeTab)) ?? visibleTabGroups[0]
+  const activeGroupTabs = visibleDashboardTabs.filter((tab) =>
+    activeTabGroup?.tabs.includes(tab.id),
+  )
+
+  function selectTabGroup(groupTabs: readonly DashboardTab[]) {
+    if (!groupTabs.includes(activeTab)) setActiveTab(groupTabs[0])
   }
 
   // Profil modalı
@@ -1398,26 +1424,47 @@ export function Dashboard() {
         </div>
 
         {/* Bölüm sekmeleri — tıklanınca ilgili bölüm gösterilir (kaydırma yok) */}
-        <nav className="dashboard-tabs">
-          {DASHBOARD_TABS.filter((t) => visibleTabs.includes(t.id)).map((t) => (
+        <nav className="dashboard-tabs" aria-label="Panel bölümleri">
+          <div className="dashboard-tab-groups" aria-label="Bölüm grupları">
+            {visibleTabGroups.map((group) => (
+              <button
+                key={group.id}
+                type="button"
+                aria-pressed={activeTabGroup?.id === group.id}
+                className={
+                  activeTabGroup?.id === group.id
+                    ? 'dashboard-tab-group active'
+                    : 'dashboard-tab-group'
+                }
+                onClick={() => selectTabGroup(group.tabs)}
+              >
+                {group.label}
+              </button>
+            ))}
             <button
-              key={t.id}
               type="button"
-              className={activeTab === t.id ? 'dashboard-tab active' : 'dashboard-tab'}
-              onClick={() => setActiveTab(t.id)}
+              className="dashboard-tab-edit"
+              onClick={() => setTabsEditOpen(true)}
+              aria-label="Sekmeleri düzenle"
+              title="Sekmeleri düzenle"
             >
-              {t.label}
+              Düzenle
             </button>
-          ))}
-          <button
-            type="button"
-            className="dashboard-tab-edit"
-            onClick={() => setTabsEditOpen(true)}
-            aria-label="Sekmeleri düzenle"
-            title="Sekmeleri düzenle"
-          >
-            ✎ Düzenle
-          </button>
+          </div>
+          <div className="dashboard-tab-items" role="tablist" aria-label="Bölümler">
+            {activeGroupTabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === t.id}
+                className={activeTab === t.id ? 'dashboard-tab active' : 'dashboard-tab'}
+                onClick={() => setActiveTab(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </nav>
 
         {/* Sekme düzenleme modalı — bölüm ekle/çıkar */}
