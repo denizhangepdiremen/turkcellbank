@@ -58,8 +58,9 @@ hierarchy `BranchEmployee` → `BranchManager` → `ProvincialManager` → `Dire
 - Passwords are always hashed with **BCrypt**; never stored or logged in plain text.
 
 ### Git / Commits
-- Commit messages: `feat:` / `fix:` / `chore:` / `refactor:` / `docs:` prefix +
-  a short **Turkish** description.
+- Commit messages must be written in **English**.
+- Use a conventional prefix such as `feat:`, `fix:`, `chore:`, `refactor:`,
+  `docs:`, or `test:` followed by a short English description.
 - End the commit body with a `Co-Authored-By: ...` line (for assistant commits).
 - Small, logical commits. Push at the end of the day.
 
@@ -83,3 +84,5 @@ hierarchy `BranchEmployee` → `BranchManager` → `ProvincialManager` → `Dire
 - Advance large changes step by step, with user approval.
 - **Mimic existing patterns** — when adding a new module, follow the file
   structure and flow of an existing module (e.g. Loans, Cards) exactly.
+
+## Imported Claude Cowork project instructions
