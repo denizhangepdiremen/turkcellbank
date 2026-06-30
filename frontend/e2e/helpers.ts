@@ -100,9 +100,9 @@ const DASHBOARD_TAB_GROUP_BY_LABEL: Record<DashboardTabLabel, string> = {
   Ödemeler: 'Günlük Bankacılık',
   Faturalar: 'Fatura & Talimat',
   Talimatlar: 'Fatura & Talimat',
-  Krediler: 'Kredi, Kart, Mevduat',
-  Kartlar: 'Kredi, Kart, Mevduat',
-  'Vadeli Mevduat': 'Kredi, Kart, Mevduat',
+  Krediler: 'Kredi, Kart, Yatırım',
+  Kartlar: 'Kredi, Kart, Yatırım',
+  'Vadeli Mevduat': 'Kredi, Kart, Yatırım',
   Güvenlik: 'Güvenlik',
 }
 
