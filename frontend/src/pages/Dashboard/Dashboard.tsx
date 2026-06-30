@@ -447,10 +447,20 @@ function ListSkeleton() {
   )
 }
 
+// Kayıtlı alıcı için avatar baş harfleri (ör. "Ahmet Yılmaz" -> "AY")
+const recipientInitials = (name: string) =>
+  name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w.charAt(0).toLocaleUpperCase('tr-TR'))
+    .join('') || '?'
+
 // Garanti gibi: üstte sekmeler, tek seferde tek bölüm görünür (aşağı kaydırma derdi yok)
 const DASHBOARD_TABS = [
   { id: 'accounts', label: 'Hesaplarım' },
   { id: 'transactions', label: 'İşlemler' },
+  { id: 'recipients', label: 'Alıcılarım' },
   { id: 'loans', label: 'Krediler' },
   { id: 'cards', label: 'Kartlar' },
   { id: 'payments', label: 'Ödemeler' },
@@ -462,7 +472,7 @@ const DASHBOARD_TABS = [
 type DashboardTab = (typeof DASHBOARD_TABS)[number]['id']
 
 const DASHBOARD_TAB_GROUPS = [
-  { id: 'daily', label: 'Günlük Bankacılık', tabs: ['accounts', 'transactions', 'payments'] },
+  { id: 'daily', label: 'Günlük Bankacılık', tabs: ['accounts', 'transactions', 'recipients', 'payments'] },
   { id: 'billing', label: 'Fatura & Talimat', tabs: ['bills', 'orders'] },
   { id: 'products', label: 'Kredi, Kart, Mevduat', tabs: ['loans', 'cards', 'deposits'] },
   { id: 'security', label: 'Güvenlik', tabs: ['security'] },
@@ -765,6 +775,16 @@ export function Dashboard() {
     queryFn: getRecipients,
   })
   const recipients = recipientsData?.data ?? []
+  const [recipientSearch, setRecipientSearch] = useState('')
+  const filteredRecipients = recipients.filter((r) => {
+    const q = recipientSearch.trim().toLocaleLowerCase('tr-TR')
+    if (!q) return true
+    return (
+      r.name.toLocaleLowerCase('tr-TR').includes(q)
+      || r.iban.toLocaleLowerCase('tr-TR').includes(q)
+      || (r.note ?? '').toLocaleLowerCase('tr-TR').includes(q)
+    )
+  })
   const selectedRecipient = recipients.find((r) => r.id === selectedRecipientId)
   const normalizedTransferIban = normalizeIban(toIban)
   const transferIbanAlreadySaved = recipients.some((r) => r.iban === normalizedTransferIban)
@@ -804,6 +824,7 @@ export function Dashboard() {
   const [txMinAmount, setTxMinAmount] = useState('')
   const [txMaxAmount, setTxMaxAmount] = useState('')
   const [txSearch, setTxSearch] = useState('')
+  const [txFilterOpen, setTxFilterOpen] = useState(false)
 
   const isAllAccounts = historyAccountId === ALL_ACCOUNTS
 
@@ -830,6 +851,15 @@ export function Dashboard() {
       || txMaxAmount
       || txSearch.trim(),
   )
+  const activeTxFilterCount = [
+    txFromDate,
+    txToDate,
+    txType,
+    txDirection,
+    txMinAmount,
+    txMaxAmount,
+    txSearch.trim(),
+  ].filter(Boolean).length
 
   useEffect(() => {
     setTxVisible(PAGE_SIZE)
@@ -1766,64 +1796,6 @@ export function Dashboard() {
 
         {activeTab === 'transactions' && (
           <>
-        {/* Kayıtlı alıcılar */}
-        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
-          <h2 className="dashboard-section-title">Kayıtlı Alıcılar</h2>
-          <Button size="sm" variant="primary" onClick={openRecipientModal}>
-            + Alıcı Ekle
-          </Button>
-        </div>
-
-        <Card>
-          <CardContent>
-            {recipientsLoading ? (
-              <ListSkeleton />
-            ) : recipients.length === 0 ? (
-              <div className="dashboard-state">Henüz kayıtlı alıcınız yok.</div>
-            ) : (
-              <div className="dashboard-recipient-list">
-                {recipients.map((recipient) => (
-                  <div key={recipient.id} className="dashboard-recipient-row">
-                    <div>
-                      <p className="dashboard-recipient-name">{recipient.name}</p>
-                      <p className="dashboard-recipient-iban">{formatIban(recipient.iban)}</p>
-                      {recipient.note && (
-                        <p className="dashboard-recipient-note">{recipient.note}</p>
-                      )}
-                    </div>
-                    <div className="dashboard-recipient-actions">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setFromAccountId(activeAccounts[0]?.id ?? '')
-                          setSelectedRecipientId(recipient.id)
-                          setToIban(formatIbanInput(recipient.iban))
-                          setTransferAmount('')
-                          setTransferDesc(recipient.note ?? '')
-                          setSaveRecipientAfterTransfer(false)
-                          setRecipientNameAfterTransfer('')
-                          setTransferOpen(true)
-                        }}
-                        disabled={activeAccounts.length === 0}
-                      >
-                        Gönder
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setDeleteRecipientTarget(recipient)}
-                      >
-                        Sil
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
         {/* İşlem geçmişi */}
         <div className="dashboard-history-head">
           <div>
@@ -1851,85 +1823,18 @@ export function Dashboard() {
             )}
             <Button
               size="sm"
+              variant={hasTxFilters ? 'primary' : 'secondary'}
+              onClick={() => setTxFilterOpen(true)}
+            >
+              Filtrele{hasTxFilters ? ` (${activeTxFilterCount})` : ''}
+            </Button>
+            <Button
+              size="sm"
               variant="secondary"
               onClick={generateAccountStatement}
               disabled={historyBusy || history.length === 0}
             >
               Ekstre (PDF)
-            </Button>
-          </div>
-        </div>
-
-        <div className="dashboard-tx-tools">
-          <div className="dashboard-tx-filters">
-            <Input
-              label="Başlangıç"
-              type="date"
-              value={txFromDate}
-              onChange={(e) => setTxFromDate(e.target.value)}
-            />
-            <Input
-              label="Bitiş"
-              type="date"
-              value={txToDate}
-              onChange={(e) => setTxToDate(e.target.value)}
-            />
-            <Select
-              label="Tip"
-              options={txTypeOptions}
-              value={txType}
-              onChange={(e) => setTxType(e.target.value as TransactionHistoryFilters['type'])}
-            />
-            <Select
-              label="Yön"
-              options={txDirectionOptions}
-              value={txDirection}
-              onChange={(e) => setTxDirection(e.target.value as TransactionHistoryFilters['direction'])}
-            />
-            <Input
-              label="Min. tutar"
-              type="number"
-              min="0"
-              value={txMinAmount}
-              onChange={(e) => setTxMinAmount(e.target.value)}
-            />
-            <Input
-              label="Maks. tutar"
-              type="number"
-              min="0"
-              value={txMaxAmount}
-              onChange={(e) => setTxMaxAmount(e.target.value)}
-            />
-            <Input
-              label="Ara"
-              value={txSearch}
-              onChange={(e) => setTxSearch(e.target.value)}
-              placeholder="Açıklama, IBAN, kanal"
-            />
-          </div>
-
-          <div className="dashboard-tx-tool-footer">
-            <div className="dashboard-tx-summary" aria-label="Filtreli işlem özeti">
-              <div>
-                <span>Gelen</span>
-                <strong className="in">{formatTL(historyIncome)}</strong>
-              </div>
-              <div>
-                <span>Giden</span>
-                <strong className="out">{formatTL(historyExpense)}</strong>
-              </div>
-              <div>
-                <span>Net</span>
-                <strong>{formatTL(historyIncome - historyExpense)}</strong>
-              </div>
-            </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={clearTransactionFilters}
-              disabled={!hasTxFilters}
-            >
-              Filtreleri temizle
             </Button>
           </div>
         </div>
@@ -2008,6 +1913,103 @@ export function Dashboard() {
                   </div>
                 )}
               </>
+            )}
+          </CardContent>
+        </Card>
+          </>
+        )}
+
+        {activeTab === 'recipients' && (
+          <>
+        {/* Kayıtlı alıcılar — kendi sekmesi (yönetim) */}
+        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+          <div className="dashboard-section-heading">
+            <h2 className="dashboard-section-title">Kayıtlı Alıcılar</h2>
+            {recipients.length > 0 && (
+              <span className="dashboard-recipient-count">{recipients.length}</span>
+            )}
+          </div>
+          <Button size="sm" variant="primary" onClick={openRecipientModal}>
+            + Alıcı Ekle
+          </Button>
+        </div>
+
+        <p className="dashboard-section-hint">
+          Sık para gönderdiğiniz hesapları kaydedin; transfer ekranında tek tıkla seçin.
+        </p>
+
+        {recipients.length > 3 && (
+          <div className="dashboard-recipient-toolbar">
+            <Input
+              value={recipientSearch}
+              onChange={(e) => setRecipientSearch(e.target.value)}
+              placeholder="Alıcı adı veya IBAN ara"
+            />
+          </div>
+        )}
+
+        <Card>
+          <CardContent>
+            {recipientsLoading ? (
+              <ListSkeleton />
+            ) : recipients.length === 0 ? (
+              <div className="dashboard-recipient-empty">
+                <div className="dashboard-recipient-empty-icon" aria-hidden="true">👥</div>
+                <p className="dashboard-recipient-empty-title">Henüz kayıtlı alıcınız yok</p>
+                <p className="dashboard-recipient-empty-sub">
+                  Sık işlem yaptığınız kişileri ekleyin, sonraki transferleriniz çok daha hızlı olsun.
+                </p>
+                <Button size="sm" variant="primary" onClick={openRecipientModal}>
+                  + İlk alıcıyı ekle
+                </Button>
+              </div>
+            ) : filteredRecipients.length === 0 ? (
+              <div className="dashboard-state">"{recipientSearch}" ile eşleşen alıcı yok.</div>
+            ) : (
+              <div className="dashboard-recipient-list">
+                {filteredRecipients.map((recipient) => (
+                  <div key={recipient.id} className="dashboard-recipient-row">
+                    <div className="dashboard-recipient-main">
+                      <div className="dashboard-recipient-avatar" aria-hidden="true">
+                        {recipientInitials(recipient.name)}
+                      </div>
+                      <div>
+                        <p className="dashboard-recipient-name">{recipient.name}</p>
+                        <p className="dashboard-recipient-iban">{formatIban(recipient.iban)}</p>
+                        {recipient.note && (
+                          <p className="dashboard-recipient-note">{recipient.note}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="dashboard-recipient-actions">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setFromAccountId(activeAccounts[0]?.id ?? '')
+                          setSelectedRecipientId(recipient.id)
+                          setToIban(formatIbanInput(recipient.iban))
+                          setTransferAmount('')
+                          setTransferDesc(recipient.note ?? '')
+                          setSaveRecipientAfterTransfer(false)
+                          setRecipientNameAfterTransfer('')
+                          setTransferOpen(true)
+                        }}
+                        disabled={activeAccounts.length === 0}
+                      >
+                        Gönder
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleteRecipientTarget(recipient)}
+                      >
+                        Sil
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -2574,6 +2576,94 @@ export function Dashboard() {
       </div>
 
       {/* --- Hesap açma modalı --- */}
+      {/* --- İşlem filtreleme modalı --- */}
+      <Modal
+        open={txFilterOpen}
+        onClose={() => setTxFilterOpen(false)}
+        title="İşlemleri Filtrele"
+        className="max-w-2xl"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={clearTransactionFilters}
+              disabled={!hasTxFilters}
+            >
+              Filtreleri temizle
+            </Button>
+            <Button variant="primary" onClick={() => setTxFilterOpen(false)}>
+              Tamam
+            </Button>
+          </>
+        }
+      >
+        <div className="dashboard-tx-filters">
+          <Input
+            label="Başlangıç"
+            type="date"
+            value={txFromDate}
+            onChange={(e) => setTxFromDate(e.target.value)}
+          />
+          <Input
+            label="Bitiş"
+            type="date"
+            value={txToDate}
+            onChange={(e) => setTxToDate(e.target.value)}
+          />
+          <Select
+            label="Tip"
+            options={txTypeOptions}
+            value={txType}
+            onChange={(e) => setTxType(e.target.value as TransactionHistoryFilters['type'])}
+          />
+          <Select
+            label="Yön"
+            options={txDirectionOptions}
+            value={txDirection}
+            onChange={(e) => setTxDirection(e.target.value as TransactionHistoryFilters['direction'])}
+          />
+          <Input
+            label="Min. tutar"
+            type="number"
+            min="0"
+            value={txMinAmount}
+            onChange={(e) => setTxMinAmount(e.target.value)}
+          />
+          <Input
+            label="Maks. tutar"
+            type="number"
+            min="0"
+            value={txMaxAmount}
+            onChange={(e) => setTxMaxAmount(e.target.value)}
+          />
+          <Input
+            label="Ara"
+            value={txSearch}
+            onChange={(e) => setTxSearch(e.target.value)}
+            placeholder="Açıklama, IBAN, kanal"
+          />
+        </div>
+
+        <div
+          className="dashboard-tx-summary"
+          aria-label="Filtreli işlem özeti"
+          style={{ marginTop: '1.25rem' }}
+        >
+          <div>
+            <span>Gelen</span>
+            <strong className="in">{formatTL(historyIncome)}</strong>
+          </div>
+          <div>
+            <span>Giden</span>
+            <strong className="out">{formatTL(historyExpense)}</strong>
+          </div>
+          <div>
+            <span>Net</span>
+            <strong>{formatTL(historyIncome - historyExpense)}</strong>
+          </div>
+        </div>
+      </Modal>
+
       <Modal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
