@@ -44,6 +44,8 @@ public static class DependencyInjection
         services.AddScoped<Features.PaymentOrders.IPaymentOrderExecutor, Features.PaymentOrders.PaymentOrderExecutor>();
         services.AddScoped<Features.TimeDeposits.ITimeDepositService, Features.TimeDeposits.TimeDepositService>();
         services.AddScoped<Features.TimeDeposits.ITimeDepositMaturityProcessor, Features.TimeDeposits.TimeDepositMaturityProcessor>();
+        services.AddScoped<Features.Fx.IFxService, Features.Fx.FxService>();
+        services.AddScoped<Features.Fx.IExchangeRateUpdater, Features.Fx.ExchangeRateUpdater>();
 
         // Validator'lar
         services.AddScoped<IValidator<RegisterRequest>, RegisterRequestValidator>();
@@ -61,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<IValidator<Features.Bills.Dtos.PayBillRequest>, Features.Bills.Validators.PayBillRequestValidator>();
         services.AddScoped<IValidator<Features.PaymentOrders.Dtos.CreatePaymentOrderRequest>, Features.PaymentOrders.Validators.CreatePaymentOrderRequestValidator>();
         services.AddScoped<IValidator<Features.TimeDeposits.Dtos.OpenTimeDepositRequest>, Features.TimeDeposits.Validators.OpenTimeDepositRequestValidator>();
+        services.AddScoped<IValidator<Features.Fx.Dtos.FxTradeRequest>, Features.Fx.Validators.FxTradeRequestValidator>();
 
         return services;
     }

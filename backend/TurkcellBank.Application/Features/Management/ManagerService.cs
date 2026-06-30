@@ -167,7 +167,7 @@ public class ManagerService : IManagerService
     }
 
     private static AccountDto Map(Account a) =>
-        new(a.Id, a.Iban, a.AccountType, a.Balance, a.IsActive, a.IsFrozen,
+        new(a.Id, a.Iban, a.AccountType, a.Currency, a.Balance, a.IsActive, a.IsFrozen,
             a.FreezeType.ToString(), a.CreatedAt);
 
     private static LoanDto MapLoan(LoanApplication l) =>

@@ -33,6 +33,38 @@ public static class DbSeeder
         await SeedDemoCustomersAsync(db, passwordHasher, configuration);
         await SeedReferenceCreditRecordsAsync(db);
         await SeedExternalBankLoansAsync(db);
+        await SeedExchangeRatesAsync(db);
+    }
+
+    // Döviz/altın başlangıç kurları (yalnız boşsa). Arka plan servisi sonra oynatır.
+    private static async Task SeedExchangeRatesAsync(AppDbContext db)
+    {
+        if (await db.ExchangeRates.AnyAsync()) return;
+
+        // (Birim, referans ortalama TL kuru) — gerçekçi başlangıç seviyeleri.
+        var seeds = new (Currency Currency, decimal BaseMid)[]
+        {
+            (Currency.USD, 46.64m),
+            (Currency.EUR, 53.23m),
+            (Currency.XAU, 5955.00m), // gram altın
+        };
+
+        var now = DateTime.UtcNow;
+        foreach (var (currency, baseMid) in seeds)
+        {
+            var spread = decimal.Round(baseMid * Application.Features.Fx.FxCatalog.HalfSpread, 4);
+            db.ExchangeRates.Add(new ExchangeRate
+            {
+                Id = Guid.NewGuid(),
+                Currency = currency,
+                BaseMid = baseMid,
+                BuyRate = baseMid - spread,
+                SellRate = baseMid + spread,
+                UpdatedAt = now,
+            });
+        }
+
+        await db.SaveChangesAsync();
     }
 
     private static async Task SeedAdminAsync(

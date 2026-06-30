@@ -30,6 +30,8 @@ public class AppDbContext : DbContext
     public DbSet<BillPayment> BillPayments => Set<BillPayment>();
     public DbSet<PaymentOrder> PaymentOrders => Set<PaymentOrder>();
     public DbSet<TimeDeposit> TimeDeposits => Set<TimeDeposit>();
+    public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
+    public DbSet<FxTrade> FxTrades => Set<FxTrade>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -165,6 +167,36 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // --- ExchangeRate tablosu kuralları ---
+        modelBuilder.Entity<ExchangeRate>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.Currency).HasConversion<string>().HasMaxLength(3);
+            entity.HasIndex(r => r.Currency).IsUnique(); // her birimden tek kur satırı
+            entity.Property(r => r.BuyRate).HasPrecision(18, 4);
+            entity.Property(r => r.SellRate).HasPrecision(18, 4);
+            entity.Property(r => r.BaseMid).HasPrecision(18, 4);
+        });
+
+        // --- FxTrade tablosu kuralları ---
+        modelBuilder.Entity<FxTrade>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.Side).HasConversion<string>().HasMaxLength(10);
+            entity.Property(t => t.Currency).HasConversion<string>().HasMaxLength(3);
+            entity.Property(t => t.Amount).HasPrecision(18, 2);
+            entity.Property(t => t.Rate).HasPrecision(18, 4);
+            entity.Property(t => t.TryAmount).HasPrecision(18, 2);
+            entity.Property(t => t.Channel).HasConversion<string>().HasMaxLength(10);
+
+            entity.HasIndex(t => t.UserId);
+
+            entity.HasOne(t => t.User)
+                .WithMany()
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // --- Account tablosu kuralları ---
         modelBuilder.Entity<Account>(entity =>
         {
@@ -174,6 +206,8 @@ public class AppDbContext : DbContext
             entity.HasIndex(a => a.Iban).IsUnique(); // IBAN benzersiz
 
             entity.Property(a => a.AccountType).HasConversion<string>().HasMaxLength(20);
+
+            entity.Property(a => a.Currency).HasConversion<string>().HasMaxLength(3);
 
             entity.Property(a => a.Balance).HasPrecision(18, 2); // para hassasiyeti
 

@@ -56,6 +56,7 @@ public class AccountService : IAccountService
             UserId = _ctx.ActingUserId, // hesap, işlemin sahibine ait (müşteri)
             Iban = iban,
             AccountType = request.AccountType,
+            Currency = request.Currency, // TL (varsayılan) ya da döviz/altın
             Balance = 0m, // yeni hesap sıfır bakiyeyle açılır
             IsActive = true,
             IsFrozen = false,
@@ -189,6 +190,6 @@ public class AccountService : IAccountService
 
     // Entity -> DTO dönüşümü (hassas/iç alanlar dışarı çıkmaz)
     private static AccountDto Map(Account a) =>
-        new(a.Id, a.Iban, a.AccountType, a.Balance, a.IsActive, a.IsFrozen,
+        new(a.Id, a.Iban, a.AccountType, a.Currency, a.Balance, a.IsActive, a.IsFrozen,
             a.FreezeType.ToString(), a.CreatedAt);
 }

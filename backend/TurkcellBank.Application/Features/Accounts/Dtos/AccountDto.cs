@@ -7,6 +7,7 @@ public record AccountDto(
     Guid Id,
     string Iban,
     AccountType AccountType,
+    Currency Currency, // TRY / USD / EUR / XAU (gram altın)
     decimal Balance,
     bool IsActive,
     bool IsFrozen,

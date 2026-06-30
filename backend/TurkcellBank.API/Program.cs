@@ -141,6 +141,8 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<TurkcellBank.API.Services.PaymentOrderWorker>();
 // Vadesi dolan vadeli mevduatları periyodik işleyen arka plan servisi
 builder.Services.AddHostedService<TurkcellBank.API.Services.TimeDepositWorker>();
+// Döviz/altın kurlarını periyodik oynatan arka plan servisi (canlı kur hissi)
+builder.Services.AddHostedService<TurkcellBank.API.Services.FxRateWorker>();
 
 // --- JWT kimlik doğrulama ---
 // Gelen "Authorization: Bearer <token>" başlığındaki token'ı otomatik doğrular

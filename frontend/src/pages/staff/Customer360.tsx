@@ -43,6 +43,8 @@ function txTypeLabel(type: string) {
   if (type === 'BillPayment') return 'Fatura Ödemesi'
   if (type === 'TimeDepositOpen') return 'Vadeli Mevduat Açılışı'
   if (type === 'TimeDepositMaturity') return 'Vadeli Mevduat Getirisi'
+  if (type === 'FxBuy') return 'Döviz / Altın Alış'
+  if (type === 'FxSell') return 'Döviz / Altın Satış'
   return type
 }
 

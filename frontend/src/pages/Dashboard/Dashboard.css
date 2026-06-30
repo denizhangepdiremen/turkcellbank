@@ -875,6 +875,108 @@
   max-width: 26rem;
 }
 
+/* --- Döviz & Altın --- */
+.dashboard-fx-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #059669; /* emerald-600 */
+  letter-spacing: 0.02em;
+}
+
+.dashboard-fx-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 720px) {
+  .dashboard-fx-board {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-fx-rate {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.dashboard-fx-rate-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.dashboard-fx-rate-code {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #4f46e5; /* indigo-600 */
+  letter-spacing: 0.02em;
+}
+
+.dashboard-fx-rate-name {
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.dashboard-fx-rate-prices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.dashboard-fx-rate-prices > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.dashboard-fx-rate-prices span {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dashboard-fx-rate-prices strong {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-fx-rate-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dashboard-fx-rate-actions button {
+  flex: 1;
+}
+
+.dashboard-fx-acc-badge {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fef3c7; /* amber-100 — varlık vurgusu */
+  color: #b45309; /* amber-700 */
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.dashboard-fx-hint {
+  margin: 0.4rem 0 0;
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
 .dashboard-tx-receipt:hover {
   background-color: transparent;
   text-decoration: underline;

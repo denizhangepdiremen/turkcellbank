@@ -27,10 +27,14 @@ export interface AuthResponse {
 
 export type AccountType = 'Bireysel' | 'Isletme'
 
+// TRY = Türk Lirası, USD/EUR döviz, XAU = gram altın
+export type Currency = 'TRY' | 'USD' | 'EUR' | 'XAU'
+
 export interface Account {
   id: string
   iban: string
   accountType: AccountType
+  currency: Currency
   balance: number
   isActive: boolean // false = kapalı (listede gösterilmez)
   isFrozen: boolean // true = dondurulmuş/deaktive (listede kalır, işlem yapılamaz)
@@ -50,6 +54,8 @@ export interface Transaction {
     | 'BillPayment'
     | 'TimeDepositOpen'
     | 'TimeDepositMaturity'
+    | 'FxBuy'
+    | 'FxSell'
   direction: 'In' | 'Out' // gelen / giden (o hesabın bakışıyla)
   amount: number
   counterpartyIban: string | null
@@ -170,6 +176,43 @@ export interface TimeDeposit {
   openedAt: string
   maturityDate: string
   closedAt: string | null
+}
+
+// --- Döviz & Altın ---
+export type FxTradeSide = 'Buy' | 'Sell'
+
+// Kur tahtası satırı (1 birim = ? TL)
+export interface ExchangeRate {
+  currency: Currency
+  code: string
+  name: string
+  unit: string
+  buyRate: number
+  sellRate: number
+  updatedAt: string
+}
+
+// Alış/satış öncesi anlık fiyat sorgusu sonucu
+export interface FxQuote {
+  side: FxTradeSide
+  currency: Currency
+  amount: number
+  rate: number
+  tryAmount: number
+}
+
+// Gerçekleşen döviz/altın işlemi
+export interface FxTrade {
+  id: string
+  side: FxTradeSide
+  currency: Currency
+  code: string
+  amount: number
+  rate: number
+  tryAmount: number
+  tryIban: string
+  foreignIban: string
+  createdAt: string
 }
 
 export type CardStatus = 'Pending' | 'Approved' | 'Rejected' | 'Blocked'

@@ -17,6 +17,10 @@ public class Account
 
     public AccountType AccountType { get; set; }
 
+    // Hesabın para birimi. Varsayılan TRY; döviz/altın hesapları USD/EUR/XAU olur.
+    // Bakiye bu birim cinsinden tutulur (XAU için gram).
+    public Currency Currency { get; set; } = Currency.TRY;
+
     // Para alanı: decimal (kuruş hassasiyeti). Yeni hesap 0 bakiyeyle açılır.
     public decimal Balance { get; set; }
 
