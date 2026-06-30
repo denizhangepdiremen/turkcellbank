@@ -15,3 +15,11 @@ export async function markAllNotificationsRead() {
   )
   return data
 }
+
+export async function markNotificationRead(id: string) {
+  const { data } = await apiClient.post<ApiResponse<string>>(
+    `/api/notifications/${id}/read`,
+    {},
+  )
+  return data
+}

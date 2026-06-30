@@ -6,9 +6,6 @@ const formatTL = (n: number) =>
 const trDate = (iso: string) =>
   new Date(iso).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })
 
-const esc = (s: string) =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-
 const txTypeLabel = (type: Transaction['type']) => {
   if (type === 'Deposit') return 'Para Yatırma'
   if (type === 'Transfer') return 'Havale'
@@ -22,33 +19,60 @@ const txTypeLabel = (type: Transaction['type']) => {
   return type
 }
 
-export interface TransactionReceiptInput {
-  transaction: Transaction
+const esc = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+export interface AccountStatementInput {
   customerName: string
+  accountLabel: string
   accountIban?: string | null
+  transactions: Transaction[]
+  fromDate?: string
+  toDate?: string
 }
 
-export function openTransactionReceipt({
-  transaction,
+export function openAccountStatement({
   customerName,
+  accountLabel,
   accountIban,
-}: TransactionReceiptInput) {
-  const iban = accountIban ?? transaction.accountIban
-  const amountSign = transaction.direction === 'In' ? '+' : '-'
-  const directionLabel = transaction.direction === 'In' ? 'Gelen' : 'Giden'
-  const counterpartyLabel = transaction.direction === 'In' ? 'Gönderen / Kaynak' : 'Alıcı / Hedef'
-  const channelLabel =
-    transaction.channel === 'Branch'
-      ? 'Şube'
-      : transaction.channel === 'Automatic'
-        ? 'Otomatik Talimat'
-        : 'İnternet Bankacılığı'
+  transactions,
+  fromDate,
+  toDate,
+}: AccountStatementInput) {
+  const sorted = [...transactions].sort(
+    (a, b) => +new Date(a.createdAt) - +new Date(b.createdAt),
+  )
+  const income = sorted
+    .filter((tx) => tx.direction === 'In')
+    .reduce((sum, tx) => sum + tx.amount, 0)
+  const expense = sorted
+    .filter((tx) => tx.direction === 'Out')
+    .reduce((sum, tx) => sum + tx.amount, 0)
+  const period = fromDate || toDate
+    ? `${fromDate || 'Başlangıç'} - ${toDate || 'Bugün'}`
+    : 'Tüm dönem'
+
+  const rows = sorted
+    .map((tx) => {
+      const sign = tx.direction === 'In' ? '+' : '-'
+      return `
+        <tr>
+          <td>${trDate(tx.createdAt)}</td>
+          <td>${txTypeLabel(tx.type)}</td>
+          <td>${esc(tx.description || '-')}</td>
+          <td>${tx.counterpartyIban ? esc(tx.counterpartyIban) : '-'}</td>
+          <td class="amount ${tx.direction === 'In' ? 'in' : 'out'}">${sign}${formatTL(tx.amount)}</td>
+        </tr>`
+    })
+    .join('')
+
+  const emptyRow = '<tr><td colspan="5" class="empty">Bu dönemde işlem bulunmuyor.</td></tr>'
 
   const html = `<!doctype html>
 <html lang="tr">
 <head>
 <meta charset="utf-8" />
-<title>İşlem Dekontu - ${esc(transaction.id.slice(0, 8))}</title>
+<title>Hesap Ekstresi - ${esc(accountLabel)}</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #1e293b; margin: 0; padding: 40px; }
@@ -58,10 +82,13 @@ export function openTransactionReceipt({
   .meta-row { display: flex; justify-content: space-between; gap: 24px; font-size: 13px; padding: 4px 0; }
   .meta-row span:first-child { color: #64748b; }
   .meta-row span:last-child { font-weight: 600; text-align: right; }
-  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
   th { text-align: left; background: #f1f5f9; color: #475569; padding: 10px; border-bottom: 2px solid #e2e8f0; }
-  th.amount, td.amount { text-align: right; }
-  td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; }
+  th.amount, td.amount { text-align: right; white-space: nowrap; }
+  td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+  td.empty { text-align: center; color: #94a3b8; padding: 24px; }
+  td.in { color: #059669; font-weight: 700; }
+  td.out { color: #dc2626; font-weight: 700; }
   .totals { margin-top: 16px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
   .totals .row { display: flex; gap: 24px; font-size: 13px; }
   .totals .row span:first-child { color: #64748b; }
@@ -72,44 +99,37 @@ export function openTransactionReceipt({
 </head>
 <body>
   <div class="brand">TurkcellBank</div>
-  <div class="doc-title">İşlem Dekontu</div>
+  <div class="doc-title">Hesap Hareketleri Ekstresi</div>
 
   <div class="meta">
     <div class="meta-row"><span>Müşteri</span><span>${esc(customerName)}</span></div>
-    <div class="meta-row"><span>İşlem No</span><span>${esc(transaction.id)}</span></div>
-    <div class="meta-row"><span>Referans Kodu</span><span>TRX-${esc(transaction.id.slice(0, 8).toUpperCase())}</span></div>
-    <div class="meta-row"><span>İşlem Tarihi</span><span>${trDate(transaction.createdAt)}</span></div>
-    <div class="meta-row"><span>Kanal</span><span>${channelLabel}</span></div>
-    <div class="meta-row"><span>Hesap</span><span>${iban ? esc(iban) : '-'}</span></div>
-    <div class="meta-row"><span>${counterpartyLabel}</span><span>${transaction.counterpartyIban ? esc(transaction.counterpartyIban) : '-'}</span></div>
+    <div class="meta-row"><span>Hesap</span><span>${esc(accountLabel)}</span></div>
+    <div class="meta-row"><span>IBAN</span><span>${accountIban ? esc(accountIban) : '-'}</span></div>
+    <div class="meta-row"><span>Dönem</span><span>${esc(period)}</span></div>
+    <div class="meta-row"><span>Düzenleme Tarihi</span><span>${trDate(new Date().toISOString())}</span></div>
   </div>
 
   <table>
     <thead>
       <tr>
+        <th>Tarih</th>
         <th>İşlem</th>
-        <th>Yön</th>
         <th>Açıklama</th>
+        <th>Karşı Hesap</th>
         <th class="amount">Tutar</th>
       </tr>
     </thead>
-    <tbody>
-      <tr>
-        <td>${txTypeLabel(transaction.type)}</td>
-        <td>${directionLabel}</td>
-        <td>${esc(transaction.description || '-')}</td>
-        <td class="amount">${amountSign}${formatTL(transaction.amount)}</td>
-      </tr>
-    </tbody>
+    <tbody>${rows || emptyRow}</tbody>
   </table>
 
   <div class="totals">
-    <div class="row"><span>İşlem Yönü</span><span>${directionLabel}</span></div>
-    <div class="row net"><span>İşlem Tutarı</span><span>${amountSign}${formatTL(transaction.amount)}</span></div>
+    <div class="row"><span>Toplam Gelen</span><span>${formatTL(income)}</span></div>
+    <div class="row"><span>Toplam Giden</span><span>${formatTL(expense)}</span></div>
+    <div class="row net"><span>Net Hareket</span><span>${formatTL(income - expense)}</span></div>
   </div>
 
   <div class="footer">
-    Bu belge TurkcellBank tarafından oluşturulmuş işlem dekontudur (eğitim simülasyonu).
+    Bu belge TurkcellBank tarafından oluşturulmuş hesap hareketleri ekstresidir (eğitim simülasyonu).
   </div>
 
   <script>
@@ -118,7 +138,7 @@ export function openTransactionReceipt({
 </body>
 </html>`
 
-  const win = window.open('', '_blank', 'width=800,height=900')
+  const win = window.open('', '_blank', 'width=900,height=900')
   if (!win) return false
   win.document.open()
   win.document.write(html)

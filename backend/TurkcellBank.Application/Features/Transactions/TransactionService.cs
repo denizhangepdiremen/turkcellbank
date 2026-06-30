@@ -146,17 +146,96 @@ public class TransactionService : ITransactionService
         var list = await _transactions.GetByAccountIdAsync(accountId);
 
         // Her işlemi BU hesabın bakış açısıyla çevir (gelen mi giden mi)
-        return list.Select(t =>
+        return list.Select(t => ToDto(t, accountId, account!.Iban)).ToList();
+    }
+
+    public async Task<TransactionHistoryResult> SearchHistoryAsync(Guid accountId, TransactionHistoryQuery query)
+    {
+        var account = await _accounts.GetByIdAsync(accountId);
+        EnsureOwnedAndActive(account, requireActive: false);
+
+        var list = await _transactions.GetByAccountIdAsync(accountId);
+        var rows = list.Select(t => ToDto(t, accountId, account!.Iban));
+
+        if (query.FromDate is { } fromDate)
+            rows = rows.Where(t => t.CreatedAt >= fromDate);
+
+        if (query.ToDate is { } toDate)
+            rows = rows.Where(t => t.CreatedAt <= toDate);
+
+        if (!string.IsNullOrWhiteSpace(query.Type)
+            && Enum.TryParse<TransactionType>(query.Type, ignoreCase: true, out var type))
+            rows = rows.Where(t => t.Type == type.ToString());
+
+        if (!string.IsNullOrWhiteSpace(query.Direction))
         {
-            var isOutgoing = t.FromAccountId == accountId;
-            var direction = isOutgoing ? "Out" : "In";
-            var counterparty = isOutgoing ? t.ToIban : t.FromIban; // deposit'te FromIban null
-            return new TransactionDto(
-                t.Id, t.Type.ToString(), direction, t.Amount, counterparty, account.Iban, t.Description, t.Channel.ToString(), t.CreatedAt);
-        }).ToList();
+            var direction = query.Direction.Trim();
+            rows = rows.Where(t => string.Equals(t.Direction, direction, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (query.MinAmount is { } minAmount)
+            rows = rows.Where(t => t.Amount >= minAmount);
+
+        if (query.MaxAmount is { } maxAmount)
+            rows = rows.Where(t => t.Amount <= maxAmount);
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim();
+            rows = rows.Where(t =>
+                Contains(t.Description, search)
+                || Contains(t.CounterpartyIban, search)
+                || Contains(t.AccountIban, search)
+                || Contains(t.Type, search));
+        }
+
+        var filtered = rows.ToList();
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        var items = filtered
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        var income = filtered
+            .Where(t => t.Direction == "In")
+            .Sum(t => t.Amount);
+        var expense = filtered
+            .Where(t => t.Direction == "Out")
+            .Sum(t => t.Amount);
+
+        return new TransactionHistoryResult(
+            items,
+            page,
+            pageSize,
+            filtered.Count,
+            income,
+            expense,
+            income - expense);
     }
 
     // --- yardımcılar ---
+
+    private static TransactionDto ToDto(Transaction transaction, Guid accountId, string accountIban)
+    {
+        var isOutgoing = transaction.FromAccountId == accountId;
+        var direction = isOutgoing ? "Out" : "In";
+        var counterparty = isOutgoing ? transaction.ToIban : transaction.FromIban;
+
+        return new TransactionDto(
+            transaction.Id,
+            transaction.Type.ToString(),
+            direction,
+            transaction.Amount,
+            counterparty,
+            accountIban,
+            transaction.Description,
+            transaction.Channel.ToString(),
+            transaction.CreatedAt);
+    }
+
+    private static bool Contains(string? value, string search)
+        => value?.Contains(search, StringComparison.OrdinalIgnoreCase) == true;
 
     private async Task ValidateAsync<T>(IValidator<T> validator, T request)
     {

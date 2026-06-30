@@ -44,4 +44,12 @@ public class TransactionsController : ControllerBase
         var result = await _transactionService.GetHistoryAsync(accountId);
         return Ok(ApiResponse<List<TransactionDto>>.SuccessResponse(result));
     }
+
+    /// <summary>Filtreli ve sayfalı işlem geçmişi. GET /api/transactions/{accountId}/search</summary>
+    [HttpGet("{accountId:guid}/search")]
+    public async Task<IActionResult> SearchHistory(Guid accountId, [FromQuery] TransactionHistoryQuery query)
+    {
+        var result = await _transactionService.SearchHistoryAsync(accountId, query);
+        return Ok(ApiResponse<TransactionHistoryResult>.SuccessResponse(result));
+    }
 }

@@ -1,5 +1,10 @@
 import { apiClient } from '../lib/apiClient'
-import type { ApiResponse, Transaction } from '../lib/types'
+import type {
+  ApiResponse,
+  Transaction,
+  TransactionHistoryFilters,
+  TransactionHistoryResult,
+} from '../lib/types'
 
 // Para yatırma
 export async function deposit(accountId: string, amount: number) {
@@ -28,6 +33,24 @@ export async function transfer(payload: {
 export async function getHistory(accountId: string) {
   const { data } = await apiClient.get<ApiResponse<Transaction[]>>(
     `/api/transactions/${accountId}`,
+  )
+  return data
+}
+
+export async function getHistoryPage(
+  accountId: string,
+  filters: TransactionHistoryFilters = {},
+) {
+  const params = new URLSearchParams()
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return
+    params.set(key, String(value))
+  })
+
+  const qs = params.toString()
+  const { data } = await apiClient.get<ApiResponse<TransactionHistoryResult>>(
+    `/api/transactions/${accountId}/search${qs ? `?${qs}` : ''}`,
   )
   return data
 }

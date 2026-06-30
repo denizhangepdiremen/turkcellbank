@@ -59,6 +59,28 @@ export interface Transaction {
   createdAt: string
 }
 
+export interface TransactionHistoryFilters {
+  fromDate?: string
+  toDate?: string
+  type?: Transaction['type'] | ''
+  direction?: Transaction['direction'] | ''
+  minAmount?: number
+  maxAmount?: number
+  search?: string
+  page?: number
+  pageSize?: number
+}
+
+export interface TransactionHistoryResult {
+  items: Transaction[]
+  page: number
+  pageSize: number
+  totalCount: number
+  incomeTotal: number
+  expenseTotal: number
+  netTotal: number
+}
+
 export interface SavedRecipient {
   id: string
   name: string

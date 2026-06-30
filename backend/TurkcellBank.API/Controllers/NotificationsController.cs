@@ -34,4 +34,12 @@ public class NotificationsController : ControllerBase
         await _notifications.MarkAllReadAsync();
         return Ok(ApiResponse<string>.SuccessResponse("ok", "Bildirimler okundu."));
     }
+
+    /// <summary>Tek bildirimi okundu işaretle. POST /api/notifications/{id}/read</summary>
+    [HttpPost("{id:guid}/read")]
+    public async Task<IActionResult> MarkOneRead(Guid id)
+    {
+        await _notifications.MarkOneReadAsync(id);
+        return Ok(ApiResponse<string>.SuccessResponse("ok", "Bildirim okundu."));
+    }
 }

@@ -11,5 +11,6 @@ public interface INotificationService
 {
     Task NotifyAsync(Guid userId, string title, string body);
     Task<List<NotificationDto>> GetMineAsync();
+    Task MarkOneReadAsync(Guid notificationId);
     Task MarkAllReadAsync();
 }

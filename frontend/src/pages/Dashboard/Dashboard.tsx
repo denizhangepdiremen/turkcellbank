@@ -22,8 +22,8 @@ import {
   reactivateAccount,
 } from '../../api/accountApi'
 import { updateProfile, changePassword, setTransferLimit } from '../../api/authApi'
-import { getNotifications, markAllNotificationsRead } from '../../api/notificationApi'
-import { deposit, transfer, getHistory } from '../../api/transactionApi'
+import { getNotifications, markAllNotificationsRead, markNotificationRead } from '../../api/notificationApi'
+import { deposit, transfer, getHistory, getHistoryPage } from '../../api/transactionApi'
 import { applyLoan, getMyLoans, getLoanDetail, payInstallment } from '../../api/loanApi'
 import { pay, getMyPayments } from '../../api/paymentApi'
 import { createCard, getMyCards, setCardOnlineShopping } from '../../api/cardApi'
@@ -56,9 +56,11 @@ import type {
   PaymentStatus,
   SavedRecipient,
   Transaction,
+  TransactionHistoryFilters,
 } from '../../lib/types'
 import { openCardStatement } from '../../lib/cardStatement'
 import { openTransactionReceipt } from '../../lib/transactionReceipt'
+import { openAccountStatement } from '../../lib/accountStatement'
 import './Dashboard.css'
 
 const accountTypeOptions = [
@@ -70,6 +72,25 @@ const PAGE_SIZE = 5
 
 // İşlem geçmişinde "tüm hesaplar" seçeneğinin özel değeri
 const ALL_ACCOUNTS = '__all__'
+
+const txTypeOptions = [
+  { value: '', label: 'Tüm işlem tipleri' },
+  { value: 'Deposit', label: 'Para yatırma' },
+  { value: 'Transfer', label: 'Havale' },
+  { value: 'Payment', label: 'Kart ödemesi' },
+  { value: 'Refund', label: 'İade' },
+  { value: 'LoanDisbursement', label: 'Kredi kullandırımı' },
+  { value: 'LoanRepayment', label: 'Kredi taksiti' },
+  { value: 'BillPayment', label: 'Fatura ödemesi' },
+  { value: 'TimeDepositOpen', label: 'Vadeli mevduat açılışı' },
+  { value: 'TimeDepositMaturity', label: 'Vadeli mevduat getirisi' },
+]
+
+const txDirectionOptions = [
+  { value: '', label: 'Tüm yönler' },
+  { value: 'In', label: 'Gelen' },
+  { value: 'Out', label: 'Giden' },
+]
 
 // Kredi durumu -> rozet rengi / Türkçe etiket
 const loanBadgeVariant = (s: LoanStatus) =>
@@ -310,6 +331,39 @@ function getCashFlowSummary(transactions: Transaction[]) {
   const expensePercent = total > 0 ? 100 - incomePercent : 50
 
   return { income, expense, total, incomePercent, expensePercent }
+}
+
+function toStartOfDayIso(date: string) {
+  if (!date) return undefined
+  return new Date(`${date}T00:00:00`).toISOString()
+}
+
+function toEndOfDayIso(date: string) {
+  if (!date) return undefined
+  return new Date(`${date}T23:59:59.999`).toISOString()
+}
+
+function matchesTransactionFilters(
+  tx: Transaction,
+  filters: TransactionHistoryFilters,
+) {
+  if (filters.fromDate && new Date(tx.createdAt) < new Date(filters.fromDate)) return false
+  if (filters.toDate && new Date(tx.createdAt) > new Date(filters.toDate)) return false
+  if (filters.type && tx.type !== filters.type) return false
+  if (filters.direction && tx.direction !== filters.direction) return false
+  if (filters.minAmount !== undefined && tx.amount < filters.minAmount) return false
+  if (filters.maxAmount !== undefined && tx.amount > filters.maxAmount) return false
+
+  const search = filters.search?.trim().toLocaleLowerCase('tr-TR')
+  if (!search) return true
+
+  return [
+    tx.description,
+    tx.counterpartyIban,
+    tx.accountIban,
+    tx.type,
+    tx.channel,
+  ].some((value) => value?.toLocaleLowerCase('tr-TR').includes(search))
 }
 
 function CashFlowSummary({
@@ -568,9 +622,12 @@ export function Dashboard() {
     mutationFn: markAllNotificationsRead,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   })
+  const markOneReadMutation = useMutation({
+    mutationFn: markNotificationRead,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  })
   function openNotifications() {
     setNotifOpen(true)
-    if (unreadCount > 0) markReadMutation.mutate() // açınca okundu işaretle
   }
 
   // --- Hesaplar ---
@@ -740,17 +797,48 @@ export function Dashboard() {
   // --- İşlem geçmişi (seçili hesap ya da tüm hesaplar) ---
   const [historyAccountId, setHistoryAccountId] = useState(ALL_ACCOUNTS)
   const [txVisible, setTxVisible] = useState(PAGE_SIZE)
+  const [txFromDate, setTxFromDate] = useState('')
+  const [txToDate, setTxToDate] = useState('')
+  const [txType, setTxType] = useState<TransactionHistoryFilters['type']>('')
+  const [txDirection, setTxDirection] = useState<TransactionHistoryFilters['direction']>('')
+  const [txMinAmount, setTxMinAmount] = useState('')
+  const [txMaxAmount, setTxMaxAmount] = useState('')
+  const [txSearch, setTxSearch] = useState('')
 
   const isAllAccounts = historyAccountId === ALL_ACCOUNTS
 
   // Tek hesap seçilirse ek geçmiş sorgusu yalnız İşlemler sekmesinde çalışsın.
   // Tüm Hesaplar görünümü üst özet için zaten çekilen hesap geçmişlerini kullanır.
   const txTabActive = activeTab === 'transactions'
+  const txFilters: TransactionHistoryFilters = {
+    fromDate: toStartOfDayIso(txFromDate),
+    toDate: toEndOfDayIso(txToDate),
+    type: txType,
+    direction: txDirection,
+    minAmount: txMinAmount ? Number(txMinAmount) : undefined,
+    maxAmount: txMaxAmount ? Number(txMaxAmount) : undefined,
+    search: txSearch.trim() || undefined,
+    page: 1,
+    pageSize: txVisible,
+  }
+  const hasTxFilters = Boolean(
+    txFromDate
+      || txToDate
+      || txType
+      || txDirection
+      || txMinAmount
+      || txMaxAmount
+      || txSearch.trim(),
+  )
+
+  useEffect(() => {
+    setTxVisible(PAGE_SIZE)
+  }, [historyAccountId, txFromDate, txToDate, txType, txDirection, txMinAmount, txMaxAmount, txSearch])
 
   // Tek hesap görünümü
-  const { data: historyData, isLoading: historyLoading } = useQuery({
-    queryKey: ['transactions', historyAccountId],
-    queryFn: () => getHistory(historyAccountId),
+  const { data: historyPageData, isLoading: historyLoading } = useQuery({
+    queryKey: ['transactions', historyAccountId, txFilters],
+    queryFn: () => getHistoryPage(historyAccountId, txFilters),
     enabled: txTabActive && !!historyAccountId && !isAllAccounts,
   })
 
@@ -767,11 +855,29 @@ export function Dashboard() {
         .sort((x, y) => +new Date(y.createdAt) - +new Date(x.createdAt))
     : []
 
-  const history: HistoryRow[] = isAllAccounts ? mergedHistory : (historyData?.data ?? [])
+  const filteredMergedHistory = mergedHistory.filter((tx) =>
+    matchesTransactionFilters(tx, txFilters),
+  )
+  const history: HistoryRow[] = isAllAccounts
+    ? filteredMergedHistory
+    : (historyPageData?.data?.items ?? [])
+  const visibleHistory = isAllAccounts ? history.slice(0, txVisible) : history
   const historyBusy = isAllAccounts
     ? balanceTrendLoading
     : historyLoading
   const cashFlowSummary = getCashFlowSummary(balanceTrendTransactions)
+  const historyIncome = isAllAccounts
+    ? history.filter((tx) => tx.direction === 'In').reduce((sum, tx) => sum + tx.amount, 0)
+    : (historyPageData?.data?.incomeTotal ?? 0)
+  const historyExpense = isAllAccounts
+    ? history.filter((tx) => tx.direction === 'Out').reduce((sum, tx) => sum + tx.amount, 0)
+    : (historyPageData?.data?.expenseTotal ?? 0)
+  const historyTotalCount = isAllAccounts
+    ? history.length
+    : (historyPageData?.data?.totalCount ?? 0)
+  const historyHasMore = isAllAccounts
+    ? history.length > txVisible
+    : historyTotalCount > txVisible
 
   // --- Krediler ---
   const { data: loansData, isLoading: loansLoading } = useQuery({
@@ -967,6 +1073,34 @@ export function Dashboard() {
       transaction: tx,
       customerName: user?.fullName ?? '',
       accountIban,
+    })
+    if (!ok) toast.error('Açılır pencere engellendi. Lütfen pop-up iznine bakın.')
+  }
+
+  function clearTransactionFilters() {
+    setTxFromDate('')
+    setTxToDate('')
+    setTxType('')
+    setTxDirection('')
+    setTxMinAmount('')
+    setTxMaxAmount('')
+    setTxSearch('')
+  }
+
+  function generateAccountStatement() {
+    const account = accounts.find((a) => a.id === historyAccountId)
+    const accountLabel = isAllAccounts
+      ? 'Tüm Hesaplar'
+      : account
+        ? `${account.accountType} Hesap · ...${account.iban.slice(-4)}`
+        : 'Seçili Hesap'
+    const ok = openAccountStatement({
+      customerName: user?.fullName ?? '',
+      accountLabel,
+      accountIban: isAllAccounts ? null : account?.iban,
+      transactions: history,
+      fromDate: txFromDate || undefined,
+      toDate: txToDate || undefined,
     })
     if (!ok) toast.error('Açılır pencere engellendi. Lütfen pop-up iznine bakın.')
   }
@@ -1692,19 +1826,112 @@ export function Dashboard() {
 
         {/* İşlem geçmişi */}
         <div className="dashboard-history-head">
-          <h2 className="dashboard-section-title">Son İşlemler</h2>
-          {accounts.length > 0 && (
-            <div className="dashboard-history-select">
-              <Select
-                options={accountOptions}
-                value={historyAccountId}
-                onChange={(e) => {
-                  setHistoryAccountId(e.target.value)
-                  setTxVisible(PAGE_SIZE)
-                }}
-              />
+          <div>
+            <h2 className="dashboard-section-title">Son İşlemler</h2>
+            <p className="dashboard-history-caption">
+              {historyTotalCount > 0
+                ? `${historyTotalCount} işlem listeleniyor`
+                : hasTxFilters
+                  ? 'Filtreye uygun işlem bulunamadı'
+                  : 'Hesap hareketlerinizi buradan takip edin'}
+            </p>
+          </div>
+          <div className="dashboard-history-actions">
+            {accounts.length > 0 && (
+              <div className="dashboard-history-select">
+                <Select
+                  options={accountOptions}
+                  value={historyAccountId}
+                  onChange={(e) => {
+                    setHistoryAccountId(e.target.value)
+                    setTxVisible(PAGE_SIZE)
+                  }}
+                />
+              </div>
+            )}
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={generateAccountStatement}
+              disabled={historyBusy || history.length === 0}
+            >
+              Ekstre (PDF)
+            </Button>
+          </div>
+        </div>
+
+        <div className="dashboard-tx-tools">
+          <div className="dashboard-tx-filters">
+            <Input
+              label="Başlangıç"
+              type="date"
+              value={txFromDate}
+              onChange={(e) => setTxFromDate(e.target.value)}
+            />
+            <Input
+              label="Bitiş"
+              type="date"
+              value={txToDate}
+              onChange={(e) => setTxToDate(e.target.value)}
+            />
+            <Select
+              label="Tip"
+              options={txTypeOptions}
+              value={txType}
+              onChange={(e) => setTxType(e.target.value as TransactionHistoryFilters['type'])}
+            />
+            <Select
+              label="Yön"
+              options={txDirectionOptions}
+              value={txDirection}
+              onChange={(e) => setTxDirection(e.target.value as TransactionHistoryFilters['direction'])}
+            />
+            <Input
+              label="Min. tutar"
+              type="number"
+              min="0"
+              value={txMinAmount}
+              onChange={(e) => setTxMinAmount(e.target.value)}
+            />
+            <Input
+              label="Maks. tutar"
+              type="number"
+              min="0"
+              value={txMaxAmount}
+              onChange={(e) => setTxMaxAmount(e.target.value)}
+            />
+            <Input
+              label="Ara"
+              value={txSearch}
+              onChange={(e) => setTxSearch(e.target.value)}
+              placeholder="Açıklama, IBAN, kanal"
+            />
+          </div>
+
+          <div className="dashboard-tx-tool-footer">
+            <div className="dashboard-tx-summary" aria-label="Filtreli işlem özeti">
+              <div>
+                <span>Gelen</span>
+                <strong className="in">{formatTL(historyIncome)}</strong>
+              </div>
+              <div>
+                <span>Giden</span>
+                <strong className="out">{formatTL(historyExpense)}</strong>
+              </div>
+              <div>
+                <span>Net</span>
+                <strong>{formatTL(historyIncome - historyExpense)}</strong>
+              </div>
             </div>
-          )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={clearTransactionFilters}
+              disabled={!hasTxFilters}
+            >
+              Filtreleri temizle
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -1717,7 +1944,7 @@ export function Dashboard() {
               </div>
             ) : (
               <>
-                {history.slice(0, txVisible).map((tx, idx) => {
+                {visibleHistory.map((tx, idx) => {
                   // Mevcut bakiyeden geriye hesaplayarak her işlem anındaki bakiyeyi bul
                   // Bu satırdan sonraki işlemlerin etkisini mevcut bakiyeden çıkar
                   const accountIban = tx.accountIban ?? accounts.find(a => a.id === historyAccountId)?.iban
@@ -1769,7 +1996,7 @@ export function Dashboard() {
                   </div>
                   )
                 })}
-                {history.length > txVisible && (
+                {historyHasMore && (
                   <div className="dashboard-loadmore">
                     <Button
                       size="sm"
@@ -2575,19 +2802,43 @@ export function Dashboard() {
         onClose={() => setNotifOpen(false)}
         title="Bildirimler"
         footer={
-          <Button variant="primary" onClick={() => setNotifOpen(false)}>
-            Kapat
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => markReadMutation.mutate()}
+              disabled={unreadCount === 0 || markReadMutation.isPending}
+            >
+              Tümünü okundu yap
+            </Button>
+            <Button variant="primary" onClick={() => setNotifOpen(false)}>
+              Kapat
+            </Button>
+          </>
         }
       >
         {notifications.length === 0 ? (
           <div className="dashboard-state">Henüz bildiriminiz yok.</div>
         ) : (
           notifications.map((n) => (
-            <div key={n.id} className="dashboard-notif">
-              <p className="dashboard-notif-title">{n.title}</p>
-              <p className="dashboard-notif-body">{n.body}</p>
-              <p className="dashboard-notif-date">{trDate(n.createdAt)}</p>
+            <div key={n.id} className={`dashboard-notif ${n.isRead ? '' : 'unread'}`}>
+              <div>
+                <div className="dashboard-notif-head">
+                  <p className="dashboard-notif-title">{n.title}</p>
+                  {!n.isRead && <span>Yeni</span>}
+                </div>
+                <p className="dashboard-notif-body">{n.body}</p>
+                <p className="dashboard-notif-date">{trDate(n.createdAt)}</p>
+              </div>
+              {!n.isRead && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => markOneReadMutation.mutate(n.id)}
+                  disabled={markOneReadMutation.isPending}
+                >
+                  Okundu
+                </Button>
+              )}
             </div>
           ))
         )}

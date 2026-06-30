@@ -32,5 +32,8 @@ public class NotificationService : INotificationService
         return list.Select(n => new NotificationDto(n.Id, n.Title, n.Body, n.IsRead, n.CreatedAt)).ToList();
     }
 
+    public Task MarkOneReadAsync(Guid notificationId)
+        => _repo.MarkOneReadAsync(_currentUser.UserId, notificationId);
+
     public Task MarkAllReadAsync() => _repo.MarkAllReadAsync(_currentUser.UserId);
 }

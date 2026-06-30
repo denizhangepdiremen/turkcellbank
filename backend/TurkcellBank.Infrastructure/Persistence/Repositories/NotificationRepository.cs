@@ -25,6 +25,17 @@ public class NotificationRepository : INotificationRepository
             .OrderByDescending(n => n.CreatedAt)
             .ToListAsync();
 
+    public async Task MarkOneReadAsync(Guid userId, Guid notificationId)
+    {
+        var notification = await _db.Notifications
+            .FirstOrDefaultAsync(n => n.UserId == userId && n.Id == notificationId);
+
+        if (notification is null || notification.IsRead) return;
+
+        notification.IsRead = true;
+        await _db.SaveChangesAsync();
+    }
+
     public async Task MarkAllReadAsync(Guid userId)
     {
         var unread = await _db.Notifications
