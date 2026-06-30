@@ -56,6 +56,7 @@ export interface Transaction {
     | 'TimeDepositMaturity'
     | 'FxBuy'
     | 'FxSell'
+    | 'FxConvert'
   direction: 'In' | 'Out' // gelen / giden (o hesabın bakışıyla)
   amount: number
   counterpartyIban: string | null
@@ -180,6 +181,7 @@ export interface TimeDeposit {
 
 // --- Döviz & Altın ---
 export type FxTradeSide = 'Buy' | 'Sell'
+export type FxAlertDirection = 'Above' | 'Below'
 
 // Kur tahtası satırı (1 birim = ? TL)
 export interface ExchangeRate {
@@ -212,6 +214,35 @@ export interface FxTrade {
   tryAmount: number
   tryIban: string
   foreignIban: string
+  createdAt: string
+}
+
+export interface FxRateAlert {
+  id: string
+  currency: Currency
+  code: string
+  direction: FxAlertDirection
+  targetRate: number
+  lastCheckedRate: number | null
+  isActive: boolean
+  isTriggered: boolean
+  triggeredAt: string | null
+  createdAt: string
+}
+
+export interface FxConversion {
+  id: string
+  fromCurrency: Currency
+  fromCode: string
+  toCurrency: Currency
+  toCode: string
+  fromAmount: number
+  toAmount: number
+  tryAmount: number
+  fromRate: number
+  toRate: number
+  fromIban: string
+  toIban: string
   createdAt: string
 }
 

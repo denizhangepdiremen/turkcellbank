@@ -799,6 +799,15 @@
   gap: 0.6rem;
 }
 
+/* Bölüm başlığının sağındaki aksiyon butonları — tek grup, ayrık durmasın */
+.dashboard-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .dashboard-recipient-count {
   display: inline-flex;
   align-items: center;
@@ -892,12 +901,6 @@
   gap: 1rem;
 }
 
-@media (max-width: 720px) {
-  .dashboard-fx-board {
-    grid-template-columns: 1fr;
-  }
-}
-
 .dashboard-fx-rate {
   display: flex;
   flex-direction: column;
@@ -957,6 +960,52 @@
   flex: 1;
 }
 
+.dashboard-fx-mini-chart {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.35rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 0.45rem;
+  background: #f8fafc;
+  color: #6b7280;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.dashboard-fx-mini-chart.empty {
+  display: flex;
+  justify-content: center;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.dashboard-fx-mini-chart svg {
+  width: 100%;
+  height: 2rem;
+}
+
+.dashboard-fx-mini-chart polyline {
+  fill: none;
+  stroke: #059669;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dashboard-fx-mini-chart.down polyline {
+  stroke: #dc2626;
+}
+
+.dashboard-fx-mini-chart.up span {
+  color: #059669;
+}
+
+.dashboard-fx-mini-chart.down span {
+  color: #dc2626;
+}
+
 .dashboard-fx-acc-badge {
   flex-shrink: 0;
   width: 2.5rem;
@@ -975,6 +1024,228 @@
   margin: 0.4rem 0 0;
   color: #6b7280;
   font-size: 0.8rem;
+}
+
+.dashboard-fx-portfolio-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard-fx-portfolio-head strong {
+  display: block;
+  margin-top: 0.12rem;
+  color: #111827;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.dashboard-fx-portfolio-head > span,
+.dashboard-fx-portfolio-kicker {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.dashboard-fx-portfolio {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.dashboard-fx-portfolio-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(10rem, 2fr) minmax(7rem, 0.9fr);
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.dashboard-fx-portfolio-label span {
+  display: inline-flex;
+  align-items: center;
+  height: 1.35rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.dashboard-fx-portfolio-label strong {
+  display: block;
+  margin-top: 0.22rem;
+  color: #111827;
+  font-size: 0.88rem;
+}
+
+.dashboard-fx-portfolio-track {
+  height: 0.55rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.dashboard-fx-portfolio-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4f46e5, #0ea5e9);
+}
+
+.dashboard-fx-portfolio-row.usd .dashboard-fx-portfolio-track span {
+  background: linear-gradient(90deg, #0ea5e9, #10b981);
+}
+
+.dashboard-fx-portfolio-row.eur .dashboard-fx-portfolio-track span {
+  background: linear-gradient(90deg, #8b5cf6, #ec4899);
+}
+
+.dashboard-fx-portfolio-row.xau .dashboard-fx-portfolio-track span {
+  background: linear-gradient(90deg, #f59e0b, #facc15);
+}
+
+.dashboard-fx-portfolio-value {
+  text-align: right;
+}
+
+.dashboard-fx-portfolio-value strong {
+  display: block;
+  color: #111827;
+  font-size: 0.88rem;
+}
+
+.dashboard-fx-portfolio-value span {
+  color: #6b7280;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.dashboard-fx-trades {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-fx-trade-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0;
+  border-top: 1px solid #f3f4f6;
+}
+
+.dashboard-fx-trade-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.dashboard-fx-trade-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.dashboard-fx-trade-main p {
+  margin: 0;
+  color: #111827;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.dashboard-fx-trade-main span:not(.dashboard-fx-trade-side) {
+  display: block;
+  margin-top: 0.12rem;
+  color: #6b7280;
+  font-size: 0.78rem;
+}
+
+.dashboard-fx-trade-side {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.1rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.dashboard-fx-trade-side.buy {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.dashboard-fx-trade-side.sell {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.dashboard-fx-trade-side.convert {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.dashboard-fx-trade-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.dashboard-fx-trade-right strong {
+  color: #111827;
+  font-size: 0.92rem;
+}
+
+.dashboard-fx-trade-right > span {
+  color: #6b7280;
+  font-size: 0.76rem;
+}
+
+.dashboard-fx-alerts {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-fx-alert-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0;
+  border-top: 1px solid #f3f4f6;
+}
+
+.dashboard-fx-alert-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.dashboard-fx-alert-row p {
+  margin: 0;
+  color: #111827;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.dashboard-fx-alert-row span:not(.inline-flex) {
+  display: block;
+  margin-top: 0.12rem;
+  color: #6b7280;
+  font-size: 0.78rem;
+}
+
+.dashboard-fx-alert-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .dashboard-tx-receipt:hover {
@@ -1997,5 +2268,28 @@
 
   .dashboard-tx-summary {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-fx-board {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-fx-portfolio-head,
+  .dashboard-fx-trade-row,
+  .dashboard-fx-alert-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboard-fx-portfolio-row {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+
+  .dashboard-fx-portfolio-value,
+  .dashboard-fx-trade-right,
+  .dashboard-fx-alert-actions {
+    align-items: flex-start;
+    text-align: left;
   }
 }

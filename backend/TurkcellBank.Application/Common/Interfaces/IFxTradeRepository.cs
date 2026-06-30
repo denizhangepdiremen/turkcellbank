@@ -14,4 +14,10 @@ public interface IFxTradeRepository
 
     /// <summary>Kullanıcının döviz/altın işlemleri (yeniden eskiye).</summary>
     Task<List<FxTrade>> GetByUserIdAsync(Guid userId);
+
+    /// <summary>Çapraz dönüşümü ve iki işlem bacağını tek SaveChanges ile kaydeder.</summary>
+    Task AddConversionAsync(FxConversion conversion, Transaction debitLeg, Transaction creditLeg);
+
+    /// <summary>Kullanıcının çapraz dönüşümleri (yeniden eskiye).</summary>
+    Task<List<FxConversion>> GetConversionsByUserIdAsync(Guid userId);
 }

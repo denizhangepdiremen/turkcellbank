@@ -1,4 +1,7 @@
 using TurkcellBank.Application.Common.Interfaces;
+using TurkcellBank.Application.Features.Notifications;
+using TurkcellBank.Domain.Entities;
+using TurkcellBank.Domain.Enums;
 
 namespace TurkcellBank.Application.Features.Fx;
 
@@ -11,10 +14,17 @@ namespace TurkcellBank.Application.Features.Fx;
 public class ExchangeRateUpdater : IExchangeRateUpdater
 {
     private readonly IExchangeRateRepository _rates;
+    private readonly IFxRateAlertRepository _alerts;
+    private readonly INotificationService _notifications;
 
-    public ExchangeRateUpdater(IExchangeRateRepository rates)
+    public ExchangeRateUpdater(
+        IExchangeRateRepository rates,
+        IFxRateAlertRepository alerts,
+        INotificationService notifications)
     {
         _rates = rates;
+        _alerts = alerts;
+        _notifications = notifications;
     }
 
     public async Task<int> JitterAsync(CancellationToken ct = default)
@@ -45,6 +55,45 @@ public class ExchangeRateUpdater : IExchangeRateUpdater
         }
 
         await _rates.SaveChangesAsync();
+        await TriggerRateAlertsAsync(rates, now, ct);
         return rates.Count;
+    }
+
+    private async Task TriggerRateAlertsAsync(
+        IReadOnlyCollection<ExchangeRate> rates,
+        DateTime now,
+        CancellationToken ct)
+    {
+        var byCurrency = rates.ToDictionary(r => r.Currency);
+        var alerts = await _alerts.GetActiveAsync();
+
+        foreach (var alert in alerts)
+        {
+            if (ct.IsCancellationRequested) break;
+            if (!byCurrency.TryGetValue(alert.Currency, out var rate)) continue;
+
+            var current = Math.Round((rate.BuyRate + rate.SellRate) / 2m, 4, MidpointRounding.AwayFromZero);
+            alert.LastCheckedRate = current;
+
+            var triggered = alert.Direction == FxAlertDirection.Above
+                ? current >= alert.TargetRate
+                : current <= alert.TargetRate;
+
+            if (!triggered) continue;
+
+            alert.IsTriggered = true;
+            alert.IsActive = false;
+            alert.TriggeredAt = now;
+
+            var code = FxCatalog.Tradable.FirstOrDefault(c => c.Currency == alert.Currency)?.Code
+                ?? alert.Currency.ToString();
+            var direction = alert.Direction == FxAlertDirection.Above ? "üstüne çıktı" : "altına indi";
+            await _notifications.NotifyAsync(
+                alert.UserId,
+                "Kur alarmı gerçekleşti",
+                $"{code} kuru {alert.TargetRate:N4} hedefinin {direction}. Güncel ortalama kur: {current:N4} TL.");
+        }
+
+        await _alerts.SaveChangesAsync();
     }
 }

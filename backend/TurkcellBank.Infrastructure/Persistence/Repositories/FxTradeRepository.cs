@@ -27,4 +27,18 @@ public class FxTradeRepository : IFxTradeRepository
             .Where(t => t.UserId == userId)
             .OrderByDescending(t => t.CreatedAt)
             .ToListAsync();
+
+    public async Task AddConversionAsync(FxConversion conversion, Transaction debitLeg, Transaction creditLeg)
+    {
+        _db.FxConversions.Add(conversion);
+        _db.Transactions.Add(debitLeg);
+        _db.Transactions.Add(creditLeg);
+        await _db.SaveChangesAsync();
+    }
+
+    public Task<List<FxConversion>> GetConversionsByUserIdAsync(Guid userId)
+        => _db.FxConversions
+            .Where(c => c.UserId == userId)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
 }

@@ -17,6 +17,7 @@ public class FxService : IFxService
 {
     private readonly IExchangeRateRepository _rates;
     private readonly IFxTradeRepository _trades;
+    private readonly IFxRateAlertRepository _alerts;
     private readonly IAccountRepository _accounts;
     private readonly IOperationContext _ctx;
     private readonly IValidator<FxTradeRequest> _tradeValidator;
@@ -24,12 +25,14 @@ public class FxService : IFxService
     public FxService(
         IExchangeRateRepository rates,
         IFxTradeRepository trades,
+        IFxRateAlertRepository alerts,
         IAccountRepository accounts,
         IOperationContext ctx,
         IValidator<FxTradeRequest> tradeValidator)
     {
         _rates = rates;
         _trades = trades;
+        _alerts = alerts;
         _accounts = accounts;
         _ctx = ctx;
         _tradeValidator = tradeValidator;
@@ -189,6 +192,105 @@ public class FxService : IFxService
             trade.TryAmount, tryAccount.Iban, foreignAccount.Iban, trade.CreatedAt);
     }
 
+    public async Task<FxConversionDto> ConvertAsync(FxConversionRequest request)
+    {
+        if (!FxCatalog.IsTradable(request.FromCurrency) || !FxCatalog.IsTradable(request.ToCurrency))
+            throw new BusinessException("Çapraz dönüşüm için TRY dışı iki birim seçin.");
+        if (request.FromCurrency == request.ToCurrency)
+            throw new BusinessException("Kaynak ve hedef birim farklı olmalı.");
+        if (request.Amount <= 0)
+            throw new BusinessException("Miktar sıfırdan büyük olmalı.");
+
+        var fromRateRow = await _rates.GetByCurrencyAsync(request.FromCurrency)
+            ?? throw new NotFoundException("Kaynak kur bilgisi bulunamadı.");
+        var toRateRow = await _rates.GetByCurrencyAsync(request.ToCurrency)
+            ?? throw new NotFoundException("Hedef kur bilgisi bulunamadı.");
+
+        var fromAccount = await ResolveForeignAccountAsync(request.FromCurrency, createIfMissing: false)
+            ?? throw new BusinessException($"{CodeOf(request.FromCurrency)} hesabınız bulunmuyor.");
+        if (!fromAccount.IsActive) throw new BusinessException("Kaynak hesap kapalı.");
+        if (fromAccount.IsFrozen) throw new BusinessException("Kaynak hesap dondurulmuş.");
+        if (fromAccount.Balance < request.Amount)
+            throw new BusinessException($"Yetersiz {CodeOf(request.FromCurrency)} bakiyesi.");
+
+        var toAccount = await ResolveForeignAccountAsync(request.ToCurrency, createIfMissing: true);
+
+        var tryAmount = Math.Round(request.Amount * fromRateRow.BuyRate, 2, MidpointRounding.AwayFromZero);
+        if (tryAmount < FxCatalog.MinTradeTry)
+            throw new BusinessException($"İşlem tutarı en az {FxCatalog.MinTradeTry:N0} TL olmalı.");
+
+        var toAmount = Math.Round(tryAmount / toRateRow.SellRate, 2, MidpointRounding.AwayFromZero);
+        var now = DateTime.UtcNow;
+        var fromCode = CodeOf(request.FromCurrency);
+        var toCode = CodeOf(request.ToCurrency);
+
+        fromAccount.Balance -= request.Amount;
+        toAccount.Balance += toAmount;
+
+        var debitLeg = new Transaction
+        {
+            Id = Guid.NewGuid(),
+            Type = TransactionType.FxConvert,
+            FromAccountId = fromAccount.Id,
+            FromIban = fromAccount.Iban,
+            ToAccountId = toAccount.Id,
+            ToIban = toAccount.Iban,
+            Amount = request.Amount,
+            Description = $"{fromCode}->{toCode} dönüşüm",
+            CreatedAt = now,
+            Channel = _ctx.Channel,
+            PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
+        };
+        var creditLeg = new Transaction
+        {
+            Id = Guid.NewGuid(),
+            Type = TransactionType.FxConvert,
+            FromAccountId = fromAccount.Id,
+            FromIban = fromAccount.Iban,
+            ToAccountId = toAccount.Id,
+            ToIban = toAccount.Iban,
+            Amount = toAmount,
+            Description = $"{fromCode}->{toCode} dönüşüm",
+            CreatedAt = now,
+            Channel = _ctx.Channel,
+            PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
+        };
+        var conversion = new FxConversion
+        {
+            Id = Guid.NewGuid(),
+            UserId = _ctx.ActingUserId,
+            FromCurrency = request.FromCurrency,
+            ToCurrency = request.ToCurrency,
+            FromAmount = request.Amount,
+            ToAmount = toAmount,
+            TryAmount = tryAmount,
+            FromRate = fromRateRow.BuyRate,
+            ToRate = toRateRow.SellRate,
+            FromAccountId = fromAccount.Id,
+            ToAccountId = toAccount.Id,
+            CreatedAt = now,
+            Channel = _ctx.Channel,
+            PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
+        };
+
+        await _trades.AddConversionAsync(conversion, debitLeg, creditLeg);
+
+        return new FxConversionDto(
+            conversion.Id,
+            conversion.FromCurrency,
+            fromCode,
+            conversion.ToCurrency,
+            toCode,
+            conversion.FromAmount,
+            conversion.ToAmount,
+            conversion.TryAmount,
+            conversion.FromRate,
+            conversion.ToRate,
+            fromAccount.Iban,
+            toAccount.Iban,
+            conversion.CreatedAt);
+    }
+
     public async Task<List<FxTradeDto>> GetMyTradesAsync()
     {
         var trades = await _trades.GetByUserIdAsync(_ctx.ActingUserId);
@@ -199,6 +301,70 @@ public class FxService : IFxService
             ibanById.GetValueOrDefault(t.TryAccountId, "—"),
             ibanById.GetValueOrDefault(t.ForeignAccountId, "—"),
             t.CreatedAt)).ToList();
+    }
+
+    public async Task<List<FxConversionDto>> GetMyConversionsAsync()
+    {
+        var conversions = await _trades.GetConversionsByUserIdAsync(_ctx.ActingUserId);
+        var accounts = await _accounts.GetByUserIdAsync(_ctx.ActingUserId);
+        var ibanById = accounts.ToDictionary(a => a.Id, a => a.Iban);
+        return conversions.Select(c => new FxConversionDto(
+            c.Id,
+            c.FromCurrency,
+            CodeOf(c.FromCurrency),
+            c.ToCurrency,
+            CodeOf(c.ToCurrency),
+            c.FromAmount,
+            c.ToAmount,
+            c.TryAmount,
+            c.FromRate,
+            c.ToRate,
+            ibanById.GetValueOrDefault(c.FromAccountId, "—"),
+            ibanById.GetValueOrDefault(c.ToAccountId, "—"),
+            c.CreatedAt)).ToList();
+    }
+
+    public async Task<List<FxRateAlertDto>> GetMyAlertsAsync()
+    {
+        var alerts = await _alerts.GetByUserIdAsync(_ctx.ActingUserId);
+        return alerts.Select(MapAlert).ToList();
+    }
+
+    public async Task<FxRateAlertDto> CreateAlertAsync(CreateFxRateAlertRequest request)
+    {
+        if (!FxCatalog.IsTradable(request.Currency))
+            throw new BusinessException("Geçersiz para birimi.");
+        if (request.TargetRate <= 0)
+            throw new BusinessException("Hedef kur sıfırdan büyük olmalı.");
+
+        var currentRate = await _rates.GetByCurrencyAsync(request.Currency)
+            ?? throw new NotFoundException("Kur bilgisi bulunamadı.");
+
+        var alert = new FxRateAlert
+        {
+            Id = Guid.NewGuid(),
+            UserId = _ctx.ActingUserId,
+            Currency = request.Currency,
+            Direction = request.Direction,
+            TargetRate = request.TargetRate,
+            LastCheckedRate = MidRate(currentRate),
+            IsActive = true,
+            IsTriggered = false,
+            CreatedAt = DateTime.UtcNow,
+        };
+
+        await _alerts.AddAsync(alert);
+        return MapAlert(alert);
+    }
+
+    public async Task DeleteAlertAsync(Guid id)
+    {
+        var alert = await _alerts.GetByIdAsync(id);
+        if (alert is null || alert.UserId != _ctx.ActingUserId)
+            throw new NotFoundException("Alarm bulunamadı.");
+
+        alert.IsActive = false;
+        await _alerts.SaveChangesAsync();
     }
 
     // Kullanıcının verilen para birimindeki aktif hesabını bulur; yoksa (alışta) açar.
@@ -233,6 +399,21 @@ public class FxService : IFxService
 
     private static string CodeOf(Currency c) =>
         FxCatalog.Tradable.FirstOrDefault(i => i.Currency == c)?.Code ?? c.ToString();
+
+    private static decimal MidRate(ExchangeRate rate) => (rate.BuyRate + rate.SellRate) / 2m;
+
+    private static FxRateAlertDto MapAlert(FxRateAlert alert) =>
+        new(
+            alert.Id,
+            alert.Currency,
+            CodeOf(alert.Currency),
+            alert.Direction,
+            alert.TargetRate,
+            alert.LastCheckedRate,
+            alert.IsActive,
+            alert.IsTriggered,
+            alert.TriggeredAt,
+            alert.CreatedAt);
 
     private static ExchangeRateDto Map(ExchangeRate r)
     {

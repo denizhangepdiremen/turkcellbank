@@ -14,4 +14,5 @@ public enum TransactionType
     TimeDepositMaturity, // vadeli mevduat dönüşü (hesaba giriş — anapara + net faiz)
     FxBuy,             // döviz/altın alış (bir bacak TL çıkışı, diğer bacak döviz girişi)
     FxSell,            // döviz/altın satış (bir bacak döviz çıkışı, diğer bacak TL girişi)
+    FxConvert,         // döviz/altın çapraz dönüşüm (kaynak birim çıkışı, hedef birim girişi)
 }

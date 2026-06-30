@@ -46,3 +46,44 @@ public record FxTradeDto(
     string TryIban,
     string ForeignIban,
     DateTime CreatedAt);
+
+/// <summary>Kur alarmı oluşturma isteği.</summary>
+public record CreateFxRateAlertRequest(
+    Currency Currency,
+    FxAlertDirection Direction,
+    decimal TargetRate);
+
+/// <summary>Müşterinin kur alarmı.</summary>
+public record FxRateAlertDto(
+    Guid Id,
+    Currency Currency,
+    string Code,
+    FxAlertDirection Direction,
+    decimal TargetRate,
+    decimal? LastCheckedRate,
+    bool IsActive,
+    bool IsTriggered,
+    DateTime? TriggeredAt,
+    DateTime CreatedAt);
+
+/// <summary>Çapraz döviz/altın dönüşümü isteği.</summary>
+public record FxConversionRequest(
+    Currency FromCurrency,
+    Currency ToCurrency,
+    decimal Amount);
+
+/// <summary>Gerçekleşen çapraz dönüşüm sonucu.</summary>
+public record FxConversionDto(
+    Guid Id,
+    Currency FromCurrency,
+    string FromCode,
+    Currency ToCurrency,
+    string ToCode,
+    decimal FromAmount,
+    decimal ToAmount,
+    decimal TryAmount,
+    decimal FromRate,
+    decimal ToRate,
+    string FromIban,
+    string ToIban,
+    DateTime CreatedAt);

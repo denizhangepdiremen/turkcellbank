@@ -21,6 +21,7 @@ const txTypeLabel = (type: Transaction['type']) => {
   if (type === 'TimeDepositMaturity') return 'Vadeli Mevduat Getirisi'
   if (type === 'FxBuy') return 'Döviz / Altın Alış'
   if (type === 'FxSell') return 'Döviz / Altın Satış'
+  if (type === 'FxConvert') return 'Döviz / Altın Dönüşüm'
   return type
 }
 

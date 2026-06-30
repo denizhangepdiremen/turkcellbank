@@ -32,6 +32,8 @@ public class AppDbContext : DbContext
     public DbSet<TimeDeposit> TimeDeposits => Set<TimeDeposit>();
     public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
     public DbSet<FxTrade> FxTrades => Set<FxTrade>();
+    public DbSet<FxRateAlert> FxRateAlerts => Set<FxRateAlert>();
+    public DbSet<FxConversion> FxConversions => Set<FxConversion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -194,6 +196,45 @@ public class AppDbContext : DbContext
             entity.HasOne(t => t.User)
                 .WithMany()
                 .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- FxRateAlert tablosu kuralları ---
+        modelBuilder.Entity<FxRateAlert>(entity =>
+        {
+            entity.HasKey(a => a.Id);
+            entity.Property(a => a.Currency).HasConversion<string>().HasMaxLength(3);
+            entity.Property(a => a.Direction).HasConversion<string>().HasMaxLength(10);
+            entity.Property(a => a.TargetRate).HasPrecision(18, 4);
+            entity.Property(a => a.LastCheckedRate).HasPrecision(18, 4);
+
+            entity.HasIndex(a => a.UserId);
+            entity.HasIndex(a => new { a.IsActive, a.IsTriggered });
+
+            entity.HasOne(a => a.User)
+                .WithMany()
+                .HasForeignKey(a => a.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- FxConversion tablosu kuralları ---
+        modelBuilder.Entity<FxConversion>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.FromCurrency).HasConversion<string>().HasMaxLength(3);
+            entity.Property(c => c.ToCurrency).HasConversion<string>().HasMaxLength(3);
+            entity.Property(c => c.FromAmount).HasPrecision(18, 2);
+            entity.Property(c => c.ToAmount).HasPrecision(18, 2);
+            entity.Property(c => c.TryAmount).HasPrecision(18, 2);
+            entity.Property(c => c.FromRate).HasPrecision(18, 4);
+            entity.Property(c => c.ToRate).HasPrecision(18, 4);
+            entity.Property(c => c.Channel).HasConversion<string>().HasMaxLength(10);
+
+            entity.HasIndex(c => c.UserId);
+
+            entity.HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

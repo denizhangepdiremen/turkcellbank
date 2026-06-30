@@ -41,7 +41,16 @@ import {
   openTimeDeposit,
   closeTimeDeposit,
 } from '../../api/timeDepositApi'
-import { getFxRates, fxTrade } from '../../api/fxApi'
+import {
+  getFxRates,
+  fxTrade,
+  fxConvert,
+  getMyFxTrades,
+  getMyFxConversions,
+  getFxAlerts,
+  createFxAlert,
+  deleteFxAlert,
+} from '../../api/fxApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { digitsOnly, formatIban, formatIbanInput, normalizeIban } from '../../lib/format'
@@ -53,6 +62,8 @@ import type {
   CardStatus,
   Currency,
   ExchangeRate,
+  FxAlertDirection,
+  FxTrade,
   FxTradeSide,
   Loan,
   TimeDeposit,
@@ -65,6 +76,7 @@ import type {
 import { openCardStatement } from '../../lib/cardStatement'
 import { openTransactionReceipt } from '../../lib/transactionReceipt'
 import { openAccountStatement } from '../../lib/accountStatement'
+import { openFxReceipt } from '../../lib/fxReceipt'
 import './Dashboard.css'
 
 const accountTypeOptions = [
@@ -76,6 +88,7 @@ const PAGE_SIZE = 5
 
 // İşlem geçmişinde "tüm hesaplar" seçeneğinin özel değeri
 const ALL_ACCOUNTS = '__all__'
+const FX_RATE_HISTORY_STORAGE_KEY = 'turkcellbank_fx_rate_history'
 
 const txTypeOptions = [
   { value: '', label: 'Tüm işlem tipleri' },
@@ -88,6 +101,7 @@ const txTypeOptions = [
   { value: 'BillPayment', label: 'Fatura ödemesi' },
   { value: 'TimeDepositOpen', label: 'Vadeli mevduat açılışı' },
   { value: 'TimeDepositMaturity', label: 'Vadeli mevduat getirisi' },
+  { value: 'FxConvert', label: 'Döviz/altın dönüşüm' },
 ]
 
 const txDirectionOptions = [
@@ -138,6 +152,7 @@ const txTitle = (tx: Transaction) => {
   if (tx.type === 'TimeDepositMaturity') return 'Vadeli Mevduat Getirisi'
   if (tx.type === 'FxBuy') return `Döviz/Altın Alış${tx.description ? ` · ${tx.description}` : ''}`
   if (tx.type === 'FxSell') return `Döviz/Altın Satış${tx.description ? ` · ${tx.description}` : ''}`
+  if (tx.type === 'FxConvert') return `Döviz/Altın Dönüşüm${tx.description ? ` · ${tx.description}` : ''}`
   return tx.direction === 'Out'
     ? `Transfer → ${tx.counterpartyIban}`
     : `Transfer ← ${tx.counterpartyIban}`
@@ -157,6 +172,11 @@ const formatCurrencyAmount = (amount: number, currency: Currency) => {
   const n = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
   const meta = CURRENCY_META[currency]
   return currency === 'XAU' ? `${n} ${meta.unit}` : `${meta.unit}${n}`
+}
+
+type FxRatePoint = {
+  at: number
+  value: number
 }
 
 const formatTL = (n: number) =>
@@ -337,6 +357,42 @@ function BalanceSparkline({
         <polyline className="dashboard-sparkline-area" points={`${padding},${height - padding} ${points} ${width - padding},${height - padding}`} />
         <polyline className="dashboard-sparkline-line" points={points} />
       </svg>
+    </div>
+  )
+}
+
+function FxRateSparkline({ points }: { points: FxRatePoint[] }) {
+  if (points.length < 2) {
+    return <div className="dashboard-fx-mini-chart empty">Trend için veri toplanıyor</div>
+  }
+
+  const width = 180
+  const height = 44
+  const padding = 4
+  const min = Math.min(...points.map((p) => p.value))
+  const max = Math.max(...points.map((p) => p.value))
+  const range = max - min || 1
+  const start = points[0].at
+  const end = points[points.length - 1].at
+  const timeRange = end - start || 1
+  const coords = points
+    .map((point) => {
+      const x = padding + ((point.at - start) / timeRange) * (width - padding * 2)
+      const y = height - padding - ((point.value - min) / range) * (height - padding * 2)
+      return `${x},${y}`
+    })
+    .join(' ')
+  const change = points[points.length - 1].value - points[0].value
+
+  return (
+    <div
+      className={`dashboard-fx-mini-chart ${change >= 0 ? 'up' : 'down'}`}
+      aria-label="Kur trendi"
+    >
+      <svg viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+        <polyline points={coords} />
+      </svg>
+      <span>{change >= 0 ? '+' : ''}{change.toLocaleString('tr-TR', { maximumFractionDigits: 4 })}</span>
     </div>
   )
 }
@@ -678,11 +734,66 @@ export function Dashboard() {
     queryFn: getFxRates,
     refetchInterval: 15_000,
   })
+  const { data: fxTradesData, isLoading: fxTradesLoading } = useQuery({
+    queryKey: ['fx-trades'],
+    queryFn: getMyFxTrades,
+    enabled: activeTab === 'fx',
+  })
+  const { data: fxConversionsData, isLoading: fxConversionsLoading } = useQuery({
+    queryKey: ['fx-conversions'],
+    queryFn: getMyFxConversions,
+    enabled: activeTab === 'fx',
+  })
+  const { data: fxAlertsData, isLoading: fxAlertsLoading } = useQuery({
+    queryKey: ['fx-alerts'],
+    queryFn: getFxAlerts,
+    enabled: activeTab === 'fx',
+  })
   const rates = useMemo(() => ratesData?.data ?? [], [ratesData?.data])
+  const fxTrades = fxTradesData?.data ?? []
+  const fxConversions = fxConversionsData?.data ?? []
+  const fxAlerts = fxAlertsData?.data ?? []
+  // İşlem geçmişi: alış/satış + çapraz dönüşüm tek listede (yeniden eskiye, son 8)
+  const fxHistory = [
+    ...fxTrades.map((t) => ({ kind: 'trade' as const, at: t.createdAt, trade: t })),
+    ...fxConversions.map((c) => ({ kind: 'convert' as const, at: c.createdAt, conv: c })),
+  ]
+    .sort((a, b) => (a.at < b.at ? 1 : -1))
+    .slice(0, 8)
+  const [fxRateHistory, setFxRateHistory] = useState<Record<string, FxRatePoint[]>>(() => {
+    try {
+      const raw = localStorage.getItem(FX_RATE_HISTORY_STORAGE_KEY)
+      return raw ? JSON.parse(raw) as Record<string, FxRatePoint[]> : {}
+    } catch {
+      return {}
+    }
+  })
   const rateByCurrency = useMemo(() => {
     const map = new Map<Currency, ExchangeRate>()
     for (const r of rates) map.set(r.currency, r)
     return map
+  }, [rates])
+  useEffect(() => {
+    if (rates.length === 0) return
+
+    setFxRateHistory((prev) => {
+      const now = Date.now()
+      const dayAgo = now - DAY_MS
+      const next: Record<string, FxRatePoint[]> = { ...prev }
+      for (const rate of rates) {
+        const value = Math.round(((rate.buyRate + rate.sellRate) / 2) * 10000) / 10000
+        const existing = next[rate.currency] ?? []
+        const last = existing[existing.length - 1]
+        if (last && last.value === value && now - last.at < 60_000) continue
+
+        next[rate.currency] = [...existing, { at: now, value }]
+          .filter((point) => point.at >= dayAgo)
+          .slice(-48)
+      }
+
+      localStorage.setItem(FX_RATE_HISTORY_STORAGE_KEY, JSON.stringify(next))
+      return next
+    })
   }, [rates])
   // Bir hesabın TL karşılığı (döviz/altın için banka alış kuruyla çevrilir).
   const tryValueOf = useCallback(
@@ -693,6 +804,15 @@ export function Dashboard() {
   const fxAccounts = balanceAccounts.filter((a) => a.currency !== 'TRY')
   // Toplam varlık: TL hesapları + döviz/altın hesaplarının TL karşılığı.
   const totalBalance = balanceAccounts.reduce((sum, a) => sum + tryValueOf(a), 0)
+  const portfolioItems = (['TRY', 'USD', 'EUR', 'XAU'] as Currency[])
+    .map((currency) => {
+      const accountsForCurrency = balanceAccounts.filter((a) => a.currency === currency)
+      const amount = accountsForCurrency.reduce((sum, a) => sum + a.balance, 0)
+      const tryValue = accountsForCurrency.reduce((sum, a) => sum + tryValueOf(a), 0)
+      const percent = totalBalance > 0 ? Math.round((tryValue / totalBalance) * 100) : 0
+      return { currency, amount, tryValue, percent }
+    })
+    .filter((item) => item.tryValue > 0)
   const balanceHistoryQueries = useQueries({
     queries: balanceAccounts.map((a) => ({
       queryKey: ['transactions', a.id],
@@ -1448,6 +1568,14 @@ export function Dashboard() {
   const [fxCurrency, setFxCurrency] = useState<Currency>('USD')
   const [fxTryAccountId, setFxTryAccountId] = useState('')
   const [fxAmount, setFxAmount] = useState('')
+  const [fxAlertOpen, setFxAlertOpen] = useState(false)
+  const [fxAlertCurrency, setFxAlertCurrency] = useState<Currency>('USD')
+  const [fxAlertDirection, setFxAlertDirection] = useState<FxAlertDirection>('Above')
+  const [fxAlertTarget, setFxAlertTarget] = useState('')
+  const [fxConvertOpen, setFxConvertOpen] = useState(false)
+  const [fxConvertFrom, setFxConvertFrom] = useState<Currency>('USD')
+  const [fxConvertTo, setFxConvertTo] = useState<Currency>('EUR')
+  const [fxConvertAmount, setFxConvertAmount] = useState('')
 
   const fxRate = rateByCurrency.get(fxCurrency)
   // Önizleme: alışta satış kuru, satışta alış kuru; TL karşılığı = miktar * kur.
@@ -1461,6 +1589,17 @@ export function Dashboard() {
 
   // Satışta o para biriminden hesabın mevcut bakiyesi (yeterlilik göstergesi)
   const fxSellableBalance = fxAccounts.find((a) => a.currency === fxCurrency)?.balance ?? 0
+  const fxConvertibleAccounts = fxAccounts.filter((a) => a.balance > 0)
+  const fxConvertSourceBalance = fxAccounts.find((a) => a.currency === fxConvertFrom)?.balance ?? 0
+  const fxConvertPreview = useMemo(() => {
+    const amount = Number(fxConvertAmount)
+    const fromRate = rateByCurrency.get(fxConvertFrom)
+    const toRate = rateByCurrency.get(fxConvertTo)
+    if (!fromRate || !toRate || !(amount > 0) || fxConvertFrom === fxConvertTo) return null
+    const tryAmount = Math.round(amount * fromRate.buyRate * 100) / 100
+    const toAmount = Math.round((tryAmount / toRate.sellRate) * 100) / 100
+    return { tryAmount, toAmount, fromRate: fromRate.buyRate, toRate: toRate.sellRate }
+  }, [fxConvertAmount, fxConvertFrom, fxConvertTo, rateByCurrency])
 
   const fxTradeMutation = useMutation({
     mutationFn: () =>
@@ -1474,10 +1613,54 @@ export function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
       queryClient.invalidateQueries({ queryKey: ['fx-rates'] })
+      queryClient.invalidateQueries({ queryKey: ['fx-trades'] })
       setFxOpen(false)
       toast.success(fxSide === 'Buy' ? 'Alış gerçekleşti.' : 'Satış gerçekleşti.')
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'İşlem gerçekleştirilemedi.')),
+  })
+
+  const createFxAlertMutation = useMutation({
+    mutationFn: () =>
+      createFxAlert({
+        currency: fxAlertCurrency,
+        direction: fxAlertDirection,
+        targetRate: Number(fxAlertTarget),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fx-alerts'] })
+      setFxAlertOpen(false)
+      setFxAlertTarget('')
+      toast.success('Kur alarmı oluşturuldu.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Kur alarmı oluşturulamadı.')),
+  })
+
+  const deleteFxAlertMutation = useMutation({
+    mutationFn: deleteFxAlert,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fx-alerts'] })
+      toast.success('Kur alarmı silindi.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Kur alarmı silinemedi.')),
+  })
+
+  const fxConvertMutation = useMutation({
+    mutationFn: () =>
+      fxConvert({
+        fromCurrency: fxConvertFrom,
+        toCurrency: fxConvertTo,
+        amount: Number(fxConvertAmount),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['fx-conversions'] })
+      setFxConvertOpen(false)
+      setFxConvertAmount('')
+      toast.success('Dönüşüm gerçekleşti.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Dönüşüm gerçekleştirilemedi.')),
   })
 
   function openFxTrade(side: FxTradeSide, currency: Currency) {
@@ -1488,9 +1671,40 @@ export function Dashboard() {
     setFxOpen(true)
   }
 
+  function openFxAlert(currency: Currency) {
+    const rate = rateByCurrency.get(currency)
+    setFxAlertCurrency(currency)
+    setFxAlertDirection('Above')
+    setFxAlertTarget(rate ? String(Math.round(((rate.buyRate + rate.sellRate) / 2) * 10000) / 10000) : '')
+    setFxAlertOpen(true)
+  }
+
+  function openFxConvert(from?: Currency) {
+    const source = from ?? fxConvertibleAccounts[0]?.currency ?? 'USD'
+    const target = (['USD', 'EUR', 'XAU'] as Currency[]).find((c) => c !== source) ?? 'EUR'
+    setFxConvertFrom(source)
+    setFxConvertTo(target)
+    setFxConvertAmount('')
+    setFxConvertOpen(true)
+  }
+
   const fxFormValid =
     !!fxTryAccountId && Number(fxAmount) > 0 && !!fxPreview &&
     (fxSide === 'Buy' || Number(fxAmount) <= fxSellableBalance)
+  const fxAlertValid = Number(fxAlertTarget) > 0 && !!rateByCurrency.get(fxAlertCurrency)
+  const fxConvertValid =
+    Number(fxConvertAmount) > 0
+    && fxConvertFrom !== fxConvertTo
+    && !!fxConvertPreview
+    && Number(fxConvertAmount) <= fxConvertSourceBalance
+
+  function openFxTradeReceipt(trade: FxTrade) {
+    const ok = openFxReceipt({
+      trade,
+      customerName: user?.fullName ?? '',
+    })
+    if (!ok) toast.error('Açılır pencere engellendi. Lütfen pop-up iznine bakın.')
+  }
 
   const frozenAccounts = accounts.filter((a) => a.isFrozen)
   const blockedCards = cards.filter((c) => c.status === 'Blocked')
@@ -2523,66 +2737,75 @@ export function Dashboard() {
             <h2 className="dashboard-section-title">Döviz & Altın</h2>
             <span className="dashboard-fx-live" title="Kurlar canlı güncellenir">● Canlı</span>
           </div>
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={() => openFxTrade('Buy', 'USD')}
-            disabled={tryAccounts.length === 0}
-          >
-            + Al / Sat
-          </Button>
+          <div className="dashboard-section-actions">
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => openFxTrade('Buy', 'USD')}
+              disabled={tryAccounts.length === 0}
+            >
+              + Al / Sat
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => openFxConvert()}
+              disabled={fxConvertibleAccounts.length === 0}
+            >
+              Dönüştür
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => openFxAlert('USD')}
+              disabled={rates.length === 0}
+            >
+              Alarm Kur
+            </Button>
+          </div>
         </div>
         <p className="dashboard-section-hint">
           Güncel kurlarla döviz ve altın alın, satın. İlk alışınızda ilgili hesap otomatik açılır.
         </p>
 
-        {/* Kur tahtası */}
-        <div className="dashboard-fx-board">
-          {rates.length === 0 ? (
-            <div className="dashboard-state">Kur bilgisi yükleniyor…</div>
-          ) : (
-            rates.map((r) => (
-              <Card key={r.currency}>
-                <CardContent>
-                  <div className="dashboard-fx-rate">
-                    <div className="dashboard-fx-rate-head">
-                      <span className="dashboard-fx-rate-code">{r.code}</span>
-                      <span className="dashboard-fx-rate-name">{r.name}</span>
+        {/* Portföy dağılımı */}
+        <Card>
+          <CardContent>
+            <div className="dashboard-fx-portfolio-head">
+              <div>
+                <p className="dashboard-fx-portfolio-kicker">Toplam Varlık</p>
+                <strong>{formatTL(totalBalance)}</strong>
+              </div>
+              <span>TL karşılığı</span>
+            </div>
+
+            {portfolioItems.length === 0 ? (
+              <div className="dashboard-state">Portföy dağılımı için aktif bakiyeniz yok.</div>
+            ) : (
+              <div className="dashboard-fx-portfolio">
+                {portfolioItems.map((item) => (
+                  <div key={item.currency} className={`dashboard-fx-portfolio-row ${item.currency.toLowerCase()}`}>
+                    <div className="dashboard-fx-portfolio-label">
+                      <span>{CURRENCY_META[item.currency].code}</span>
+                      <strong>
+                        {item.currency === 'TRY'
+                          ? formatTL(item.amount)
+                          : formatCurrencyAmount(item.amount, item.currency)}
+                      </strong>
                     </div>
-                    <div className="dashboard-fx-rate-prices">
-                      <div>
-                        <span>Alış</span>
-                        <strong>{formatTL(r.buyRate)}</strong>
-                      </div>
-                      <div>
-                        <span>Satış</span>
-                        <strong>{formatTL(r.sellRate)}</strong>
-                      </div>
+                    <div className="dashboard-fx-portfolio-track" aria-hidden="true">
+                      <span style={{ width: `${Math.max(item.percent, 3)}%` }} />
                     </div>
-                    <div className="dashboard-fx-rate-actions">
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        onClick={() => openFxTrade('Buy', r.currency)}
-                        disabled={tryAccounts.length === 0}
-                      >
-                        Al
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => openFxTrade('Sell', r.currency)}
-                        disabled={!fxAccounts.some((a) => a.currency === r.currency)}
-                      >
-                        Sat
-                      </Button>
+                    <div className="dashboard-fx-portfolio-value">
+                      <strong>{formatTL(item.tryValue)}</strong>
+                      <span>%{item.percent}</span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Döviz/altın hesaplarım */}
         <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
@@ -2626,9 +2849,181 @@ export function Dashboard() {
                       >
                         Sat
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => openFxConvert(a.currency)}
+                      >
+                        Dönüştür
+                      </Button>
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Kur tahtası */}
+        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+          <h2 className="dashboard-section-title">Kur Tahtası</h2>
+        </div>
+        <div className="dashboard-fx-board">
+          {rates.length === 0 ? (
+            <div className="dashboard-state">Kur bilgisi yükleniyor…</div>
+          ) : (
+            rates.map((r) => (
+              <Card key={r.currency}>
+                <CardContent>
+                  <div className="dashboard-fx-rate">
+                    <div className="dashboard-fx-rate-head">
+                      <span className="dashboard-fx-rate-code">{r.code}</span>
+                      <span className="dashboard-fx-rate-name">{r.name}</span>
+                    </div>
+                    <div className="dashboard-fx-rate-prices">
+                      <div>
+                        <span>Alış</span>
+                        <strong>{formatTL(r.buyRate)}</strong>
+                      </div>
+                      <div>
+                        <span>Satış</span>
+                        <strong>{formatTL(r.sellRate)}</strong>
+                      </div>
+                    </div>
+                    <FxRateSparkline points={fxRateHistory[r.currency] ?? []} />
+                    <div className="dashboard-fx-rate-actions">
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => openFxTrade('Buy', r.currency)}
+                        disabled={tryAccounts.length === 0}
+                      >
+                        Al
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => openFxTrade('Sell', r.currency)}
+                        disabled={!fxAccounts.some((a) => a.currency === r.currency)}
+                      >
+                        Sat
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => openFxAlert(r.currency)}
+                      >
+                        Alarm
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* Kur alarmları */}
+        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+          <h2 className="dashboard-section-title">Kur Alarmlarım</h2>
+        </div>
+        <Card>
+          <CardContent>
+            {fxAlertsLoading ? (
+              <ListSkeleton />
+            ) : fxAlerts.length === 0 ? (
+              <div className="dashboard-state">Henüz kur alarmınız yok.</div>
+            ) : (
+              <div className="dashboard-fx-alerts">
+                {fxAlerts.map((alert) => (
+                  <div key={alert.id} className="dashboard-fx-alert-row">
+                    <div>
+                      <p>
+                        {alert.code} {alert.direction === 'Above' ? 'üstüne çıkınca' : 'altına inince'}
+                      </p>
+                      <span>
+                        Hedef {formatTL(alert.targetRate)}
+                        {alert.lastCheckedRate ? ` · Son ${formatTL(alert.lastCheckedRate)}` : ''}
+                      </span>
+                    </div>
+                    <div className="dashboard-fx-alert-actions">
+                      <Badge variant={alert.isTriggered ? 'success' : alert.isActive ? 'info' : 'warning'}>
+                        {alert.isTriggered ? 'Gerçekleşti' : alert.isActive ? 'Aktif' : 'Pasif'}
+                      </Badge>
+                      {alert.isActive && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => deleteFxAlertMutation.mutate(alert.id)}
+                          disabled={deleteFxAlertMutation.isPending}
+                        >
+                          Sil
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Döviz/altın işlem geçmişi */}
+        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+          <h2 className="dashboard-section-title">Döviz / Altın İşlem Geçmişi</h2>
+        </div>
+        <Card>
+          <CardContent>
+            {(fxTradesLoading || fxConversionsLoading) ? (
+              <ListSkeleton />
+            ) : fxHistory.length === 0 ? (
+              <div className="dashboard-state">Henüz döviz/altın işleminiz yok.</div>
+            ) : (
+              <div className="dashboard-fx-trades">
+                {fxHistory.map((item) =>
+                  item.kind === 'trade' ? (
+                    <div key={item.trade.id} className="dashboard-fx-trade-row">
+                      <div className="dashboard-fx-trade-main">
+                        <span className={`dashboard-fx-trade-side ${item.trade.side.toLowerCase()}`}>
+                          {item.trade.side === 'Buy' ? 'Alış' : 'Satış'}
+                        </span>
+                        <div>
+                          <p>{item.trade.code} · {formatCurrencyAmount(item.trade.amount, item.trade.currency)}</p>
+                          <span>{trDate(item.trade.createdAt)} · Kur {formatTL(item.trade.rate)}</span>
+                        </div>
+                      </div>
+                      <div className="dashboard-fx-trade-right">
+                        <strong>{formatTL(item.trade.tryAmount)}</strong>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="dashboard-tx-receipt"
+                          onClick={() => openFxTradeReceipt(item.trade)}
+                        >
+                          Dekont
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={item.conv.id} className="dashboard-fx-trade-row">
+                      <div className="dashboard-fx-trade-main">
+                        <span className="dashboard-fx-trade-side convert">Çevir</span>
+                        <div>
+                          <p>{item.conv.fromCode} → {item.conv.toCode}</p>
+                          <span>
+                            {formatCurrencyAmount(item.conv.fromAmount, item.conv.fromCurrency)}
+                            {' → '}
+                            {formatCurrencyAmount(item.conv.toAmount, item.conv.toCurrency)}
+                            {' · '}{trDate(item.conv.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="dashboard-fx-trade-right">
+                        <strong>{formatTL(item.conv.tryAmount)}</strong>
+                      </div>
+                    </div>
+                  ),
+                )}
               </div>
             )}
           </CardContent>
@@ -4209,6 +4604,150 @@ export function Dashboard() {
             <div>
               <span>{fxSide === 'Buy' ? 'Ödenecek tutar' : 'Alınacak tutar'}</span>
               <strong>{formatTL(fxPreview.tryAmount)}</strong>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* --- Kur alarmı modalı --- */}
+      <Modal
+        open={fxAlertOpen}
+        onClose={() => setFxAlertOpen(false)}
+        title="Kur Alarmı Kur"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setFxAlertOpen(false)}>
+              İptal
+            </Button>
+            <Button
+              variant="primary"
+              loading={createFxAlertMutation.isPending}
+              disabled={!fxAlertValid}
+              onClick={() => createFxAlertMutation.mutate()}
+            >
+              Alarm Kur
+            </Button>
+          </>
+        }
+      >
+        <div className="dashboard-modal-field">
+          <Select
+            label="Birim"
+            options={rates.map((r) => ({ value: r.currency, label: `${r.code} · ${r.name}` }))}
+            value={fxAlertCurrency}
+            onChange={(e) => setFxAlertCurrency(e.target.value as Currency)}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Select
+            label="Koşul"
+            options={[
+              { value: 'Above', label: 'Hedefin üstüne çıkınca' },
+              { value: 'Below', label: 'Hedefin altına inince' },
+            ]}
+            value={fxAlertDirection}
+            onChange={(e) => setFxAlertDirection(e.target.value as FxAlertDirection)}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Input
+            label="Hedef Kur (₺)"
+            type="number"
+            min="0"
+            step="0.0001"
+            value={fxAlertTarget}
+            onChange={(e) => setFxAlertTarget(e.target.value)}
+          />
+        </div>
+        {rateByCurrency.get(fxAlertCurrency) && (
+          <div className="dashboard-bill-summary">
+            <div>
+              <span>Güncel Ortalama</span>
+              <strong>
+                {formatTL(
+                  ((rateByCurrency.get(fxAlertCurrency)?.buyRate ?? 0)
+                    + (rateByCurrency.get(fxAlertCurrency)?.sellRate ?? 0)) / 2,
+                )}
+              </strong>
+            </div>
+            <div>
+              <span>Alarm</span>
+              <strong>{fxAlertDirection === 'Above' ? 'Yükselince' : 'Düşünce'}</strong>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* --- Çapraz dönüşüm modalı --- */}
+      <Modal
+        open={fxConvertOpen}
+        onClose={() => setFxConvertOpen(false)}
+        title="Döviz / Altın Dönüştür"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setFxConvertOpen(false)}>
+              İptal
+            </Button>
+            <Button
+              variant="primary"
+              loading={fxConvertMutation.isPending}
+              disabled={!fxConvertValid}
+              onClick={() => fxConvertMutation.mutate()}
+            >
+              Dönüştür
+            </Button>
+          </>
+        }
+      >
+        <div className="dashboard-modal-field">
+          <Select
+            label="Kaynak Birim"
+            options={fxAccounts.map((a) => ({
+              value: a.currency,
+              label: `${CURRENCY_META[a.currency].code} · ${formatCurrencyAmount(a.balance, a.currency)}`,
+            }))}
+            value={fxConvertFrom}
+            onChange={(e) => {
+              const next = e.target.value as Currency
+              setFxConvertFrom(next)
+              if (next === fxConvertTo) {
+                setFxConvertTo((['USD', 'EUR', 'XAU'] as Currency[]).find((c) => c !== next) ?? 'EUR')
+              }
+            }}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Select
+            label="Hedef Birim"
+            options={rates
+              .filter((r) => r.currency !== fxConvertFrom)
+              .map((r) => ({ value: r.currency, label: `${r.code} · ${r.name}` }))}
+            value={fxConvertTo}
+            onChange={(e) => setFxConvertTo(e.target.value as Currency)}
+          />
+        </div>
+        <div className="dashboard-modal-field">
+          <Input
+            label={`Miktar (${CURRENCY_META[fxConvertFrom].code})`}
+            type="number"
+            min="0"
+            placeholder="0"
+            value={fxConvertAmount}
+            onChange={(e) => setFxConvertAmount(e.target.value)}
+          />
+          <p className="dashboard-fx-hint">
+            Mevcut bakiye: {formatCurrencyAmount(fxConvertSourceBalance, fxConvertFrom)}
+          </p>
+        </div>
+        {fxConvertPreview && (
+          <div className="dashboard-bill-summary">
+            <div>
+              <span>TL Ara Karşılığı</span>
+              <strong>{formatTL(fxConvertPreview.tryAmount)}</strong>
+            </div>
+            <div>
+              <span>Hesaba Geçecek</span>
+              <strong>{formatCurrencyAmount(fxConvertPreview.toAmount, fxConvertTo)}</strong>
             </div>
           </div>
         )}

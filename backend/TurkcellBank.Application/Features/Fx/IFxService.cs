@@ -14,8 +14,23 @@ public interface IFxService
     /// <summary>Döviz/altın al ya da sat. İki bacaklı, atomik para hareketi.</summary>
     Task<FxTradeDto> TradeAsync(FxTradeRequest request);
 
+    /// <summary>Döviz/altın birimleri arasında çapraz dönüşüm yapar.</summary>
+    Task<FxConversionDto> ConvertAsync(FxConversionRequest request);
+
     /// <summary>Kullanıcının döviz/altın işlem geçmişi.</summary>
     Task<List<FxTradeDto>> GetMyTradesAsync();
+
+    /// <summary>Kullanıcının çapraz dönüşüm geçmişi.</summary>
+    Task<List<FxConversionDto>> GetMyConversionsAsync();
+
+    /// <summary>Kullanıcının kur alarmları.</summary>
+    Task<List<FxRateAlertDto>> GetMyAlertsAsync();
+
+    /// <summary>Yeni kur alarmı oluşturur.</summary>
+    Task<FxRateAlertDto> CreateAlertAsync(CreateFxRateAlertRequest request);
+
+    /// <summary>Kur alarmını siler.</summary>
+    Task DeleteAlertAsync(Guid id);
 }
 
 /// <summary>

@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<ITimeDepositRepository, TimeDepositRepository>();
         services.AddScoped<IExchangeRateRepository, ExchangeRateRepository>();
         services.AddScoped<IFxTradeRepository, FxTradeRepository>();
+        services.AddScoped<IFxRateAlertRepository, FxRateAlertRepository>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, JwtTokenService>();
 

@@ -44,11 +44,51 @@ public class FxController : ControllerBase
         return Ok(ApiResponse<FxTradeDto>.SuccessResponse(trade, msg));
     }
 
+    /// <summary>Döviz/altın çapraz dönüşüm. POST /api/fx/convert</summary>
+    [HttpPost("convert")]
+    public async Task<IActionResult> Convert(FxConversionRequest request)
+    {
+        var conversion = await _service.ConvertAsync(request);
+        return Ok(ApiResponse<FxConversionDto>.SuccessResponse(conversion, "Dönüşüm gerçekleşti."));
+    }
+
     /// <summary>Döviz/altın işlem geçmişim. GET /api/fx/trades</summary>
     [HttpGet("trades")]
     public async Task<IActionResult> Trades()
     {
         var list = await _service.GetMyTradesAsync();
         return Ok(ApiResponse<List<FxTradeDto>>.SuccessResponse(list));
+    }
+
+    /// <summary>Döviz/altın çapraz dönüşüm geçmişim. GET /api/fx/conversions</summary>
+    [HttpGet("conversions")]
+    public async Task<IActionResult> Conversions()
+    {
+        var list = await _service.GetMyConversionsAsync();
+        return Ok(ApiResponse<List<FxConversionDto>>.SuccessResponse(list));
+    }
+
+    /// <summary>Kur alarmlarım. GET /api/fx/alerts</summary>
+    [HttpGet("alerts")]
+    public async Task<IActionResult> Alerts()
+    {
+        var list = await _service.GetMyAlertsAsync();
+        return Ok(ApiResponse<List<FxRateAlertDto>>.SuccessResponse(list));
+    }
+
+    /// <summary>Yeni kur alarmı oluştur. POST /api/fx/alerts</summary>
+    [HttpPost("alerts")]
+    public async Task<IActionResult> CreateAlert(CreateFxRateAlertRequest request)
+    {
+        var alert = await _service.CreateAlertAsync(request);
+        return Ok(ApiResponse<FxRateAlertDto>.SuccessResponse(alert, "Kur alarmı oluşturuldu."));
+    }
+
+    /// <summary>Kur alarmını sil/pasifleştir. DELETE /api/fx/alerts/{id}</summary>
+    [HttpDelete("alerts/{id:guid}")]
+    public async Task<IActionResult> DeleteAlert(Guid id)
+    {
+        await _service.DeleteAlertAsync(id);
+        return Ok(ApiResponse<string>.SuccessResponse("ok", "Kur alarmı silindi."));
     }
 }
