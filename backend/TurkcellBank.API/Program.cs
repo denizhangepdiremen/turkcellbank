@@ -77,6 +77,11 @@ builder.Services.AddSingleton(
     builder.Configuration.GetSection("Transfer").Get<TurkcellBank.Application.Features.Transactions.TransferOptions>()
         ?? new TurkcellBank.Application.Features.Transactions.TransferOptions());
 
+// Kredi kartı limit/onay/asgari parametreleri (config "CreditCard"; yoksa varsayılanlar)
+builder.Services.AddSingleton(
+    builder.Configuration.GetSection("CreditCard").Get<TurkcellBank.Application.Features.CreditCards.CreditCardOptions>()
+        ?? new TurkcellBank.Application.Features.CreditCards.CreditCardOptions());
+
 // --- Hız sınırlama (rate limiting) ---
 // Sabit pencere, IP başına. "auth"/"register" politikaları ilgili endpoint'lerde
 // (brute-force koruması); ayrıca tüm istekler için gevşek global limiter.
@@ -143,6 +148,8 @@ builder.Services.AddHostedService<TurkcellBank.API.Services.PaymentOrderWorker>(
 builder.Services.AddHostedService<TurkcellBank.API.Services.TimeDepositWorker>();
 // Döviz/altın kurlarını periyodik oynatan arka plan servisi (canlı kur hissi)
 builder.Services.AddHostedService<TurkcellBank.API.Services.FxRateWorker>();
+// Kesim günü gelen kredi kartları için dönem ekstresini kesen arka plan servisi
+builder.Services.AddHostedService<TurkcellBank.API.Services.CreditCardStatementWorker>();
 
 // --- JWT kimlik doğrulama ---
 // Gelen "Authorization: Bearer <token>" başlığındaki token'ı otomatik doğrular

@@ -88,6 +88,7 @@ type DashboardTabLabel =
   | 'İşlemler'
   | 'Krediler'
   | 'Kartlar'
+  | 'Kredi Kartı'
   | 'Ödemeler'
   | 'Faturalar'
   | 'Talimatlar'
@@ -102,6 +103,7 @@ const DASHBOARD_TAB_GROUP_BY_LABEL: Record<DashboardTabLabel, string> = {
   Talimatlar: 'Fatura & Talimat',
   Krediler: 'Kredi, Kart, Yatırım',
   Kartlar: 'Kredi, Kart, Yatırım',
+  'Kredi Kartı': 'Kredi, Kart, Yatırım',
   'Vadeli Mevduat': 'Kredi, Kart, Yatırım',
   Güvenlik: 'Güvenlik',
 }
@@ -226,4 +228,68 @@ export async function applyForCard(page: Page) {
 export async function loginAsAdmin(page: Page) {
   await loginViaUi(page, ADMIN.email, ADMIN.password)
   await page.waitForURL(/\/admin$/)
+}
+
+/**
+ * Benzersiz (zaman damgalı) taze bir müşteri üretir ve backend'e kaydeder.
+ * Kredi kartı gibi "kullanıcı başına tek kayıt" akışlarının her koşuda temiz
+ * başlaması için kullanılır. E-postadan deterministik geçerli TC türetilir.
+ */
+export async function registerFreshUser(prefix: string): Promise<TestUser> {
+  const email = `${prefix}.${Date.now()}${Math.floor(Math.random() * 1000)}@turkcellbank.com`
+  const user: TestUser = {
+    name: 'E2E Kredi Kartı',
+    email,
+    nationalId: testNationalIdFor(email),
+    password: 'parola123',
+  }
+  await ensureRegistered(user)
+  return user
+}
+
+/**
+ * Kredi kartı başvurusu yapar (Kredi Kartı sekmesinden). Limit motorca atanır;
+ * "değerlendiriliyor" ekranından sonra sonuç modalı açılır. Yardımcı sonuç
+ * modalını bekleyip kapatır. Zorunlu olmayan alanlar makul varsayılanlarla dolar.
+ */
+export async function applyForCreditCard(
+  page: Page,
+  opts: {
+    income: string
+    expenses?: string
+    profession?: string
+    age?: string
+    marital?: 'Single' | 'Married'
+    children?: string
+    housing?: 'Tenant' | 'Owner'
+    employment?: string
+    statementDay?: number
+    // Beklenen sonuç başlığı (varsayılan: otomatik onay)
+    expectHeading?: RegExp
+  },
+) {
+  await openTab(page, 'Kredi Kartı')
+  await page.getByRole('button', { name: '+ Kredi Kartı Başvurusu' }).click()
+
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByLabel('TC Kimlik No')).toHaveValue(/\d{11}/)
+  await dialog.getByLabel('Yaş').fill(opts.age ?? '35')
+  await dialog.getByLabel('Medeni Hal').selectOption(opts.marital ?? 'Single')
+  await dialog.getByLabel('Çocuk Sayısı').fill(opts.children ?? '0')
+  await dialog.getByLabel('Konut Durumu').selectOption(opts.housing ?? 'Tenant')
+  await dialog.getByLabel('Aylık Gelir (₺)').fill(opts.income)
+  await dialog.getByLabel('Aylık Gider (₺)').fill(opts.expenses ?? '8000')
+  await dialog.getByLabel('Çalışma Kıdemi (ay)').fill(opts.employment ?? '36')
+  await dialog.getByLabel('Meslek').fill(opts.profession ?? 'Mühendis')
+  await dialog.getByLabel('Kesim Günü').selectOption(String(opts.statementDay ?? 1))
+  await dialog.getByRole('button', { name: 'Başvur', exact: true }).click()
+
+  // Sonuç modalı: otomatik onay / onaya gönderildi / reddedildi (AI için geniş timeout)
+  await expect(
+    page.getByRole('heading', {
+      name: opts.expectHeading ?? /Kredi Kartınız Onaylandı/,
+    }),
+  ).toBeVisible({ timeout: 50_000 })
+
+  await page.getByRole('dialog').getByRole('button', { name: 'Kapat' }).last().click()
 }

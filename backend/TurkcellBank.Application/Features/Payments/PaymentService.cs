@@ -1,6 +1,8 @@
 using FluentValidation;
 using TurkcellBank.Application.Common.Exceptions;
 using TurkcellBank.Application.Common.Interfaces;
+using TurkcellBank.Application.Features.CreditCards;
+using TurkcellBank.Application.Features.CreditCards.Dtos;
 using TurkcellBank.Application.Features.Payments.Dtos;
 using TurkcellBank.Domain.Entities;
 using TurkcellBank.Domain.Enums;
@@ -15,6 +17,7 @@ public class PaymentService : IPaymentService
     private readonly ICardRepository _cards;
     private readonly IAccountRepository _accounts;
     private readonly ITransactionRepository _transactions;
+    private readonly ICreditCardService _creditCards;
     private readonly IOperationContext _ctx;
     private readonly IValidator<PaymentRequest> _validator;
 
@@ -23,6 +26,7 @@ public class PaymentService : IPaymentService
         ICardRepository cards,
         IAccountRepository accounts,
         ITransactionRepository transactions,
+        ICreditCardService creditCards,
         IOperationContext ctx,
         IValidator<PaymentRequest> validator)
     {
@@ -30,6 +34,7 @@ public class PaymentService : IPaymentService
         _cards = cards;
         _accounts = accounts;
         _transactions = transactions;
+        _creditCards = creditCards;
         _ctx = ctx;
         _validator = validator;
     }
@@ -41,8 +46,16 @@ public class PaymentService : IPaymentService
             throw new Common.Exceptions.ValidationException(
                 validation.Errors.Select(e => e.ErrorMessage).ToList());
 
+        // Kredi kartıyla ödeme → kredi kartı akışına devredilir (limitten harcanır, taksitlenir).
+        if (request.Instrument == "credit")
+        {
+            return await _creditCards.SpendAsync(new CreditCardSpendRequest(
+                request.CreditCardId!.Value, request.Amount, request.Installments,
+                request.ThreeDSCode, request.Description));
+        }
+
         // 1) Kart işlemin sahibine mi ait?
-        var card = await _cards.GetByIdAsync(request.CardId);
+        var card = await _cards.GetByIdAsync(request.CardId!.Value);
         if (card is null || card.UserId != _ctx.ActingUserId)
             throw new NotFoundException("Kart bulunamadı.");
 

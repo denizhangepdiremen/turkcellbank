@@ -46,6 +46,8 @@ public static class DependencyInjection
         services.AddScoped<Features.TimeDeposits.ITimeDepositMaturityProcessor, Features.TimeDeposits.TimeDepositMaturityProcessor>();
         services.AddScoped<Features.Fx.IFxService, Features.Fx.FxService>();
         services.AddScoped<Features.Fx.IExchangeRateUpdater, Features.Fx.ExchangeRateUpdater>();
+        services.AddScoped<Features.CreditCards.ICreditCardService, Features.CreditCards.CreditCardService>();
+        services.AddScoped<Features.CreditCards.ICreditCardStatementProcessor, Features.CreditCards.CreditCardStatementProcessor>();
 
         // Validator'lar
         services.AddScoped<IValidator<RegisterRequest>, RegisterRequestValidator>();
@@ -64,6 +66,8 @@ public static class DependencyInjection
         services.AddScoped<IValidator<Features.PaymentOrders.Dtos.CreatePaymentOrderRequest>, Features.PaymentOrders.Validators.CreatePaymentOrderRequestValidator>();
         services.AddScoped<IValidator<Features.TimeDeposits.Dtos.OpenTimeDepositRequest>, Features.TimeDeposits.Validators.OpenTimeDepositRequestValidator>();
         services.AddScoped<IValidator<Features.Fx.Dtos.FxTradeRequest>, Features.Fx.Validators.FxTradeRequestValidator>();
+        services.AddScoped<IValidator<Features.CreditCards.Dtos.CreditCardApplicationRequest>, Features.CreditCards.Validators.CreditCardApplicationRequestValidator>();
+        services.AddScoped<IValidator<Features.CreditCards.Dtos.PayCreditCardRequest>, Features.CreditCards.Validators.PayCreditCardRequestValidator>();
 
         return services;
     }

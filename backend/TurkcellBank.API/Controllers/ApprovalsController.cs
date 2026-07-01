@@ -7,6 +7,8 @@ using TurkcellBank.Application.Features.Transactions;
 using TurkcellBank.Application.Features.Transactions.Dtos;
 using TurkcellBank.Application.Features.Cards;
 using TurkcellBank.Application.Features.Cards.Dtos;
+using TurkcellBank.Application.Features.CreditCards;
+using TurkcellBank.Application.Features.CreditCards.Dtos;
 
 namespace TurkcellBank.API.Controllers;
 
@@ -24,15 +26,18 @@ public class ApprovalsController : ControllerBase
     private readonly ILoanService _loanService;
     private readonly ITransferApprovalService _transferApproval;
     private readonly ICardService _cardService;
+    private readonly ICreditCardService _creditCardService;
 
     public ApprovalsController(
         ILoanService loanService,
         ITransferApprovalService transferApproval,
-        ICardService cardService)
+        ICardService cardService,
+        ICreditCardService creditCardService)
     {
         _loanService = loanService;
         _transferApproval = transferApproval;
         _cardService = cardService;
+        _creditCardService = creditCardService;
     }
 
     /// <summary>Onay bekleyen krediler (görünüm + CanApprove). GET /api/approvals/loans</summary>
@@ -133,5 +138,29 @@ public class ApprovalsController : ControllerBase
     {
         var card = await _cardService.RejectAsync(id);
         return Ok(ApiResponse<CardDto>.SuccessResponse(card, "Kart reddedildi."));
+    }
+
+    /// <summary>Onay bekleyen kredi kartı başvuruları. GET /api/approvals/credit-cards</summary>
+    [HttpGet("credit-cards")]
+    public async Task<IActionResult> PendingCreditCards()
+    {
+        var cards = await _creditCardService.GetPendingApprovalAsync();
+        return Ok(ApiResponse<List<AdminCreditCardDto>>.SuccessResponse(cards));
+    }
+
+    /// <summary>Kredi kartını onayla. POST /api/approvals/credit-cards/{id}/approve</summary>
+    [HttpPost("credit-cards/{id:guid}/approve")]
+    public async Task<IActionResult> ApproveCreditCard(Guid id)
+    {
+        var card = await _creditCardService.ApproveAsync(id);
+        return Ok(ApiResponse<CreditCardDto>.SuccessResponse(card, "Kredi kartı onaylandı."));
+    }
+
+    /// <summary>Kredi kartını reddet. POST /api/approvals/credit-cards/{id}/reject</summary>
+    [HttpPost("credit-cards/{id:guid}/reject")]
+    public async Task<IActionResult> RejectCreditCard(Guid id)
+    {
+        var card = await _creditCardService.RejectAsync(id);
+        return Ok(ApiResponse<CreditCardDto>.SuccessResponse(card, "Kredi kartı reddedildi."));
     }
 }

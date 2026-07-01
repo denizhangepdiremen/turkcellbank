@@ -27,6 +27,14 @@ import { deposit, transfer, getHistory, getHistoryPage } from '../../api/transac
 import { applyLoan, getMyLoans, getLoanDetail, payInstallment } from '../../api/loanApi'
 import { pay, getMyPayments } from '../../api/paymentApi'
 import { createCard, getMyCards, setCardOnlineShopping } from '../../api/cardApi'
+import {
+  applyCreditCard,
+  getMyCreditCards,
+  getCreditCardStatements,
+  getCreditCardTransactions,
+  payCreditCard,
+  setCreditCardOnlineShopping,
+} from '../../api/creditCardApi'
 import { createRecipient, deleteRecipient, getRecipients } from '../../api/recipientApi'
 import { getBillers, inquireBill, payBill, getMyBills } from '../../api/billApi'
 import {
@@ -60,6 +68,8 @@ import type {
   BillInquiry,
   Card as BankCard,
   CardStatus,
+  CreditCard,
+  CreditCardStatus,
   Currency,
   ExchangeRate,
   FxAlertDirection,
@@ -140,6 +150,48 @@ const cardLabel = (s: CardStatus) =>
         ? 'Bloke'
         : 'Bekliyor'
 
+// Kredi kartı durum rozeti
+const creditCardLabel = (s: CreditCardStatus) =>
+  s === 'Approved'
+    ? 'Aktif'
+    : s === 'PendingApproval'
+      ? 'Onay Bekliyor'
+      : s === 'Rejected'
+        ? 'Reddedildi'
+        : s === 'Blocked'
+          ? 'Bloke'
+          : 'Bekliyor'
+
+const creditCardBadgeVariant = (s: CreditCardStatus) =>
+  s === 'Approved'
+    ? 'success'
+    : s === 'Rejected' || s === 'Blocked'
+      ? 'error'
+      : 'warning'
+
+// Kredi kartı ekstre durumu rozeti
+const ccStatementLabel = (s: string) =>
+  s === 'Paid' ? 'Ödendi' : s === 'Overdue' ? 'Gecikmiş' : s === 'Due' ? 'Ödenecek' : 'Açık'
+
+const ccStatementBadgeVariant = (s: string) =>
+  s === 'Paid' ? 'success' : s === 'Overdue' ? 'error' : 'warning'
+
+// Kredi kartı hareket tipi etiketi
+const ccTxLabel = (t: string) =>
+  t === 'Purchase'
+    ? 'Harcama'
+    : t === 'Installment'
+      ? 'Taksit'
+      : t === 'Payment'
+        ? 'Ödeme'
+        : t === 'Refund'
+          ? 'İade'
+          : t === 'Fee'
+            ? 'Ücret'
+            : t === 'Interest'
+              ? 'Faiz'
+              : 'Nakit Avans'
+
 // İşlem geçmişi satır başlığı (tipe göre)
 const txTitle = (tx: Transaction) => {
   if (tx.type === 'Deposit') return 'Para Yatırma'
@@ -153,6 +205,7 @@ const txTitle = (tx: Transaction) => {
   if (tx.type === 'FxBuy') return `Döviz/Altın Alış${tx.description ? ` · ${tx.description}` : ''}`
   if (tx.type === 'FxSell') return `Döviz/Altın Satış${tx.description ? ` · ${tx.description}` : ''}`
   if (tx.type === 'FxConvert') return `Döviz/Altın Dönüşüm${tx.description ? ` · ${tx.description}` : ''}`
+  if (tx.type === 'CreditCardPayment') return 'Kredi Kartı Ödemesi'
   return tx.direction === 'Out'
     ? `Transfer → ${tx.counterpartyIban}`
     : `Transfer ← ${tx.counterpartyIban}`
@@ -541,6 +594,7 @@ const DASHBOARD_TABS = [
   { id: 'recipients', label: 'Alıcılarım' },
   { id: 'loans', label: 'Krediler' },
   { id: 'cards', label: 'Kartlar' },
+  { id: 'credit-cards', label: 'Kredi Kartı' },
   { id: 'payments', label: 'Ödemeler' },
   { id: 'bills', label: 'Faturalar' },
   { id: 'orders', label: 'Talimatlar' },
@@ -553,7 +607,7 @@ type DashboardTab = (typeof DASHBOARD_TABS)[number]['id']
 const DASHBOARD_TAB_GROUPS = [
   { id: 'daily', label: 'Günlük Bankacılık', tabs: ['accounts', 'transactions', 'recipients', 'payments'] },
   { id: 'billing', label: 'Fatura & Talimat', tabs: ['bills', 'orders'] },
-  { id: 'products', label: 'Kredi, Kart, Yatırım', tabs: ['loans', 'cards', 'deposits', 'fx'] },
+  { id: 'products', label: 'Kredi, Kart, Yatırım', tabs: ['loans', 'cards', 'credit-cards', 'deposits', 'fx'] },
   { id: 'security', label: 'Güvenlik', tabs: ['security'] },
 ] as const satisfies ReadonlyArray<{
   id: string
@@ -1220,6 +1274,148 @@ export function Dashboard() {
     setCardModalOpen(true)
   }
 
+  // --- Kredi Kartı ---
+  const { data: creditCardsData, isLoading: creditCardsLoading } = useQuery({
+    queryKey: ['credit-cards'],
+    queryFn: getMyCreditCards,
+    enabled: activeTab === 'credit-cards' || activeTab === 'payments',
+  })
+  const creditCards = useMemo(() => creditCardsData?.data ?? [], [creditCardsData?.data])
+  // MVP: müşteri başına tek kart; ilk kredi kartını ana kart kabul et
+  const creditCard = creditCards[0] ?? null
+  const activeCreditCard =
+    creditCard && creditCard.status === 'Approved' ? creditCard : null
+
+  const { data: ccStatementsData, isLoading: ccStatementsLoading } = useQuery({
+    queryKey: ['credit-card-statements', creditCard?.id],
+    queryFn: () => getCreditCardStatements(creditCard!.id),
+    enabled: activeTab === 'credit-cards' && !!creditCard,
+  })
+  const ccStatements = ccStatementsData?.data ?? []
+  const currentStatement = ccStatements.find((s) => s.status === 'Due' || s.status === 'Overdue') ?? null
+
+  const { data: ccTxData, isLoading: ccTxLoading } = useQuery({
+    queryKey: ['credit-card-transactions', creditCard?.id],
+    queryFn: () => getCreditCardTransactions(creditCard!.id),
+    enabled: activeTab === 'credit-cards' && !!creditCard,
+  })
+  const ccTransactions = ccTxData?.data ?? []
+
+  // Başvuru modalı (gelir/gider profili + kesim günü)
+  const [ccApplyOpen, setCcApplyOpen] = useState(false)
+  const [ccNationalId, setCcNationalId] = useState('')
+  const [ccAge, setCcAge] = useState('')
+  const [ccMarital, setCcMarital] = useState<'Single' | 'Married'>('Single')
+  const [ccChildren, setCcChildren] = useState('0')
+  const [ccHousing, setCcHousing] = useState<'Tenant' | 'Owner'>('Tenant')
+  const [ccIncome, setCcIncome] = useState('')
+  const [ccExpenses, setCcExpenses] = useState('')
+  const [ccEmployment, setCcEmployment] = useState('')
+  const [ccProfession, setCcProfession] = useState('')
+  const [ccStatementDay, setCcStatementDay] = useState('1')
+  const [resultCreditCard, setResultCreditCard] = useState<CreditCard | null>(null)
+
+  const ccApplyMutation = useMutation({
+    mutationFn: () =>
+      applyCreditCard({
+        nationalId: ccNationalId.trim(),
+        age: Number(ccAge),
+        maritalStatus: ccMarital,
+        childrenCount: Number(ccChildren),
+        housingStatus: ccHousing,
+        income: Number(ccIncome),
+        monthlyExpenses: Number(ccExpenses),
+        employmentMonths: Number(ccEmployment),
+        profession: ccProfession,
+        statementDay: Number(ccStatementDay),
+      }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+      if (res.data) setResultCreditCard(res.data)
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Başvuru yapılamadı.')),
+  })
+
+  function openCcApply() {
+    setCcNationalId(registeredNationalId)
+    setCcAge('')
+    setCcMarital('Single')
+    setCcChildren('0')
+    setCcHousing('Tenant')
+    setCcIncome('')
+    setCcExpenses('')
+    setCcEmployment('')
+    setCcProfession('')
+    setCcStatementDay('1')
+    setCcApplyOpen(true)
+  }
+
+  function submitCcApply() {
+    if (!/^\d{11}$/.test(ccNationalId.trim())) {
+      toast.error('TC kimlik numarası 11 haneli olmalı.')
+      return
+    }
+    if (!ccAge || !ccIncome || !ccProfession.trim()) {
+      toast.error('Lütfen zorunlu alanları doldurun.')
+      return
+    }
+    setCcApplyOpen(false)
+    ccApplyMutation.mutate()
+  }
+
+  // Borç öde modalı (Tamamı / Asgari / Tutar gir)
+  const [ccPayOpen, setCcPayOpen] = useState(false)
+  const [ccPayAccountId, setCcPayAccountId] = useState('')
+  const [ccPayAmount, setCcPayAmount] = useState('')
+  const tryPayAccounts = useMemo(
+    () => activeAccounts.filter((a) => a.currency === 'TRY'),
+    [activeAccounts],
+  )
+
+  const ccPayMutation = useMutation({
+    mutationFn: () =>
+      payCreditCard(creditCard!.id, {
+        sourceAccountId: ccPayAccountId,
+        amount: Number(ccPayAmount),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-card-statements', creditCard?.id] })
+      queryClient.invalidateQueries({ queryKey: ['credit-card-transactions', creditCard?.id] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      setCcPayOpen(false)
+      toast.success('Ödemeniz alındı.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Ödeme başarısız.')),
+  })
+
+  function openCcPay() {
+    setCcPayAccountId(tryPayAccounts[0]?.id ?? '')
+    // Varsayılan: güncel ekstre borcu (yoksa tüm güncel borç)
+    setCcPayAmount(
+      currentStatement
+        ? String(currentStatement.remainingAmount)
+        : creditCard
+          ? String(creditCard.currentDebt)
+          : '',
+    )
+    setCcPayOpen(true)
+  }
+
+  const ccOnlineShoppingMutation = useMutation({
+    mutationFn: (enabled: boolean) => setCreditCardOnlineShopping(creditCard!.id, enabled),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+      toast.success(
+        res.data?.onlineShoppingEnabled
+          ? 'İnternet alışverişi açıldı.'
+          : 'İnternet alışverişi kapatıldı.',
+      )
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'İşlem başarısız.')),
+  })
+
   // --- Sanal POS (ödemeler) ---
   const { data: paymentsData, isLoading: paymentsLoading } = useQuery({
     queryKey: ['payments'],
@@ -1301,23 +1497,36 @@ export function Dashboard() {
 
   const [payOpen, setPayOpen] = useState(false)
   const [payStep, setPayStep] = useState<'form' | '3ds'>('form')
+  const [payInstrument, setPayInstrument] = useState<'debit' | 'credit'>('debit')
   const [payCardId, setPayCardId] = useState('')
+  const [payInstallments, setPayInstallments] = useState('1')
   const [payAmount, setPayAmount] = useState('')
   const [payDesc, setPayDesc] = useState('')
   const [threeDS, setThreeDS] = useState('')
 
   const payMutation = useMutation({
     mutationFn: () =>
-      pay({
-        cardId: payCardId,
-        amount: Number(payAmount),
-        threeDSCode: threeDS,
-        description: payDesc || undefined,
-      }),
+      payInstrument === 'credit'
+        ? pay({
+            instrument: 'credit',
+            creditCardId: activeCreditCard!.id,
+            installments: Number(payInstallments),
+            amount: Number(payAmount),
+            threeDSCode: threeDS,
+            description: payDesc || undefined,
+          })
+        : pay({
+            instrument: 'debit',
+            cardId: payCardId,
+            amount: Number(payAmount),
+            threeDSCode: threeDS,
+            description: payDesc || undefined,
+          }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
       setPayOpen(false)
       toast.success('Ödeme başarılı.')
     },
@@ -1326,9 +1535,12 @@ export function Dashboard() {
 
   function openPay() {
     setPayStep('form')
+    // Onaylı banka kartı yoksa ve kredi kartı varsa doğrudan kredi kartına düş
+    setPayInstrument(approvedCards.length === 0 && activeCreditCard ? 'credit' : 'debit')
     // Varsayılan: bakiyesi olan kartlardan en yükseği (yoksa ilk onaylı kart)
     const funded = sortedPayCards.find((c) => cardBalance(c.accountIban) > 0)
     setPayCardId(funded?.id ?? sortedPayCards[0]?.id ?? '')
+    setPayInstallments('1')
     setPayAmount('')
     setPayDesc('')
     setThreeDS('')
@@ -2473,6 +2685,239 @@ export function Dashboard() {
               </div>
             ))}
           </div>
+        )}
+          </>
+        )}
+
+        {activeTab === 'credit-cards' && (
+          <>
+        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+          <h2 className="dashboard-section-title">Kredi Kartım</h2>
+          {!creditCard && !creditCardsLoading && (
+            <Button size="sm" variant="primary" onClick={openCcApply}>
+              + Kredi Kartı Başvurusu
+            </Button>
+          )}
+        </div>
+
+        {creditCardsLoading ? (
+          <div className="dashboard-cards-grid">
+            <Skeleton className="h-48 rounded-2xl" />
+          </div>
+        ) : !creditCard ? (
+          <Card>
+            <CardContent>
+              <div className="dashboard-state">
+                Henüz kredi kartınız yok. Gelir bilgilerinize göre limitiniz anında
+                belirlensin.
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <div className="dashboard-cards-grid">
+              {/* Kart görseli + limit çubuğu */}
+              <div className="dashboard-card-cell">
+                <div
+                  className={`bank-card bank-card--indigo ${creditCard.status !== 'Approved' ? 'bank-card--blocked' : ''}`}
+                >
+                  <div className="bank-card__top">
+                    <span className="bank-card__brand">TurkcellBank · Kredi</span>
+                    <Badge variant={creditCardBadgeVariant(creditCard.status)}>
+                      {creditCardLabel(creditCard.status)}
+                    </Badge>
+                  </div>
+                  <div className="bank-card__chip">
+                    <svg width="36" height="28" viewBox="0 0 36 28" fill="none">
+                      <rect x="0.5" y="0.5" width="35" height="27" rx="4" fill="#d4a843" stroke="#b8922e" />
+                      <line x1="0" y1="10" x2="36" y2="10" stroke="#b8922e" strokeWidth="0.7" />
+                      <line x1="0" y1="18" x2="36" y2="18" stroke="#b8922e" strokeWidth="0.7" />
+                      <line x1="12" y1="0" x2="12" y2="28" stroke="#b8922e" strokeWidth="0.7" />
+                      <line x1="24" y1="0" x2="24" y2="28" stroke="#b8922e" strokeWidth="0.7" />
+                    </svg>
+                  </div>
+                  <p className="bank-card__number">{creditCard.maskedCardNumber}</p>
+                  <p className="bank-card__holder">{user?.fullName?.toUpperCase()}</p>
+                  <div className="bank-card__bottom">
+                    <div>
+                      <span className="bank-card__label">SKT</span>
+                      <span className="bank-card__expiry">
+                        {String(creditCard.expiryMonth).padStart(2, '0')}/{creditCard.expiryYear}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="bank-card__label">KESİM</span>
+                      <span className="bank-card__expiry">Her ayın {creditCard.statementDay}'i</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Limit özeti + kullanılabilir limit çubuğu */}
+              <div className="dashboard-card-cell">
+                <Card>
+                  <CardContent>
+                    <div className="cc-limit-row">
+                      <span>Kullanılabilir Limit</span>
+                      <strong className="cc-limit-available">{formatTL(creditCard.availableLimit)}</strong>
+                    </div>
+                    <div className="cc-limit-bar">
+                      <div
+                        className="cc-limit-bar-fill"
+                        style={{
+                          width: `${creditCard.creditLimit > 0 ? Math.min(100, (creditCard.currentDebt / creditCard.creditLimit) * 100) : 0}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="cc-limit-meta">
+                      <span>Güncel Borç: <strong>{formatTL(creditCard.currentDebt)}</strong></span>
+                      <span>Toplam Limit: <strong>{formatTL(creditCard.creditLimit)}</strong></span>
+                    </div>
+
+                    {creditCard.status === 'Approved' && (
+                      <div className="cc-card-actions">
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          disabled={creditCard.currentDebt <= 0}
+                          onClick={openCcPay}
+                        >
+                          Borç Öde
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          loading={ccOnlineShoppingMutation.isPending}
+                          onClick={() => ccOnlineShoppingMutation.mutate(!creditCard.onlineShoppingEnabled)}
+                        >
+                          {creditCard.onlineShoppingEnabled
+                            ? 'İnternet Alışverişini Kapat'
+                            : 'İnternet Alışverişini Aç'}
+                        </Button>
+                      </div>
+                    )}
+                    {creditCard.status === 'PendingApproval' && (
+                      <Alert variant="info" className="cc-status-alert">
+                        Başvurunuz yüksek limit bandı nedeniyle yetkili onayında.
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {creditCard.status === 'Approved' && (
+              <>
+                {/* Güncel ekstre */}
+                <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+                  <h2 className="dashboard-section-title">Güncel Ekstre</h2>
+                </div>
+                {currentStatement ? (
+                  <Card>
+                    <CardContent>
+                      <div className="cc-statement-grid">
+                        <div className="cc-statement-cell">
+                          <span className="cc-statement-label">Dönem Borcu</span>
+                          <strong className="cc-statement-value">{formatTL(currentStatement.remainingAmount)}</strong>
+                        </div>
+                        <div className="cc-statement-cell">
+                          <span className="cc-statement-label">Asgari Ödeme</span>
+                          <strong className="cc-statement-value">{formatTL(currentStatement.minimumPayment)}</strong>
+                        </div>
+                        <div className="cc-statement-cell">
+                          <span className="cc-statement-label">Son Ödeme Tarihi</span>
+                          <strong className="cc-statement-value">{trDate(currentStatement.dueDate)}</strong>
+                        </div>
+                        <div className="cc-statement-cell">
+                          <span className="cc-statement-label">Durum</span>
+                          <Badge variant={ccStatementBadgeVariant(currentStatement.status)}>
+                            {ccStatementLabel(currentStatement.status)}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="cc-card-actions">
+                        <Button size="sm" variant="primary" onClick={openCcPay}>
+                          Borç Öde
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardContent>
+                      <div className="dashboard-state">
+                        Ödenecek güncel ekstreniz yok. Bir sonraki kesim tarihi:{' '}
+                        {trDate(creditCard.nextStatementDate)}.
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Hareketler */}
+                <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+                  <h2 className="dashboard-section-title">Kart Hareketleri</h2>
+                </div>
+                <Card>
+                  <CardContent>
+                    {ccTxLoading ? (
+                      <ListSkeleton />
+                    ) : ccTransactions.length === 0 ? (
+                      <div className="dashboard-state">Henüz hareket yok.</div>
+                    ) : (
+                      ccTransactions.map((t) => (
+                        <div key={t.id} className="dashboard-loan-row">
+                          <div>
+                            <p className="dashboard-loan-amount">
+                              {formatTL(t.amount)} · {ccTxLabel(t.type)}
+                              {t.installmentNo && t.installmentCount
+                                ? ` (${t.installmentNo}/${t.installmentCount})`
+                                : ''}
+                            </p>
+                            <p className="dashboard-loan-sub">
+                              {trDate(t.createdAt)}
+                              {t.description ? ` · ${t.description}` : ''}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Geçmiş ekstreler */}
+                {ccStatements.length > 0 && (
+                  <>
+                    <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+                      <h2 className="dashboard-section-title">Ekstreler</h2>
+                    </div>
+                    <Card>
+                      <CardContent>
+                        {ccStatementsLoading ? (
+                          <ListSkeleton />
+                        ) : (
+                          ccStatements.map((s) => (
+                            <div key={s.id} className="dashboard-loan-row">
+                              <div>
+                                <p className="dashboard-loan-amount">
+                                  {formatTL(s.totalDue)} · {trDate(s.statementDate)}
+                                </p>
+                                <p className="dashboard-loan-sub">
+                                  Asgari {formatTL(s.minimumPayment)} · Son ödeme {trDate(s.dueDate)}
+                                </p>
+                              </div>
+                              <Badge variant={ccStatementBadgeVariant(s.status)}>
+                                {ccStatementLabel(s.status)}
+                              </Badge>
+                            </div>
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+              </>
+            )}
+          </>
         )}
           </>
         )}
@@ -4084,7 +4529,7 @@ export function Dashboard() {
               </Button>
               <Button
                 variant="primary"
-                disabled={!payCardId}
+                disabled={payInstrument === 'credit' ? !activeCreditCard : !payCardId}
                 onClick={() => setPayStep('3ds')}
               >
                 Devam Et
@@ -4107,33 +4552,77 @@ export function Dashboard() {
         }
       >
         {payStep === 'form' ? (
-          approvedCards.length === 0 ? (
+          approvedCards.length === 0 && !activeCreditCard ? (
             <Alert variant="warning">
-              Ödeme yapmak için önce onaylı bir kartınız olmalı. “Kartlarım”dan
-              kart açıp admin onayını bekleyin.
+              Ödeme yapmak için önce onaylı bir kartınız olmalı. “Kartlarım”dan banka
+              kartı ya da “Kredi Kartı”ndan kredi kartı başvurusu yapabilirsiniz.
             </Alert>
           ) : (
             <>
-              <div className="dashboard-modal-field">
-                <Select
-                  label="Kart"
-                  options={sortedPayCards.map((c) => {
-                    // Müşteri hesabı numarasından değil bakiyesinden tanır:
-                    // karta bağlı hesabın bakiyesini göster, boşsa işaretle
-                    const balance = cardBalance(c.accountIban)
-                    const suffix =
-                      balance > 0
-                        ? ` · ${formatTL(balance)}`
-                        : ` · ${formatTL(0)} · bakiye yetersiz`
-                    return {
-                      value: c.id,
-                      label: `${c.maskedCardNumber} · Hesap ...${c.accountIban.slice(-4)}${suffix}`,
-                    }
-                  })}
-                  value={payCardId}
-                  onChange={(e) => setPayCardId(e.target.value)}
-                />
-              </div>
+              {/* Ödeme aracı: banka kartı (hesaptan) veya kredi kartı (limitten, taksitli) */}
+              {approvedCards.length > 0 && activeCreditCard && (
+                <div className="dashboard-modal-field">
+                  <Select
+                    label="Ödeme Aracı"
+                    options={[
+                      { value: 'debit', label: 'Banka Kartı (hesaptan)' },
+                      { value: 'credit', label: 'Kredi Kartı (taksitli)' },
+                    ]}
+                    value={payInstrument}
+                    onChange={(e) => setPayInstrument(e.target.value as 'debit' | 'credit')}
+                  />
+                </div>
+              )}
+
+              {payInstrument === 'credit' && activeCreditCard ? (
+                <>
+                  <div className="dashboard-modal-field">
+                    <Select
+                      label="Kredi Kartı"
+                      options={[
+                        {
+                          value: activeCreditCard.id,
+                          label: `${activeCreditCard.maskedCardNumber} · Kullanılabilir ${formatTL(activeCreditCard.availableLimit)}`,
+                        },
+                      ]}
+                      value={activeCreditCard.id}
+                      onChange={() => {}}
+                    />
+                  </div>
+                  <div className="dashboard-modal-field">
+                    <Select
+                      label="Taksit"
+                      options={[1, 2, 3, 6, 9, 12].map((n) => ({
+                        value: String(n),
+                        label: n === 1 ? 'Tek Çekim' : `${n} Taksit`,
+                      }))}
+                      value={payInstallments}
+                      onChange={(e) => setPayInstallments(e.target.value)}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="dashboard-modal-field">
+                  <Select
+                    label="Kart"
+                    options={sortedPayCards.map((c) => {
+                      // Müşteri hesabı numarasından değil bakiyesinden tanır:
+                      // karta bağlı hesabın bakiyesini göster, boşsa işaretle
+                      const balance = cardBalance(c.accountIban)
+                      const suffix =
+                        balance > 0
+                          ? ` · ${formatTL(balance)}`
+                          : ` · ${formatTL(0)} · bakiye yetersiz`
+                      return {
+                        value: c.id,
+                        label: `${c.maskedCardNumber} · Hesap ...${c.accountIban.slice(-4)}${suffix}`,
+                      }
+                    })}
+                    value={payCardId}
+                    onChange={(e) => setPayCardId(e.target.value)}
+                  />
+                </div>
+              )}
               <div className="dashboard-modal-field">
                 <Input
                   label="Tutar (₺)"
@@ -4142,6 +4631,11 @@ export function Dashboard() {
                   value={payAmount}
                   onChange={(e) => setPayAmount(e.target.value)}
                 />
+                {payInstrument === 'credit' && Number(payInstallments) > 1 && Number(payAmount) > 0 && (
+                  <p className="dashboard-field-hint">
+                    {payInstallments} taksit × {formatTL(Number(payAmount) / Number(payInstallments))}
+                  </p>
+                )}
               </div>
               <div className="dashboard-modal-field">
                 <Input
@@ -4166,6 +4660,258 @@ export function Dashboard() {
                 placeholder="123456"
                 value={threeDS}
                 onChange={(e) => setThreeDS(digitsOnly(e.target.value, 6))}
+              />
+            </div>
+          </>
+        )}
+      </Modal>
+
+      {/* --- Kredi kartı başvuru modalı --- */}
+      <Modal
+        open={ccApplyOpen}
+        onClose={() => setCcApplyOpen(false)}
+        title="Kredi Kartı Başvurusu"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setCcApplyOpen(false)}>
+              İptal
+            </Button>
+            <Button variant="primary" onClick={submitCcApply}>
+              Başvur
+            </Button>
+          </>
+        }
+      >
+        <div className="dashboard-loan-grid">
+          <div className="dashboard-modal-field">
+            <Input
+              label="TC Kimlik No"
+              inputMode="numeric"
+              maxLength={11}
+              placeholder="Kayıtlı TC kimlik numaranız"
+              value={ccNationalId}
+              disabled
+              onChange={(e) => setCcNationalId(digitsOnly(e.target.value))}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Input
+              label="Yaş"
+              type="number"
+              placeholder="Örn. 35"
+              value={ccAge}
+              onChange={(e) => setCcAge(e.target.value)}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Select
+              label="Medeni Hal"
+              value={ccMarital}
+              onChange={(e) => setCcMarital(e.target.value as 'Single' | 'Married')}
+              options={[
+                { value: 'Single', label: 'Bekar' },
+                { value: 'Married', label: 'Evli' },
+              ]}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Input
+              label="Çocuk Sayısı"
+              type="number"
+              placeholder="0"
+              value={ccChildren}
+              onChange={(e) => setCcChildren(e.target.value)}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Select
+              label="Konut Durumu"
+              value={ccHousing}
+              onChange={(e) => setCcHousing(e.target.value as 'Tenant' | 'Owner')}
+              options={[
+                { value: 'Tenant', label: 'Kiracı' },
+                { value: 'Owner', label: 'Ev sahibi' },
+              ]}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Input
+              label="Aylık Gelir (₺)"
+              type="number"
+              placeholder="Örn. 45000"
+              value={ccIncome}
+              onChange={(e) => setCcIncome(e.target.value)}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Input
+              label="Aylık Gider (₺)"
+              type="number"
+              placeholder="Örn. 20000"
+              value={ccExpenses}
+              onChange={(e) => setCcExpenses(e.target.value)}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Input
+              label="Çalışma Kıdemi (ay)"
+              type="number"
+              placeholder="Örn. 36"
+              value={ccEmployment}
+              onChange={(e) => setCcEmployment(e.target.value)}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Input
+              label="Meslek"
+              placeholder="Örn. Mühendis"
+              value={ccProfession}
+              onChange={(e) => setCcProfession(e.target.value)}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Select
+              label="Kesim Günü"
+              value={ccStatementDay}
+              onChange={(e) => setCcStatementDay(e.target.value)}
+              options={Array.from({ length: 28 }, (_, i) => ({
+                value: String(i + 1),
+                label: `Her ayın ${i + 1}'i`,
+              }))}
+            />
+          </div>
+        </div>
+        <p className="dashboard-loan-note">
+          Son ödeme tarihiniz kesim gününden 10 gün sonradır. Limitiniz gelir/gider
+          profilinize göre otomatik belirlenir.
+        </p>
+      </Modal>
+
+      {/* --- Kredi kartı "değerlendiriliyor" bekleme ekranı --- */}
+      <Modal
+        open={ccApplyMutation.isPending}
+        onClose={() => {}}
+        title="Başvurunuz değerlendiriliyor"
+      >
+        <div className="dashboard-state dashboard-loan-evaluating">
+          <Spinner />
+          <p>Başvurunuz yapay zeka tarafından değerlendiriliyor, lütfen bekleyin…</p>
+        </div>
+      </Modal>
+
+      {/* --- Kredi kartı başvuru sonucu modalı --- */}
+      <Modal
+        open={!!resultCreditCard}
+        onClose={() => setResultCreditCard(null)}
+        title={
+          resultCreditCard?.status === 'Approved'
+            ? 'Kredi Kartınız Onaylandı'
+            : resultCreditCard?.status === 'Rejected'
+              ? 'Başvurunuz Reddedildi'
+              : resultCreditCard?.status === 'PendingApproval'
+                ? 'Başvurunuz Onaya Gönderildi'
+                : 'Başvuru Sonucu'
+        }
+        footer={
+          <Button variant="primary" onClick={() => setResultCreditCard(null)}>
+            Kapat
+          </Button>
+        }
+      >
+        {resultCreditCard && (
+          <>
+            <div className="dashboard-loan-result-head">
+              <div className="dashboard-loan-result-badge">
+                <Badge variant={creditCardBadgeVariant(resultCreditCard.status)}>
+                  {creditCardLabel(resultCreditCard.status)}
+                </Badge>
+              </div>
+            </div>
+            {resultCreditCard.status !== 'Rejected' && (
+              <div className="dashboard-plan-summary">
+                Kart limiti: <strong>{formatTL(resultCreditCard.creditLimit)}</strong>
+                {' · '}Kesim: <strong>Her ayın {resultCreditCard.statementDay}'i</strong>
+              </div>
+            )}
+            <p className="dashboard-loan-reason">{resultCreditCard.aiReason}</p>
+          </>
+        )}
+      </Modal>
+
+      {/* --- Kredi kartı borç öde modalı --- */}
+      <Modal
+        open={ccPayOpen}
+        onClose={() => setCcPayOpen(false)}
+        title="Kredi Kartı Borcu Öde"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setCcPayOpen(false)}>
+              İptal
+            </Button>
+            <Button
+              variant="primary"
+              loading={ccPayMutation.isPending}
+              disabled={!ccPayAccountId || !(Number(ccPayAmount) > 0)}
+              onClick={() => ccPayMutation.mutate()}
+            >
+              Öde
+            </Button>
+          </>
+        }
+      >
+        {tryPayAccounts.length === 0 ? (
+          <Alert variant="warning">
+            Kredi kartı borcu ödemek için aktif bir TL hesabınız olmalı.
+          </Alert>
+        ) : (
+          <>
+            {creditCard && (
+              <div className="cc-pay-quickrow">
+                {currentStatement && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setCcPayAmount(String(currentStatement.minimumPayment))}
+                    >
+                      Asgari {formatTL(currentStatement.minimumPayment)}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setCcPayAmount(String(currentStatement.remainingAmount))}
+                    >
+                      Ekstre {formatTL(currentStatement.remainingAmount)}
+                    </Button>
+                  </>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setCcPayAmount(String(creditCard.currentDebt))}
+                >
+                  Tüm Borç {formatTL(creditCard.currentDebt)}
+                </Button>
+              </div>
+            )}
+            <div className="dashboard-modal-field">
+              <Select
+                label="Ödeme yapılacak hesap"
+                options={tryPayAccounts.map((a) => ({
+                  value: a.id,
+                  label: `${a.accountType} · ...${a.iban.slice(-4)} · ${formatTL(a.balance)}`,
+                }))}
+                value={ccPayAccountId}
+                onChange={(e) => setCcPayAccountId(e.target.value)}
+              />
+            </div>
+            <div className="dashboard-modal-field">
+              <Input
+                label="Tutar (₺)"
+                type="number"
+                placeholder="0"
+                value={ccPayAmount}
+                onChange={(e) => setCcPayAmount(e.target.value)}
               />
             </div>
           </>

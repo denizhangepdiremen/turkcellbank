@@ -57,6 +57,7 @@ export interface Transaction {
     | 'FxBuy'
     | 'FxSell'
     | 'FxConvert'
+    | 'CreditCardPayment'
   direction: 'In' | 'Out' // gelen / giden (o hesabın bakışıyla)
   amount: number
   counterpartyIban: string | null
@@ -279,6 +280,80 @@ export interface AdminCard {
   accountIban: string
   status: CardStatus
   createdAt: string
+  decidedAt: string | null
+}
+
+export type CreditCardStatus =
+  | 'Pending'
+  | 'PendingApproval'
+  | 'Approved'
+  | 'Rejected'
+  | 'Blocked'
+
+export interface CreditCard {
+  id: string
+  maskedCardNumber: string
+  expiryMonth: number
+  expiryYear: number
+  status: CreditCardStatus
+  creditLimit: number
+  currentDebt: number
+  availableLimit: number
+  statementDay: number
+  nextStatementDate: string
+  onlineShoppingEnabled: boolean
+  score: number
+  aiReason: string | null
+  openedAt: string
+}
+
+export type CreditCardStatementStatus = 'Open' | 'Due' | 'Paid' | 'Overdue'
+
+export interface CreditCardStatement {
+  id: string
+  creditCardId: string
+  periodStart: string
+  periodEnd: string
+  statementDate: string
+  dueDate: string
+  totalDue: number
+  minimumPayment: number
+  paidAmount: number
+  remainingAmount: number
+  status: CreditCardStatementStatus
+}
+
+export type CreditCardTxType =
+  | 'Purchase'
+  | 'Installment'
+  | 'Payment'
+  | 'Refund'
+  | 'Fee'
+  | 'Interest'
+  | 'CashAdvance'
+
+export interface CreditCardTransaction {
+  id: string
+  type: CreditCardTxType
+  amount: number
+  description: string
+  installmentNo: number | null
+  installmentCount: number | null
+  statementId: string | null
+  createdAt: string
+}
+
+// Yetkili onay listesi için (başvuran bilgisiyle)
+export interface AdminCreditCard {
+  id: string
+  holderName: string
+  holderEmail: string
+  maskedCardNumber: string
+  status: CreditCardStatus
+  creditLimit: number
+  score: number
+  aiReason: string | null
+  openedAt: string
   decidedAt: string | null
 }
 

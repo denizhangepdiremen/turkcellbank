@@ -2,13 +2,17 @@ import { apiClient } from '../lib/apiClient'
 import type { ApiResponse, Payment } from '../lib/types'
 
 export interface PayPayload {
-  cardId: string
   amount: number
   threeDSCode: string
   description?: string
+  // Ödeme aracı: banka kartı (debit) → hesaptan düşülür; kredi kartı (credit) → limitten harcanır
+  instrument?: 'debit' | 'credit'
+  cardId?: string // debit kart
+  creditCardId?: string // kredi kartı
+  installments?: number // kredi kartı taksit sayısı (1..12)
 }
 
-// Onaylı kartla ödeme yap (tutar karta bağlı hesaptan düşülür)
+// Kart ile ödeme yap (debit → hesaptan; credit → kredi kartı limitinden, taksitli)
 export async function pay(payload: PayPayload) {
   const { data } = await apiClient.post<ApiResponse<Payment>>(
     '/api/payments',

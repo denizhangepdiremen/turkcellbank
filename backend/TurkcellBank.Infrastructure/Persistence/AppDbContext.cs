@@ -34,6 +34,10 @@ public class AppDbContext : DbContext
     public DbSet<FxTrade> FxTrades => Set<FxTrade>();
     public DbSet<FxRateAlert> FxRateAlerts => Set<FxRateAlert>();
     public DbSet<FxConversion> FxConversions => Set<FxConversion>();
+    public DbSet<CreditCard> CreditCards => Set<CreditCard>();
+    public DbSet<CreditCardInstallmentPlan> CreditCardInstallmentPlans => Set<CreditCardInstallmentPlan>();
+    public DbSet<CreditCardTransaction> CreditCardTransactions => Set<CreditCardTransaction>();
+    public DbSet<CreditCardStatement> CreditCardStatements => Set<CreditCardStatement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -384,6 +388,81 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(c => c.AccountId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // --- CreditCard (gerçek kredi kartı) tablosu kuralları ---
+        modelBuilder.Entity<CreditCard>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.CardNumber).IsRequired().HasMaxLength(16);
+            entity.HasIndex(c => c.CardNumber).IsUnique();
+            entity.Property(c => c.Cvv).IsRequired().HasMaxLength(4);
+            entity.Property(c => c.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(c => c.CreditLimit).HasPrecision(18, 2);
+            entity.Property(c => c.CurrentDebt).HasPrecision(18, 2);
+            entity.Property(c => c.AiReason).HasMaxLength(1000);
+            entity.Property(c => c.Channel).HasConversion<string>().HasMaxLength(10);
+            entity.Property(c => c.OnlineShoppingEnabled).HasDefaultValue(true);
+
+            entity.HasIndex(c => c.UserId);
+            // Arka plan worker'ın kesim sorgusu için (aktif kartlarda vadesi gelen)
+            entity.HasIndex(c => new { c.Status, c.NextStatementDate });
+
+            entity.HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- CreditCardInstallmentPlan tablosu kuralları ---
+        modelBuilder.Entity<CreditCardInstallmentPlan>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.TotalAmount).HasPrecision(18, 2);
+            entity.Property(p => p.InstallmentAmount).HasPrecision(18, 2);
+            entity.Property(p => p.Description).HasMaxLength(200);
+
+            entity.HasIndex(p => p.CreditCardId);
+
+            entity.HasOne(p => p.CreditCard)
+                .WithMany()
+                .HasForeignKey(p => p.CreditCardId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- CreditCardTransaction (kart hareketi / ekstre kalemi) kuralları ---
+        modelBuilder.Entity<CreditCardTransaction>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.Type).HasConversion<string>().HasMaxLength(20);
+            entity.Property(t => t.Amount).HasPrecision(18, 2);
+            entity.Property(t => t.Description).HasMaxLength(200);
+
+            entity.HasIndex(t => t.CreditCardId);
+            entity.HasIndex(t => t.StatementId);
+
+            entity.HasOne(t => t.CreditCard)
+                .WithMany()
+                .HasForeignKey(t => t.CreditCardId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- CreditCardStatement (dönem ekstresi) tablosu kuralları ---
+        modelBuilder.Entity<CreditCardStatement>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.TotalDue).HasPrecision(18, 2);
+            entity.Property(s => s.MinimumPayment).HasPrecision(18, 2);
+            entity.Property(s => s.PaidAmount).HasPrecision(18, 2);
+            entity.Property(s => s.RemainingAmount).HasPrecision(18, 2);
+            entity.Property(s => s.Status).HasConversion<string>().HasMaxLength(20);
+
+            entity.HasIndex(s => new { s.CreditCardId, s.Status });
+
+            entity.HasOne(s => s.CreditCard)
+                .WithMany()
+                .HasForeignKey(s => s.CreditCardId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // --- PendingTransfer tablosu kuralları ---
