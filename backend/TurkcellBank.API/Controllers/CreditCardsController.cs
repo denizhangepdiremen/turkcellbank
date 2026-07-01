@@ -59,6 +59,32 @@ public class CreditCardsController : ControllerBase
         return Ok(ApiResponse<CreditCardDto>.SuccessResponse(card, "Ödemeniz alındı."));
     }
 
+    /// <summary>Kredi kartından TL hesaba nakit avans kullan. POST /api/credit-cards/{id}/cash-advance</summary>
+    [HttpPost("{id:guid}/cash-advance")]
+    public async Task<IActionResult> CashAdvance(Guid id, [FromBody] CreditCardCashAdvanceBody body)
+    {
+        var card = await _service.CashAdvanceAsync(new CreditCardCashAdvanceRequest(id, body.TargetAccountId, body.Amount));
+        return Ok(ApiResponse<CreditCardDto>.SuccessResponse(card, "Nakit avans hesabınıza aktarıldı."));
+    }
+
+    /// <summary>Kredi kartı limit artış talebi. POST /api/credit-cards/{id}/limit-increase-requests</summary>
+    [HttpPost("{id:guid}/limit-increase-requests")]
+    public async Task<IActionResult> RequestLimitIncrease(Guid id, [FromBody] CreditCardLimitIncreaseBody body)
+    {
+        var request = await _service.RequestLimitIncreaseAsync(new CreditCardLimitIncreaseRequestDto(
+            id, body.RequestedLimit, body.Age, body.MaritalStatus, body.ChildrenCount,
+            body.HousingStatus, body.Income, body.MonthlyExpenses, body.EmploymentMonths, body.Profession));
+        return Ok(ApiResponse<CreditCardLimitIncreaseDto>.SuccessResponse(request, "Limit artış talebiniz alındı."));
+    }
+
+    /// <summary>Kredi kartı limit artış taleplerim. GET /api/credit-cards/{id}/limit-increase-requests</summary>
+    [HttpGet("{id:guid}/limit-increase-requests")]
+    public async Task<IActionResult> LimitIncreaseRequests(Guid id)
+    {
+        var requests = await _service.GetLimitIncreaseRequestsAsync(id);
+        return Ok(ApiResponse<List<CreditCardLimitIncreaseDto>>.SuccessResponse(requests));
+    }
+
     /// <summary>Kartın internet alışverişini aç/kapat. PATCH /api/credit-cards/{id}/online-shopping</summary>
     [HttpPatch("{id:guid}/online-shopping")]
     public async Task<IActionResult> SetOnlineShopping(Guid id, [FromBody] SetCreditOnlineShoppingRequest request)
@@ -71,6 +97,21 @@ public class CreditCardsController : ControllerBase
 
 /// <summary>Kredi kartı borç ödeme gövdesi (kart id route'tan gelir).</summary>
 public record PayCreditCardBody(Guid SourceAccountId, decimal Amount);
+
+/// <summary>Kredi kartı nakit avans gövdesi.</summary>
+public record CreditCardCashAdvanceBody(Guid TargetAccountId, decimal Amount);
+
+/// <summary>Kredi kartı limit artış talebi gövdesi.</summary>
+public record CreditCardLimitIncreaseBody(
+    decimal RequestedLimit,
+    int Age,
+    TurkcellBank.Domain.Enums.MaritalStatus MaritalStatus,
+    int ChildrenCount,
+    TurkcellBank.Domain.Enums.HousingStatus HousingStatus,
+    decimal Income,
+    decimal MonthlyExpenses,
+    int EmploymentMonths,
+    string Profession);
 
 /// <summary>Kredi kartı internet alışverişi aç/kapat isteği.</summary>
 public record SetCreditOnlineShoppingRequest(bool Enabled);

@@ -31,6 +31,8 @@ public class CreditCardService : ICreditCardService
     private readonly IOperationContext _ctx;
     private readonly IValidator<CreditCardApplicationRequest> _applyValidator;
     private readonly IValidator<PayCreditCardRequest> _payValidator;
+    private readonly IValidator<CreditCardCashAdvanceRequest> _cashAdvanceValidator;
+    private readonly IValidator<CreditCardLimitIncreaseRequestDto> _limitIncreaseValidator;
     private readonly IAuditLogger _audit;
     private readonly INotificationService _notifications;
     private readonly CreditCardOptions _options;
@@ -46,6 +48,8 @@ public class CreditCardService : ICreditCardService
         IOperationContext ctx,
         IValidator<CreditCardApplicationRequest> applyValidator,
         IValidator<PayCreditCardRequest> payValidator,
+        IValidator<CreditCardCashAdvanceRequest> cashAdvanceValidator,
+        IValidator<CreditCardLimitIncreaseRequestDto> limitIncreaseValidator,
         IAuditLogger audit,
         INotificationService notifications,
         CreditCardOptions options)
@@ -60,6 +64,8 @@ public class CreditCardService : ICreditCardService
         _ctx = ctx;
         _applyValidator = applyValidator;
         _payValidator = payValidator;
+        _cashAdvanceValidator = cashAdvanceValidator;
+        _limitIncreaseValidator = limitIncreaseValidator;
         _audit = audit;
         _notifications = notifications;
         _options = options;
@@ -394,6 +400,197 @@ public class CreditCardService : ICreditCardService
         return Map(card);
     }
 
+    // ---------------------------------------------------------------- Nakit avans
+    public async Task<CreditCardDto> CashAdvanceAsync(CreditCardCashAdvanceRequest request)
+    {
+        var validation = await _cashAdvanceValidator.ValidateAsync(request);
+        if (!validation.IsValid)
+            throw new Common.Exceptions.ValidationException(
+                validation.Errors.Select(e => e.ErrorMessage).ToList());
+
+        var card = await _cards.GetByIdAsync(request.CreditCardId);
+        if (card is null || card.UserId != _ctx.ActingUserId)
+            throw new NotFoundException("Kredi kartı bulunamadı.");
+        if (card.Status != CreditCardStatus.Approved)
+            throw new BusinessException("Kredi kartınız aktif değil.");
+
+        var account = await _accounts.GetByIdAsync(request.TargetAccountId);
+        if (account is null || account.UserId != _ctx.ActingUserId)
+            throw new NotFoundException("Hesap bulunamadı.");
+        if (account.Currency != Currency.TRY)
+            throw new BusinessException("Nakit avans yalnızca TL hesaba aktarılabilir.");
+        if (!account.IsActive)
+            throw new BusinessException("Kapalı hesaba nakit avans aktarılamaz.");
+        if (account.IsFrozen)
+            throw new BusinessException("Dondurulmuş hesaba nakit avans aktarılamaz.");
+
+        var amount = request.Amount;
+        var fee = Math.Round(Math.Max(amount * _options.CashAdvanceFeeRate, _options.CashAdvanceMinFee), 2, MidpointRounding.AwayFromZero);
+        var interest = Math.Round(amount * (_options.MonthlyContractInterestRate / 30m), 2, MidpointRounding.AwayFromZero);
+        var debtIncrease = amount + fee + interest;
+
+        if (debtIncrease > card.CreditLimit - card.CurrentDebt)
+            throw new BusinessException("Nakit avans için kredi kartı limiti yetersiz.");
+
+        var now = DateTime.UtcNow;
+        account.Balance += amount;
+        card.CurrentDebt += debtIncrease;
+
+        _cards.AddLedgerTransaction(new Transaction
+        {
+            Id = Guid.NewGuid(),
+            Type = TransactionType.CreditCardCashAdvance,
+            ToAccountId = account.Id,
+            ToIban = account.Iban,
+            Amount = amount,
+            Description = "Kredi kartı nakit avans",
+            CreatedAt = now,
+            Channel = _ctx.Channel,
+            PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
+        });
+        _cards.AddTransaction(new CreditCardTransaction
+        {
+            Id = Guid.NewGuid(),
+            CreditCardId = card.Id,
+            Type = CreditCardTxType.CashAdvance,
+            Amount = amount,
+            Description = "Nakit avans",
+            CreatedAt = now,
+        });
+        _cards.AddTransaction(new CreditCardTransaction
+        {
+            Id = Guid.NewGuid(),
+            CreditCardId = card.Id,
+            Type = CreditCardTxType.Fee,
+            Amount = fee,
+            Description = "Nakit avans komisyonu",
+            CreatedAt = now,
+        });
+        if (interest > 0m)
+        {
+            _cards.AddTransaction(new CreditCardTransaction
+            {
+                Id = Guid.NewGuid(),
+                CreditCardId = card.Id,
+                Type = CreditCardTxType.Interest,
+                Amount = interest,
+                Description = "Nakit avans günlük faizi",
+                CreatedAt = now,
+            });
+        }
+
+        await _cards.SaveChangesAsync();
+
+        await _audit.LogAsync("Kredi kartı nakit avans",
+            $"{CardHelper.Mask(card.CardNumber)} kartından {amount:N2} TL nakit avans kullanıldı.");
+        await _notifications.NotifyAsync(card.UserId, "Nakit avans kullanıldı",
+            $"{amount:N2} TL nakit avans hesabınıza aktarıldı. Komisyon/faiz toplamı {fee + interest:N2} TL.");
+
+        return Map(card);
+    }
+
+    // ---------------------------------------------------------------- Limit artış talebi
+    public async Task<CreditCardLimitIncreaseDto> RequestLimitIncreaseAsync(CreditCardLimitIncreaseRequestDto request)
+    {
+        var validation = await _limitIncreaseValidator.ValidateAsync(request);
+        if (!validation.IsValid)
+            throw new Common.Exceptions.ValidationException(
+                validation.Errors.Select(e => e.ErrorMessage).ToList());
+
+        var card = await _cards.GetByIdAsync(request.CreditCardId);
+        if (card is null || card.UserId != _ctx.ActingUserId)
+            throw new NotFoundException("Kredi kartı bulunamadı.");
+        if (card.Status != CreditCardStatus.Approved)
+            throw new BusinessException("Yalnızca aktif kredi kartı için limit artışı talep edilebilir.");
+        if (request.RequestedLimit <= card.CreditLimit)
+            throw new BusinessException("Talep edilen limit mevcut limitten yüksek olmalı.");
+        if (request.RequestedLimit > _options.MaxLimit)
+            throw new BusinessException($"Talep edilen limit en fazla {_options.MaxLimit:N0} TL olabilir.");
+        if (await _cards.HasPendingLimitIncreaseRequestAsync(card.Id))
+            throw new BusinessException("Bu kart için bekleyen bir limit artış talebiniz var.");
+
+        var user = await _users.GetByIdAsync(_ctx.ActingUserId)
+            ?? throw new NotFoundException("Kullanıcı bulunamadı.");
+        var nationalId = user.NationalId.Trim();
+
+        var evaluation = await EvaluateLimitCapacityAsync(
+            nationalId,
+            request.Age,
+            request.MaritalStatus,
+            request.ChildrenCount,
+            request.HousingStatus,
+            request.Income,
+            request.MonthlyExpenses,
+            request.EmploymentMonths,
+            request.Profession.Trim());
+
+        var now = DateTime.UtcNow;
+        var limitRequest = new CreditCardLimitIncreaseRequest
+        {
+            Id = Guid.NewGuid(),
+            CreditCardId = card.Id,
+            UserId = card.UserId,
+            CurrentLimit = card.CreditLimit,
+            RequestedLimit = request.RequestedLimit,
+            RecommendedLimit = evaluation.Limit,
+            Age = request.Age,
+            MaritalStatus = request.MaritalStatus,
+            ChildrenCount = request.ChildrenCount,
+            HousingStatus = request.HousingStatus,
+            Income = request.Income,
+            MonthlyExpenses = request.MonthlyExpenses,
+            EmploymentMonths = request.EmploymentMonths,
+            Profession = request.Profession.Trim(),
+            Score = evaluation.Score,
+            CreatedAt = now,
+            Channel = _ctx.Channel,
+            PerformedByEmployeeId = _ctx.PerformedByEmployeeId,
+        };
+
+        if (request.RequestedLimit > evaluation.Limit)
+        {
+            limitRequest.Status = CreditCardLimitRequestStatus.Rejected;
+            limitRequest.DecidedAt = now;
+            limitRequest.AiReason = $"{evaluation.Reason} Talep edilen limit, hesaplanan {evaluation.Limit:N0} TL kapasiteyi aştığı için reddedildi.";
+        }
+        else if (request.RequestedLimit > _options.AutoApproveMaxLimit)
+        {
+            limitRequest.Status = CreditCardLimitRequestStatus.PendingApproval;
+            limitRequest.AiReason = $"{evaluation.Reason} {request.RequestedLimit:N0} TL talep yüksek limit bandında olduğu için yetkili onayına gönderildi.";
+        }
+        else
+        {
+            limitRequest.Status = CreditCardLimitRequestStatus.Approved;
+            limitRequest.DecidedAt = now;
+            limitRequest.AiReason = $"{evaluation.Reason} Limitiniz {request.RequestedLimit:N0} TL olarak güncellendi.";
+            card.CreditLimit = request.RequestedLimit;
+        }
+
+        _cards.AddLimitIncreaseRequest(limitRequest);
+        await _cards.SaveChangesAsync();
+
+        await _audit.LogAsync("Kredi kartı limit artış talebi",
+            $"{CardHelper.Mask(card.CardNumber)} kartı için {request.RequestedLimit:N0} TL talep oluşturuldu; durum: {limitRequest.Status}.");
+        await _notifications.NotifyAsync(card.UserId, "Limit artış talebiniz alındı",
+            limitRequest.Status == CreditCardLimitRequestStatus.PendingApproval
+                ? "Limit artış talebiniz yetkili onayına gönderildi."
+                : limitRequest.Status == CreditCardLimitRequestStatus.Approved
+                    ? $"{request.RequestedLimit:N0} TL yeni limitiniz kullanıma açıldı."
+                    : "Limit artış talebiniz gelir/gider profiliniz nedeniyle reddedildi.");
+
+        return MapLimitRequest(limitRequest, card);
+    }
+
+    public async Task<List<CreditCardLimitIncreaseDto>> GetLimitIncreaseRequestsAsync(Guid cardId)
+    {
+        var card = await _cards.GetByIdAsync(cardId);
+        if (card is null || card.UserId != _ctx.ActingUserId)
+            throw new NotFoundException("Kredi kartı bulunamadı.");
+
+        var requests = await _cards.GetLimitIncreaseRequestsByCardIdAsync(cardId);
+        return requests.Select(r => MapLimitRequest(r, card)).ToList();
+    }
+
     // ---------------------------------------------------------------- İnternet alışverişi
     public async Task<CreditCardDto> SetOnlineShoppingAsync(Guid cardId, bool enabled)
     {
@@ -416,14 +613,27 @@ public class CreditCardService : ICreditCardService
     public async Task<List<AdminCreditCardDto>> GetPendingApprovalAsync()
     {
         var cards = await _cards.GetAllWithUserAsync();
-        return cards
+        var cardApprovals = cards
             .Where(c => c.Status == CreditCardStatus.PendingApproval)
             .Select(MapAdmin)
+            .ToList();
+        var limitRequests = await _cards.GetPendingLimitIncreaseRequestsAsync();
+        cardApprovals.AddRange(limitRequests.Select(MapAdminLimitRequest));
+        return cardApprovals
+            .OrderByDescending(a => a.OpenedAt)
             .ToList();
     }
 
     public Task<CreditCardDto> ApproveAsync(Guid id) => DecideAsync(id, approve: true);
     public Task<CreditCardDto> RejectAsync(Guid id) => DecideAsync(id, approve: false);
+    public Task<CreditCardDto> ApproveLimitIncreaseAsync(Guid id) => DecideLimitIncreaseAsync(id, approve: true);
+    public async Task<CreditCardLimitIncreaseDto> RejectLimitIncreaseAsync(Guid id)
+    {
+        await DecideLimitIncreaseAsync(id, approve: false);
+        var request = await _cards.GetLimitIncreaseRequestByIdAsync(id)
+            ?? throw new NotFoundException("Limit artış talebi bulunamadı.");
+        return MapLimitRequest(request, request.CreditCard ?? throw new NotFoundException("Kredi kartı bulunamadı."));
+    }
 
     private async Task<CreditCardDto> DecideAsync(Guid id, bool approve)
     {
@@ -448,6 +658,35 @@ public class CreditCardService : ICreditCardService
         return Map(card);
     }
 
+    private async Task<CreditCardDto> DecideLimitIncreaseAsync(Guid id, bool approve)
+    {
+        var request = await _cards.GetLimitIncreaseRequestByIdAsync(id)
+            ?? throw new NotFoundException("Limit artış talebi bulunamadı.");
+        if (request.CreditCard is null)
+            throw new NotFoundException("Kredi kartı bulunamadı.");
+        if (request.Status != CreditCardLimitRequestStatus.PendingApproval)
+            throw new BusinessException("Bu limit artış talebi zaten karara bağlanmış.");
+
+        request.Status = approve ? CreditCardLimitRequestStatus.Approved : CreditCardLimitRequestStatus.Rejected;
+        request.DecidedAt = DateTime.UtcNow;
+        request.DecidedByUserId = _ctx.PerformedByEmployeeId ?? _ctx.ActingUserId;
+        if (approve)
+            request.CreditCard.CreditLimit = request.RequestedLimit;
+
+        await _cards.SaveChangesAsync();
+
+        var verdict = approve ? "onaylandı" : "reddedildi";
+        var masked = CardHelper.Mask(request.CreditCard.CardNumber);
+        await _audit.LogAsync($"Kredi kartı limit artışı {verdict}",
+            $"{masked} kartı için {request.RequestedLimit:N0} TL limit artış talebi {verdict}.");
+        await _notifications.NotifyAsync(request.UserId, $"Limit artış talebiniz {verdict}",
+            approve
+                ? $"Kredi kartı limitiniz {request.RequestedLimit:N0} TL olarak güncellendi."
+                : "Limit artış talebiniz yetkili değerlendirmesi sonucu reddedildi.");
+
+        return Map(request.CreditCard);
+    }
+
     // ---------------------------------------------------------------- Yardımcılar
     /// <summary>Verilen kesim gününe göre bir sonraki kesim tarihini (UTC, 00:00) hesaplar.</summary>
     private static DateTime ComputeNextStatement(DateTime now, int statementDay)
@@ -463,10 +702,59 @@ public class CreditCardService : ICreditCardService
             c.StatementDay, c.NextStatementDate, c.OnlineShoppingEnabled, c.Score, c.AiReason, c.OpenedAt);
 
     private static AdminCreditCardDto MapAdmin(CreditCard c) =>
-        new(c.Id, c.User?.FullName ?? "—", c.User?.Email ?? "—", CardHelper.Mask(c.CardNumber),
-            c.Status.ToString(), c.CreditLimit, c.Score, c.AiReason, c.OpenedAt, c.DecidedAt);
+        new(c.Id, c.Id, "Application", c.User?.FullName ?? "—", c.User?.Email ?? "—", CardHelper.Mask(c.CardNumber),
+            c.Status.ToString(), c.CreditLimit, c.CreditLimit, c.CreditLimit, c.CreditLimit, c.Score, c.AiReason, c.OpenedAt, c.DecidedAt);
+
+    private static AdminCreditCardDto MapAdminLimitRequest(CreditCardLimitIncreaseRequest r) =>
+        new(r.Id, r.CreditCardId, "LimitIncrease", r.User?.FullName ?? "—", r.User?.Email ?? "—",
+            r.CreditCard is null ? "—" : CardHelper.Mask(r.CreditCard.CardNumber),
+            r.Status.ToString(), r.CurrentLimit, r.RequestedLimit, r.RecommendedLimit, r.RequestedLimit,
+            r.Score, r.AiReason, r.CreatedAt, r.DecidedAt);
 
     private static CreditCardStatementDto MapStatement(CreditCardStatement s) =>
         new(s.Id, s.CreditCardId, s.PeriodStart, s.PeriodEnd, s.StatementDate, s.DueDate,
-            s.TotalDue, s.MinimumPayment, s.PaidAmount, s.RemainingAmount, s.Status.ToString());
+            s.TotalDue, s.MinimumPayment, s.PaidAmount, s.RemainingAmount,
+            s.TotalInterestApplied, s.LastInterestAppliedAt, s.Status.ToString());
+
+    private static CreditCardLimitIncreaseDto MapLimitRequest(CreditCardLimitIncreaseRequest r, CreditCard card) =>
+        new(r.Id, r.CreditCardId, CardHelper.Mask(card.CardNumber), r.CurrentLimit, r.RequestedLimit,
+            r.RecommendedLimit, r.Status.ToString(), r.Score, r.AiReason, r.CreatedAt, r.DecidedAt);
+
+    private async Task<(decimal Limit, int Score, string Reason)> EvaluateLimitCapacityAsync(
+        string nationalId,
+        int age,
+        MaritalStatus maritalStatus,
+        int childrenCount,
+        HousingStatus housingStatus,
+        decimal income,
+        decimal monthlyExpenses,
+        int employmentMonths,
+        string profession)
+    {
+        var candidates = await _reference.GetCandidatesByIncomeAsync(income, 400);
+        var applicantForMatch = new LoanApplicationRequest(
+            nationalId, age, maritalStatus, childrenCount, housingStatus, income, monthlyExpenses,
+            employmentMonths, profession, 0m, 0, Guid.Empty);
+        var peers = PeerMatcher.SelectMostSimilar(applicantForMatch, candidates, 50);
+        var peerDtos = peers
+            .Select(p => new LoanPeer(
+                p.Age, p.MonthlyIncome, p.MonthlyExpenses, p.MaritalStatus,
+                p.ChildrenCount, p.HousingStatus, p.GrantedAmount, p.TermMonths, p.Defaulted))
+            .ToList();
+        var context = new LoanEvaluationContext(
+            nationalId, age, maritalStatus, childrenCount, housingStatus, income, monthlyExpenses,
+            employmentMonths, profession, 0m, 0, peerDtos);
+        var ai = await _evaluator.EvaluateAsync(context);
+        var externalLoans = await _external.GetByNationalIdAsync(nationalId);
+        var externalDebt = externalLoans.Sum(e => e.RemainingDebt);
+        var incomeCap = income * _options.IncomeMultiple;
+        var capacity = Math.Max(0m, ai.MaxLimit - externalDebt);
+        var raw = Math.Min(capacity, incomeCap);
+        var rounded = Math.Round(raw / 1000m, MidpointRounding.AwayFromZero) * 1000m;
+        var limit = Math.Min(Math.Max(0m, rounded), _options.MaxLimit);
+        var score = limit <= 0m
+            ? 0
+            : Math.Clamp((int)Math.Round((double)(limit / _options.MaxLimit) * 100), 1, 100);
+        return (limit, score, $"{ai.Reason} Mevcut dış borçlar düşüldükten sonra önerilen kart limiti {limit:N0} TL.");
+    }
 }

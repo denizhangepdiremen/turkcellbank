@@ -31,8 +31,9 @@ public class CreditCardStatementProcessor : ICreditCardStatementProcessor
 
     public async Task<int> ProcessDueAsync(DateTime nowUtc, CancellationToken ct = default)
     {
+        var interestApplied = await ApplyInterestAsync(nowUtc, ct);
         var dueCards = await _cards.GetDueForStatementAsync(nowUtc);
-        if (dueCards.Count == 0) return 0;
+        if (dueCards.Count == 0) return interestApplied;
 
         var created = 0;
         var pending = new List<(Guid UserId, string Title, string Body)>();
@@ -52,6 +53,14 @@ public class CreditCardStatementProcessor : ICreditCardStatementProcessor
                 .ToList();
 
             decimal totalDue = 0m;
+
+            var directItems = await _cards.GetUnbilledStatementItemsAsync(card.Id, statementDate);
+            foreach (var item in directItems)
+            {
+                item.StatementId = statementId;
+                totalDue += item.Type == CreditCardTxType.Refund ? -item.Amount : item.Amount;
+            }
+
             foreach (var plan in billable)
             {
                 var no = plan.InstallmentsBilled + 1;
@@ -97,6 +106,9 @@ public class CreditCardStatementProcessor : ICreditCardStatementProcessor
                     MinimumPayment = minPay,
                     PaidAmount = 0m,
                     RemainingAmount = totalDue,
+                    TotalInterestApplied = directItems
+                        .Where(i => i.Type == CreditCardTxType.Interest)
+                        .Sum(i => i.Amount),
                     Status = CreditCardStatementStatus.Due,
                     CreatedAt = nowUtc,
                 });
@@ -120,6 +132,70 @@ public class CreditCardStatementProcessor : ICreditCardStatementProcessor
             await _notifications.NotifyAsync(n.UserId, n.Title, n.Body);
         }
 
-        return created;
+        return created + interestApplied;
+    }
+
+    private async Task<int> ApplyInterestAsync(DateTime nowUtc, CancellationToken ct)
+    {
+        var statements = await _cards.GetInterestBearingStatementsAsync(nowUtc);
+        if (statements.Count == 0) return 0;
+
+        var applied = 0;
+        var pending = new List<(Guid UserId, string Title, string Body)>();
+
+        foreach (var statement in statements)
+        {
+            if (ct.IsCancellationRequested) break;
+            if (statement.CreditCard is null) continue;
+            if (statement.LastInterestAppliedAt?.Date == nowUtc.Date) continue;
+
+            var minimumPaid = statement.PaidAmount >= statement.MinimumPayment;
+            var rate = minimumPaid
+                ? _options.MonthlyContractInterestRate
+                : _options.MonthlyOverdueInterestRate;
+            var since = statement.LastInterestAppliedAt?.Date ?? statement.DueDate.Date;
+            var days = Math.Max(1, (nowUtc.Date - since).Days);
+            var interest = Math.Round(statement.RemainingAmount * (rate / 30m) * days, 2, MidpointRounding.AwayFromZero);
+            if (interest <= 0m) continue;
+
+            statement.TotalDue += interest;
+            statement.RemainingAmount += interest;
+            statement.TotalInterestApplied += interest;
+            statement.LastInterestAppliedAt = nowUtc;
+            if (!minimumPaid)
+                statement.Status = CreditCardStatementStatus.Overdue;
+            else if (statement.Status == CreditCardStatementStatus.Overdue)
+                statement.Status = CreditCardStatementStatus.Due;
+            statement.CreditCard.CurrentDebt += interest;
+
+            var title = minimumPaid ? "Akdi faiz uygulandı" : "Gecikme faizi uygulandı";
+            _cards.AddTransaction(new CreditCardTransaction
+            {
+                Id = Guid.NewGuid(),
+                CreditCardId = statement.CreditCardId,
+                Type = CreditCardTxType.Interest,
+                Amount = interest,
+                Description = minimumPaid
+                    ? $"Akdi faiz ({days} gün)"
+                    : $"Gecikme faizi ({days} gün)",
+                StatementId = statement.Id,
+                CreatedAt = nowUtc,
+            });
+
+            applied++;
+            pending.Add((statement.CreditCard.UserId, title,
+                $"{statement.StatementDate:dd.MM.yyyy} tarihli ekstrenize {interest:N2} TL faiz yansıtıldı."));
+        }
+
+        if (applied == 0) return 0;
+        await _cards.SaveChangesAsync();
+
+        foreach (var n in pending)
+        {
+            if (ct.IsCancellationRequested) break;
+            await _notifications.NotifyAsync(n.UserId, n.Title, n.Body);
+        }
+
+        return applied;
     }
 }

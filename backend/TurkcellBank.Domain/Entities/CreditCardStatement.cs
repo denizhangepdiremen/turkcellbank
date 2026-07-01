@@ -25,6 +25,8 @@ public class CreditCardStatement
     public decimal MinimumPayment { get; set; }  // asgari ödeme (dönem borcunun %20'si)
     public decimal PaidAmount { get; set; }      // bu ekstreye yapılan toplam ödeme
     public decimal RemainingAmount { get; set; } // TotalDue - PaidAmount
+    public decimal TotalInterestApplied { get; set; } // bu ekstreye işletilen toplam faiz
+    public DateTime? LastInterestAppliedAt { get; set; } // aynı gün tekrar faiz yazmayı engeller
 
     public CreditCardStatementStatus Status { get; set; } = CreditCardStatementStatus.Due;
 

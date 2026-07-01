@@ -7,6 +7,8 @@ import {
   getPendingCreditCards,
   approveCreditCard,
   rejectCreditCard,
+  approveCreditCardLimitIncrease,
+  rejectCreditCardLimitIncrease,
 } from '../../api/approvalApi'
 import { getApiErrorMessage } from '../../lib/apiError'
 import './LoanApprovalQueue.css'
@@ -25,10 +27,24 @@ export function CreditCardApprovalQueue() {
   const cards = data?.data ?? []
 
   const mutation = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' }) =>
-      action === 'approve' ? approveCreditCard(id) : rejectCreditCard(id),
+    mutationFn: ({ id, action, type }: { id: string; action: 'approve' | 'reject'; type: 'Application' | 'LimitIncrease' }) =>
+      type === 'LimitIncrease'
+        ? action === 'approve'
+          ? approveCreditCardLimitIncrease(id)
+          : rejectCreditCardLimitIncrease(id)
+        : action === 'approve'
+          ? approveCreditCard(id)
+          : rejectCreditCard(id),
     onSuccess: (_res, vars) => {
-      toast.success(vars.action === 'approve' ? 'Kredi kartı onaylandı.' : 'Kredi kartı reddedildi.')
+      toast.success(
+        vars.type === 'LimitIncrease'
+          ? vars.action === 'approve'
+            ? 'Limit artış talebi onaylandı.'
+            : 'Limit artış talebi reddedildi.'
+          : vars.action === 'approve'
+            ? 'Kredi kartı onaylandı.'
+            : 'Kredi kartı reddedildi.',
+      )
       queryClient.invalidateQueries({ queryKey: ['pending-credit-cards'] })
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'İşlem başarısız.')),
@@ -64,10 +80,20 @@ export function CreditCardApprovalQueue() {
                 <div>
                   <p className="approval-applicant">{c.holderName}</p>
                   <p className="approval-applicant-sub">{c.holderEmail}</p>
+                  <p className="approval-applicant-sub">
+                    {c.approvalType === 'LimitIncrease' ? 'Limit artış talebi' : 'Yeni kredi kartı başvurusu'}
+                  </p>
                 </div>
                 <div className="approval-amount">
-                  <span className="approval-amount-value">{formatTL(c.creditLimit)}</span>
-                  <span className="approval-amount-term">{c.maskedCardNumber} · Skor {c.score}</span>
+                  <span className="approval-amount-value">
+                    {formatTL(c.approvalType === 'LimitIncrease' ? c.requestedLimit : c.creditLimit)}
+                  </span>
+                  <span className="approval-amount-term">
+                    {c.maskedCardNumber} · Skor {c.score}
+                    {c.approvalType === 'LimitIncrease'
+                      ? ` · Mevcut ${formatTL(c.currentLimit)} · Öneri ${formatTL(c.recommendedLimit)}`
+                      : ''}
+                  </span>
                 </div>
               </div>
               {c.aiReason && <p className="approval-reason">{c.aiReason}</p>}
@@ -77,7 +103,7 @@ export function CreditCardApprovalQueue() {
                   size="sm"
                   variant="primary"
                   loading={mutation.isPending}
-                  onClick={() => mutation.mutate({ id: c.id, action: 'approve' })}
+                  onClick={() => mutation.mutate({ id: c.id, action: 'approve', type: c.approvalType })}
                 >
                   Onayla
                 </Button>
@@ -85,7 +111,7 @@ export function CreditCardApprovalQueue() {
                   size="sm"
                   variant="destructive"
                   loading={mutation.isPending}
-                  onClick={() => mutation.mutate({ id: c.id, action: 'reject' })}
+                  onClick={() => mutation.mutate({ id: c.id, action: 'reject', type: c.approvalType })}
                 >
                   Reddet
                 </Button>

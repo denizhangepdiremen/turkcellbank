@@ -38,6 +38,7 @@ public class AppDbContext : DbContext
     public DbSet<CreditCardInstallmentPlan> CreditCardInstallmentPlans => Set<CreditCardInstallmentPlan>();
     public DbSet<CreditCardTransaction> CreditCardTransactions => Set<CreditCardTransaction>();
     public DbSet<CreditCardStatement> CreditCardStatements => Set<CreditCardStatement>();
+    public DbSet<CreditCardLimitIncreaseRequest> CreditCardLimitIncreaseRequests => Set<CreditCardLimitIncreaseRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -455,13 +456,45 @@ public class AppDbContext : DbContext
             entity.Property(s => s.MinimumPayment).HasPrecision(18, 2);
             entity.Property(s => s.PaidAmount).HasPrecision(18, 2);
             entity.Property(s => s.RemainingAmount).HasPrecision(18, 2);
+            entity.Property(s => s.TotalInterestApplied).HasPrecision(18, 2);
             entity.Property(s => s.Status).HasConversion<string>().HasMaxLength(20);
 
             entity.HasIndex(s => new { s.CreditCardId, s.Status });
+            entity.HasIndex(s => new { s.Status, s.DueDate, s.LastInterestAppliedAt });
 
             entity.HasOne(s => s.CreditCard)
                 .WithMany()
                 .HasForeignKey(s => s.CreditCardId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- CreditCardLimitIncreaseRequest tablosu kuralları ---
+        modelBuilder.Entity<CreditCardLimitIncreaseRequest>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.CurrentLimit).HasPrecision(18, 2);
+            entity.Property(r => r.RequestedLimit).HasPrecision(18, 2);
+            entity.Property(r => r.RecommendedLimit).HasPrecision(18, 2);
+            entity.Property(r => r.MaritalStatus).HasConversion<string>().HasMaxLength(20);
+            entity.Property(r => r.HousingStatus).HasConversion<string>().HasMaxLength(20);
+            entity.Property(r => r.Income).HasPrecision(18, 2);
+            entity.Property(r => r.MonthlyExpenses).HasPrecision(18, 2);
+            entity.Property(r => r.Profession).IsRequired().HasMaxLength(100);
+            entity.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(r => r.AiReason).HasMaxLength(1000);
+            entity.Property(r => r.Channel).HasConversion<string>().HasMaxLength(10);
+
+            entity.HasIndex(r => r.CreditCardId);
+            entity.HasIndex(r => new { r.Status, r.CreatedAt });
+
+            entity.HasOne(r => r.CreditCard)
+                .WithMany()
+                .HasForeignKey(r => r.CreditCardId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(r => r.User)
+                .WithMany()
+                .HasForeignKey(r => r.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

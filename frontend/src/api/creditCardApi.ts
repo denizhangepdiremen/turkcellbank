@@ -2,6 +2,7 @@ import { apiClient } from '../lib/apiClient'
 import type {
   ApiResponse,
   CreditCard,
+  CreditCardLimitIncreaseRequest,
   CreditCardStatement,
   CreditCardTransaction,
   MaritalStatus,
@@ -24,6 +25,23 @@ export interface CreditCardApplicationPayload {
 export interface PayCreditCardPayload {
   sourceAccountId: string
   amount: number
+}
+
+export interface CashAdvancePayload {
+  targetAccountId: string
+  amount: number
+}
+
+export interface LimitIncreasePayload {
+  requestedLimit: number
+  age: number
+  maritalStatus: MaritalStatus
+  childrenCount: number
+  housingStatus: HousingStatus
+  income: number
+  monthlyExpenses: number
+  employmentMonths: number
+  profession: string
 }
 
 // Kredi kartı başvurusu (limit motorca atanır)
@@ -59,6 +77,32 @@ export async function payCreditCard(cardId: string, payload: PayCreditCardPayloa
   const { data } = await apiClient.post<ApiResponse<CreditCard>>(
     `/api/credit-cards/${cardId}/pay`,
     payload,
+  )
+  return data
+}
+
+// Kredi kartından TL hesaba nakit avans kullan
+export async function cashAdvanceCreditCard(cardId: string, payload: CashAdvancePayload) {
+  const { data } = await apiClient.post<ApiResponse<CreditCard>>(
+    `/api/credit-cards/${cardId}/cash-advance`,
+    payload,
+  )
+  return data
+}
+
+// Kredi kartı limit artış talebi oluştur
+export async function requestCreditCardLimitIncrease(cardId: string, payload: LimitIncreasePayload) {
+  const { data } = await apiClient.post<ApiResponse<CreditCardLimitIncreaseRequest>>(
+    `/api/credit-cards/${cardId}/limit-increase-requests`,
+    payload,
+  )
+  return data
+}
+
+// Kredi kartı limit artış taleplerim
+export async function getCreditCardLimitIncreaseRequests(cardId: string) {
+  const { data } = await apiClient.get<ApiResponse<CreditCardLimitIncreaseRequest[]>>(
+    `/api/credit-cards/${cardId}/limit-increase-requests`,
   )
   return data
 }

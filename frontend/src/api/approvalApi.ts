@@ -119,3 +119,17 @@ export async function rejectCreditCard(id: string) {
   )
   return data
 }
+export async function approveCreditCardLimitIncrease(id: string) {
+  const { data } = await apiClient.post<ApiResponse<CreditCard>>(
+    `/api/approvals/credit-card-limit-requests/${id}/approve`,
+    {},
+  )
+  return data
+}
+export async function rejectCreditCardLimitIncrease(id: string) {
+  const { data } = await apiClient.post<ApiResponse<unknown>>(
+    `/api/approvals/credit-card-limit-requests/${id}/reject`,
+    {},
+  )
+  return data
+}

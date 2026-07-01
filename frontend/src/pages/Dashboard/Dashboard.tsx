@@ -33,6 +33,9 @@ import {
   getCreditCardStatements,
   getCreditCardTransactions,
   payCreditCard,
+  cashAdvanceCreditCard,
+  requestCreditCardLimitIncrease,
+  getCreditCardLimitIncreaseRequests,
   setCreditCardOnlineShopping,
 } from '../../api/creditCardApi'
 import { createRecipient, deleteRecipient, getRecipients } from '../../api/recipientApi'
@@ -83,7 +86,7 @@ import type {
   Transaction,
   TransactionHistoryFilters,
 } from '../../lib/types'
-import { openCardStatement } from '../../lib/cardStatement'
+import { openCardStatement, openCreditCardStatement } from '../../lib/cardStatement'
 import { openTransactionReceipt } from '../../lib/transactionReceipt'
 import { openAccountStatement } from '../../lib/accountStatement'
 import { openFxReceipt } from '../../lib/fxReceipt'
@@ -206,6 +209,7 @@ const txTitle = (tx: Transaction) => {
   if (tx.type === 'FxSell') return `Döviz/Altın Satış${tx.description ? ` · ${tx.description}` : ''}`
   if (tx.type === 'FxConvert') return `Döviz/Altın Dönüşüm${tx.description ? ` · ${tx.description}` : ''}`
   if (tx.type === 'CreditCardPayment') return 'Kredi Kartı Ödemesi'
+  if (tx.type === 'CreditCardCashAdvance') return 'Kredi Kartı Nakit Avans'
   return tx.direction === 'Out'
     ? `Transfer → ${tx.counterpartyIban}`
     : `Transfer ← ${tx.counterpartyIban}`
@@ -1301,6 +1305,13 @@ export function Dashboard() {
   })
   const ccTransactions = ccTxData?.data ?? []
 
+  const { data: ccLimitRequestsData, isLoading: ccLimitRequestsLoading } = useQuery({
+    queryKey: ['credit-card-limit-requests', creditCard?.id],
+    queryFn: () => getCreditCardLimitIncreaseRequests(creditCard!.id),
+    enabled: activeTab === 'credit-cards' && !!creditCard,
+  })
+  const ccLimitRequests = ccLimitRequestsData?.data ?? []
+
   // Başvuru modalı (gelir/gider profili + kesim günü)
   const [ccApplyOpen, setCcApplyOpen] = useState(false)
   const [ccNationalId, setCcNationalId] = useState('')
@@ -1401,6 +1412,102 @@ export function Dashboard() {
           : '',
     )
     setCcPayOpen(true)
+  }
+
+  // Nakit avans modalı
+  const [ccCashOpen, setCcCashOpen] = useState(false)
+  const [ccCashAccountId, setCcCashAccountId] = useState('')
+  const [ccCashAmount, setCcCashAmount] = useState('')
+
+  const ccCashMutation = useMutation({
+    mutationFn: () =>
+      cashAdvanceCreditCard(creditCard!.id, {
+        targetAccountId: ccCashAccountId,
+        amount: Number(ccCashAmount),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-card-transactions', creditCard?.id] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      setCcCashOpen(false)
+      toast.success('Nakit avans hesabınıza aktarıldı.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Nakit avans kullanılamadı.')),
+  })
+
+  function openCcCashAdvance() {
+    setCcCashAccountId(tryPayAccounts[0]?.id ?? '')
+    setCcCashAmount('')
+    setCcCashOpen(true)
+  }
+
+  // Limit artış talebi modalı
+  const [ccLimitOpen, setCcLimitOpen] = useState(false)
+  const [ccLimitRequested, setCcLimitRequested] = useState('')
+  const [ccLimitAge, setCcLimitAge] = useState('')
+  const [ccLimitMarital, setCcLimitMarital] = useState<'Single' | 'Married'>('Single')
+  const [ccLimitChildren, setCcLimitChildren] = useState('0')
+  const [ccLimitHousing, setCcLimitHousing] = useState<'Tenant' | 'Owner'>('Tenant')
+  const [ccLimitIncome, setCcLimitIncome] = useState('')
+  const [ccLimitExpenses, setCcLimitExpenses] = useState('')
+  const [ccLimitEmployment, setCcLimitEmployment] = useState('')
+  const [ccLimitProfession, setCcLimitProfession] = useState('')
+
+  const ccLimitMutation = useMutation({
+    mutationFn: () =>
+      requestCreditCardLimitIncrease(creditCard!.id, {
+        requestedLimit: Number(ccLimitRequested),
+        age: Number(ccLimitAge),
+        maritalStatus: ccLimitMarital,
+        childrenCount: Number(ccLimitChildren),
+        housingStatus: ccLimitHousing,
+        income: Number(ccLimitIncome),
+        monthlyExpenses: Number(ccLimitExpenses),
+        employmentMonths: Number(ccLimitEmployment),
+        profession: ccLimitProfession,
+      }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-card-limit-requests', creditCard?.id] })
+      setCcLimitOpen(false)
+      toast.success(res.data?.status === 'PendingApproval' ? 'Talebiniz onaya gönderildi.' : 'Limit artış talebiniz sonuçlandı.')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Limit artış talebi oluşturulamadı.')),
+  })
+
+  function openCcLimitIncrease() {
+    setCcLimitRequested(creditCard ? String(Math.min(creditCard.creditLimit + 10000, 200000)) : '')
+    setCcLimitAge('')
+    setCcLimitMarital('Single')
+    setCcLimitChildren('0')
+    setCcLimitHousing('Tenant')
+    setCcLimitIncome('')
+    setCcLimitExpenses('')
+    setCcLimitEmployment('')
+    setCcLimitProfession('')
+    setCcLimitOpen(true)
+  }
+
+  function submitCcLimitIncrease() {
+    if (!ccLimitRequested || !ccLimitAge || !ccLimitIncome || !ccLimitProfession.trim()) {
+      toast.error('Lütfen zorunlu alanları doldurun.')
+      return
+    }
+    ccLimitMutation.mutate()
+  }
+
+  function generateCreditCardStatementPdf(statementId: string) {
+    if (!creditCard) return
+    const statement = ccStatements.find((s) => s.id === statementId)
+    if (!statement) return
+    const ok = openCreditCardStatement({
+      card: creditCard,
+      statement,
+      transactions: ccTransactions.filter((t) => t.statementId === statement.id),
+      customerName: user?.fullName ?? 'Müşteri',
+    })
+    if (!ok) toast.error('PDF penceresi açılamadı. Pop-up engelleyiciyi kontrol edin.')
   }
 
   const ccOnlineShoppingMutation = useMutation({
@@ -2786,6 +2893,21 @@ export function Dashboard() {
                         </Button>
                         <Button
                           size="sm"
+                          variant="outline"
+                          disabled={creditCard.availableLimit <= 0}
+                          onClick={openCcCashAdvance}
+                        >
+                          Nakit Avans
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={openCcLimitIncrease}
+                        >
+                          Limit Artışı
+                        </Button>
+                        <Button
+                          size="sm"
                           variant="ghost"
                           loading={ccOnlineShoppingMutation.isPending}
                           onClick={() => ccOnlineShoppingMutation.mutate(!creditCard.onlineShoppingEnabled)}
@@ -2834,10 +2956,17 @@ export function Dashboard() {
                             {ccStatementLabel(currentStatement.status)}
                           </Badge>
                         </div>
+                        <div className="cc-statement-cell">
+                          <span className="cc-statement-label">İşletilen Faiz</span>
+                          <strong className="cc-statement-value">{formatTL(currentStatement.totalInterestApplied)}</strong>
+                        </div>
                       </div>
                       <div className="cc-card-actions">
                         <Button size="sm" variant="primary" onClick={openCcPay}>
                           Borç Öde
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => generateCreditCardStatementPdf(currentStatement.id)}>
+                          PDF İndir
                         </Button>
                       </div>
                     </CardContent>
@@ -2907,6 +3036,40 @@ export function Dashboard() {
                               </div>
                               <Badge variant={ccStatementBadgeVariant(s.status)}>
                                 {ccStatementLabel(s.status)}
+                              </Badge>
+                              <Button size="sm" variant="ghost" onClick={() => generateCreditCardStatementPdf(s.id)}>
+                                PDF İndir
+                              </Button>
+                            </div>
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+
+                {ccLimitRequests.length > 0 && (
+                  <>
+                    <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
+                      <h2 className="dashboard-section-title">Limit Artış Talepleri</h2>
+                    </div>
+                    <Card>
+                      <CardContent>
+                        {ccLimitRequestsLoading ? (
+                          <ListSkeleton />
+                        ) : (
+                          ccLimitRequests.map((r) => (
+                            <div key={r.id} className="dashboard-loan-row">
+                              <div>
+                                <p className="dashboard-loan-amount">
+                                  {formatTL(r.currentLimit)} → {formatTL(r.requestedLimit)}
+                                </p>
+                                <p className="dashboard-loan-sub">
+                                  Önerilen limit {formatTL(r.recommendedLimit)} · {trDate(r.createdAt)}
+                                </p>
+                              </div>
+                              <Badge variant={r.status === 'Approved' ? 'success' : r.status === 'Rejected' ? 'error' : 'warning'}>
+                                {r.status === 'Approved' ? 'Onaylandı' : r.status === 'Rejected' ? 'Reddedildi' : 'Onay Bekliyor'}
                               </Badge>
                             </div>
                           ))
@@ -4916,6 +5079,164 @@ export function Dashboard() {
             </div>
           </>
         )}
+      </Modal>
+
+      {/* --- Kredi kartı nakit avans modalı --- */}
+      <Modal
+        open={ccCashOpen}
+        onClose={() => setCcCashOpen(false)}
+        title="Nakit Avans"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setCcCashOpen(false)}>
+              İptal
+            </Button>
+            <Button
+              variant="primary"
+              loading={ccCashMutation.isPending}
+              disabled={!ccCashAccountId || !(Number(ccCashAmount) > 0)}
+              onClick={() => ccCashMutation.mutate()}
+            >
+              Kullan
+            </Button>
+          </>
+        }
+      >
+        {tryPayAccounts.length === 0 ? (
+          <Alert variant="warning">
+            Nakit avans kullanmak için aktif bir TL hesabınız olmalı.
+          </Alert>
+        ) : (
+          <>
+            <Alert variant="info">
+              Komisyon ve günlük faiz işlem anında kredi kartı borcunuza yansıtılır.
+            </Alert>
+            <div className="dashboard-modal-field">
+              <Select
+                label="Aktarılacak hesap"
+                options={tryPayAccounts.map((a) => ({
+                  value: a.id,
+                  label: `${a.accountType} · ...${a.iban.slice(-4)} · ${formatTL(a.balance)}`,
+                }))}
+                value={ccCashAccountId}
+                onChange={(e) => setCcCashAccountId(e.target.value)}
+              />
+            </div>
+            <div className="dashboard-modal-field">
+              <Input
+                label="Tutar (₺)"
+                type="number"
+                placeholder="0"
+                value={ccCashAmount}
+                onChange={(e) => setCcCashAmount(e.target.value)}
+              />
+            </div>
+          </>
+        )}
+      </Modal>
+
+      {/* --- Kredi kartı limit artış talebi modalı --- */}
+      <Modal
+        open={ccLimitOpen}
+        onClose={() => setCcLimitOpen(false)}
+        title="Limit Artış Talebi"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setCcLimitOpen(false)}>
+              İptal
+            </Button>
+            <Button variant="primary" loading={ccLimitMutation.isPending} onClick={submitCcLimitIncrease}>
+              Talep Et
+            </Button>
+          </>
+        }
+      >
+        <div className="dashboard-loan-grid">
+          <div className="dashboard-modal-field">
+            <Input
+              label="Yeni Toplam Limit (₺)"
+              type="number"
+              placeholder="Örn. 120000"
+              value={ccLimitRequested}
+              onChange={(e) => setCcLimitRequested(e.target.value)}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Input
+              label="Yaş"
+              type="number"
+              placeholder="Örn. 35"
+              value={ccLimitAge}
+              onChange={(e) => setCcLimitAge(e.target.value)}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Select
+              label="Medeni Hal"
+              value={ccLimitMarital}
+              onChange={(e) => setCcLimitMarital(e.target.value as 'Single' | 'Married')}
+              options={[
+                { value: 'Single', label: 'Bekar' },
+                { value: 'Married', label: 'Evli' },
+              ]}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Input
+              label="Çocuk Sayısı"
+              type="number"
+              placeholder="0"
+              value={ccLimitChildren}
+              onChange={(e) => setCcLimitChildren(e.target.value)}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Select
+              label="Konut Durumu"
+              value={ccLimitHousing}
+              onChange={(e) => setCcLimitHousing(e.target.value as 'Tenant' | 'Owner')}
+              options={[
+                { value: 'Tenant', label: 'Kiracı' },
+                { value: 'Owner', label: 'Ev sahibi' },
+              ]}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Input
+              label="Aylık Gelir (₺)"
+              type="number"
+              placeholder="Örn. 45000"
+              value={ccLimitIncome}
+              onChange={(e) => setCcLimitIncome(e.target.value)}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Input
+              label="Aylık Gider (₺)"
+              type="number"
+              placeholder="Örn. 20000"
+              value={ccLimitExpenses}
+              onChange={(e) => setCcLimitExpenses(e.target.value)}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Input
+              label="Çalışma Kıdemi (ay)"
+              type="number"
+              placeholder="Örn. 36"
+              value={ccLimitEmployment}
+              onChange={(e) => setCcLimitEmployment(e.target.value)}
+            />
+          </div>
+          <div className="dashboard-modal-field">
+            <Input
+              label="Meslek"
+              placeholder="Örn. Mühendis"
+              value={ccLimitProfession}
+              onChange={(e) => setCcLimitProfession(e.target.value)}
+            />
+          </div>
+        </div>
       </Modal>
 
       {/* --- Fatura ödeme modalı (sorgula -> öde) --- */}

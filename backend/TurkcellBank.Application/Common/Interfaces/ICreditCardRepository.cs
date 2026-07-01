@@ -28,11 +28,20 @@ public interface ICreditCardRepository
     // --- Hareket / ekstre kalemi ---
     void AddTransaction(CreditCardTransaction tx);
     Task<List<CreditCardTransaction>> GetTransactionsAsync(Guid cardId);
+    Task<List<CreditCardTransaction>> GetUnbilledStatementItemsAsync(Guid cardId, DateTime statementDate);
 
     // --- Dönem ekstresi ---
     void AddStatement(CreditCardStatement statement);
     Task<List<CreditCardStatement>> GetStatementsAsync(Guid cardId);
     Task<List<CreditCardStatement>> GetUnpaidStatementsAsync(Guid cardId); // Due/Overdue, eskiden yeniye
+    Task<List<CreditCardStatement>> GetInterestBearingStatementsAsync(DateTime nowUtc);
+
+    // --- Limit artış talebi ---
+    void AddLimitIncreaseRequest(CreditCardLimitIncreaseRequest request);
+    Task<CreditCardLimitIncreaseRequest?> GetLimitIncreaseRequestByIdAsync(Guid id);
+    Task<List<CreditCardLimitIncreaseRequest>> GetLimitIncreaseRequestsByCardIdAsync(Guid cardId);
+    Task<List<CreditCardLimitIncreaseRequest>> GetPendingLimitIncreaseRequestsAsync();
+    Task<bool> HasPendingLimitIncreaseRequestAsync(Guid cardId);
 
     // --- Ana defter bacağı (borç ödemesinde TL hesap çıkışı) ---
     void AddLedgerTransaction(Transaction tx);

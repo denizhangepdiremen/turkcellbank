@@ -58,6 +58,7 @@ export interface Transaction {
     | 'FxSell'
     | 'FxConvert'
     | 'CreditCardPayment'
+    | 'CreditCardCashAdvance'
   direction: 'In' | 'Out' // gelen / giden (o hesabın bakışıyla)
   amount: number
   counterpartyIban: string | null
@@ -320,6 +321,8 @@ export interface CreditCardStatement {
   minimumPayment: number
   paidAmount: number
   remainingAmount: number
+  totalInterestApplied: number
+  lastInterestAppliedAt: string | null
   status: CreditCardStatementStatus
 }
 
@@ -346,14 +349,39 @@ export interface CreditCardTransaction {
 // Yetkili onay listesi için (başvuran bilgisiyle)
 export interface AdminCreditCard {
   id: string
+  creditCardId: string | null
+  approvalType: 'Application' | 'LimitIncrease'
   holderName: string
   holderEmail: string
   maskedCardNumber: string
-  status: CreditCardStatus
+  status: CreditCardStatus | CreditCardLimitIncreaseStatus
+  currentLimit: number
+  requestedLimit: number
+  recommendedLimit: number
   creditLimit: number
   score: number
   aiReason: string | null
   openedAt: string
+  decidedAt: string | null
+}
+
+export type CreditCardLimitIncreaseStatus =
+  | 'Pending'
+  | 'PendingApproval'
+  | 'Approved'
+  | 'Rejected'
+
+export interface CreditCardLimitIncreaseRequest {
+  id: string
+  creditCardId: string
+  maskedCardNumber: string
+  currentLimit: number
+  requestedLimit: number
+  recommendedLimit: number
+  status: CreditCardLimitIncreaseStatus
+  score: number
+  aiReason: string
+  createdAt: string
   decidedAt: string | null
 }
 

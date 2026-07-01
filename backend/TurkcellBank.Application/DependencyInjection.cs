@@ -68,6 +68,8 @@ public static class DependencyInjection
         services.AddScoped<IValidator<Features.Fx.Dtos.FxTradeRequest>, Features.Fx.Validators.FxTradeRequestValidator>();
         services.AddScoped<IValidator<Features.CreditCards.Dtos.CreditCardApplicationRequest>, Features.CreditCards.Validators.CreditCardApplicationRequestValidator>();
         services.AddScoped<IValidator<Features.CreditCards.Dtos.PayCreditCardRequest>, Features.CreditCards.Validators.PayCreditCardRequestValidator>();
+        services.AddScoped<IValidator<Features.CreditCards.Dtos.CreditCardCashAdvanceRequest>, Features.CreditCards.Validators.CreditCardCashAdvanceRequestValidator>();
+        services.AddScoped<IValidator<Features.CreditCards.Dtos.CreditCardLimitIncreaseRequestDto>, Features.CreditCards.Validators.CreditCardLimitIncreaseRequestValidator>();
 
         return services;
     }

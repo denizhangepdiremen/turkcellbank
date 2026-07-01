@@ -163,4 +163,20 @@ public class ApprovalsController : ControllerBase
         var card = await _creditCardService.RejectAsync(id);
         return Ok(ApiResponse<CreditCardDto>.SuccessResponse(card, "Kredi kartı reddedildi."));
     }
+
+    /// <summary>Kredi kartı limit artış talebini onayla. POST /api/approvals/credit-card-limit-requests/{id}/approve</summary>
+    [HttpPost("credit-card-limit-requests/{id:guid}/approve")]
+    public async Task<IActionResult> ApproveCreditCardLimitIncrease(Guid id)
+    {
+        var card = await _creditCardService.ApproveLimitIncreaseAsync(id);
+        return Ok(ApiResponse<CreditCardDto>.SuccessResponse(card, "Limit artış talebi onaylandı."));
+    }
+
+    /// <summary>Kredi kartı limit artış talebini reddet. POST /api/approvals/credit-card-limit-requests/{id}/reject</summary>
+    [HttpPost("credit-card-limit-requests/{id:guid}/reject")]
+    public async Task<IActionResult> RejectCreditCardLimitIncrease(Guid id)
+    {
+        var request = await _creditCardService.RejectLimitIncreaseAsync(id);
+        return Ok(ApiResponse<CreditCardLimitIncreaseDto>.SuccessResponse(request, "Limit artış talebi reddedildi."));
+    }
 }

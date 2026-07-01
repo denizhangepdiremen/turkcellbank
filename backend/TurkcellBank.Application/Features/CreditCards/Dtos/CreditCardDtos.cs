@@ -38,10 +38,15 @@ public record CreditCardDto(
 /// <summary>Admin/onay listesi için: başvuran bilgisiyle.</summary>
 public record AdminCreditCardDto(
     Guid Id,
+    Guid? CreditCardId,
+    string ApprovalType,
     string HolderName,
     string HolderEmail,
     string MaskedCardNumber,
     string Status,
+    decimal CurrentLimit,
+    decimal RequestedLimit,
+    decimal RecommendedLimit,
     decimal CreditLimit,
     int Score,
     string? AiReason,
@@ -60,6 +65,8 @@ public record CreditCardStatementDto(
     decimal MinimumPayment,
     decimal PaidAmount,
     decimal RemainingAmount,
+    decimal TotalInterestApplied,
+    DateTime? LastInterestAppliedAt,
     string Status);
 
 /// <summary>Kart hareketi / ekstre kalemi.</summary>
@@ -88,3 +95,36 @@ public record CreditCardSpendRequest(
     int Installments,
     string ThreeDSCode,
     string? Description);
+
+/// <summary>Nakit avans isteği; tutar müşterinin TL hesabına aktarılır.</summary>
+public record CreditCardCashAdvanceRequest(
+    Guid CreditCardId,
+    Guid TargetAccountId,
+    decimal Amount);
+
+/// <summary>Kredi kartı limit artış talebi. RequestedLimit yeni toplam limittir.</summary>
+public record CreditCardLimitIncreaseRequestDto(
+    Guid CreditCardId,
+    decimal RequestedLimit,
+    int Age,
+    MaritalStatus MaritalStatus,
+    int ChildrenCount,
+    HousingStatus HousingStatus,
+    decimal Income,
+    decimal MonthlyExpenses,
+    int EmploymentMonths,
+    string Profession);
+
+/// <summary>Müşteri ve yetkili ekranı için limit artış talebi bilgisi.</summary>
+public record CreditCardLimitIncreaseDto(
+    Guid Id,
+    Guid CreditCardId,
+    string MaskedCardNumber,
+    decimal CurrentLimit,
+    decimal RequestedLimit,
+    decimal RecommendedLimit,
+    string Status,
+    int Score,
+    string AiReason,
+    DateTime CreatedAt,
+    DateTime? DecidedAt);
