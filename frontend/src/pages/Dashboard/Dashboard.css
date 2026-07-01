@@ -2057,6 +2057,27 @@
   padding: 0.35rem 0;
 }
 
+/* Sekme düzenleme: gruplar + alt sekmeler */
+.dashboard-tab-edit-group {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+.dashboard-tab-edit-group:last-child {
+  border-bottom: none;
+}
+.dashboard-tab-edit-grouphead {
+  font-weight: 600;
+}
+.dashboard-tab-edit-grouphead label {
+  font-weight: 600;
+}
+/* Alt sekmeler grup başlığının altında girintili */
+.dashboard-tab-edit-children {
+  margin: 0.15rem 0 0 1.65rem;
+  padding-left: 0.85rem;
+  border-left: 2px solid #eef2f7;
+}
+
 /* Kredi başvuru formu: 2 sütun (dar ekranda tek sütuna iner) */
 .dashboard-loan-grid {
   display: grid;

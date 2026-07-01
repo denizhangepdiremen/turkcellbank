@@ -23,7 +23,7 @@ test.describe('Kart işlemleri', () => {
   })
 
   test('kart başvuru modalı iptal edilebilir', async ({ page }) => {
-    await openTab(page, 'Kartlar')
+    await openTab(page, 'Kartlarım')
     await page.getByRole('button', { name: '+ Kart Aç' }).click()
     await expect(page.getByText('Bağlanacak Hesap').or(page.getByText('Kart açmak için'))).toBeVisible()
 

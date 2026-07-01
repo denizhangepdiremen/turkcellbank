@@ -2,8 +2,7 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import { StaffShell, StaffTabs } from '../staff/StaffShell'
 import { LoanApprovalQueue } from '../staff/LoanApprovalQueue'
 import { TransferApprovalQueue } from '../staff/TransferApprovalQueue'
-import { CardApprovalQueue } from '../staff/CardApprovalQueue'
-import { CreditCardApprovalQueue } from '../staff/CreditCardApprovalQueue'
+import { CardApprovalsPanel } from '../staff/CardApprovalsPanel'
 import { OrgTeamView } from '../staff/OrgTeamView'
 import { ManagedCustomers } from '../staff/ManagedCustomers'
 
@@ -23,8 +22,7 @@ export function BranchManagerPanel() {
           { id: 'org', label: 'Şubem', content: <OrgTeamView /> },
           { id: 'loans', label: 'Kredi Onayları', content: <LoanApprovalQueue /> },
           { id: 'transfers', label: 'Yüksek Havale', content: <TransferApprovalQueue /> },
-          { id: 'cards', label: 'Kart Onayları', content: <CardApprovalQueue /> },
-          { id: 'credit-cards', label: 'Kredi Kartı Onayları', content: <CreditCardApprovalQueue /> },
+          { id: 'cards', label: 'Kart Onayları', content: <CardApprovalsPanel /> },
           { id: 'customers', label: 'Müşteri Hesapları', content: <ManagedCustomers /> },
         ]}
       />

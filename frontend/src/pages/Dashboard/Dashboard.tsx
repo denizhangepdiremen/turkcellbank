@@ -601,8 +601,7 @@ const DASHBOARD_TABS = [
   { id: 'transactions', label: 'İşlemler' },
   { id: 'recipients', label: 'Alıcılarım' },
   { id: 'loans', label: 'Krediler' },
-  { id: 'cards', label: 'Kartlar' },
-  { id: 'credit-cards', label: 'Kredi Kartı' },
+  { id: 'cards', label: 'Kartlarım' },
   { id: 'payments', label: 'Ödemeler' },
   { id: 'bills', label: 'Faturalar' },
   { id: 'orders', label: 'Talimatlar' },
@@ -615,7 +614,7 @@ type DashboardTab = (typeof DASHBOARD_TABS)[number]['id']
 const DASHBOARD_TAB_GROUPS = [
   { id: 'daily', label: 'Günlük Bankacılık', tabs: ['accounts', 'transactions', 'recipients', 'payments'] },
   { id: 'billing', label: 'Fatura & Talimat', tabs: ['bills', 'orders'] },
-  { id: 'products', label: 'Kredi, Kart, Yatırım', tabs: ['loans', 'cards', 'credit-cards', 'deposits', 'fx'] },
+  { id: 'products', label: 'Kredi, Kart, Yatırım', tabs: ['loans', 'cards', 'deposits', 'fx'] },
   { id: 'security', label: 'Güvenlik', tabs: ['security'] },
 ] as const satisfies ReadonlyArray<{
   id: string
@@ -671,6 +670,23 @@ export function Dashboard() {
         : visibleTabs.filter((x) => x !== id)
       : [...visibleTabs, id]
 
+    setVisibleTabs(next)
+    if (!next.includes(activeTab)) setActiveTab(next[0])
+  }
+
+  // Grup ana anahtarı: grup tümüyle açıksa hepsini kapatır; değilse (kısmi/kapalı)
+  // gruptaki tüm alt sekmeleri açar. En az bir sekme açık kalmalıdır.
+  function toggleTabGroup(groupId: (typeof DASHBOARD_TAB_GROUPS)[number]['id']) {
+    const group = DASHBOARD_TAB_GROUPS.find((g) => g.id === groupId)
+    if (!group) return
+    const ids = group.tabs as readonly DashboardTab[]
+    const allOn = ids.every((id) => visibleTabs.includes(id))
+
+    const next = allOn
+      ? visibleTabs.filter((id) => !ids.includes(id)) // grubu tamamen kapat
+      : [...visibleTabs, ...ids.filter((id) => !visibleTabs.includes(id))] // grubu tamamen aç
+
+    if (next.length === 0) return // en az bir sekme kalmalı
     setVisibleTabs(next)
     if (!next.includes(activeTab)) setActiveTab(next[0])
   }
@@ -789,6 +805,12 @@ export function Dashboard() {
   const accounts = useMemo(() => data?.data ?? [], [data?.data])
   const balanceAccounts = accounts.filter((a) => a.isActive)
   const activeAccounts = balanceAccounts.filter((a) => !a.isFrozen)
+  // "Hesaplarım" yalnız TL (vadesiz) hesapları listeler; döviz/altın hesapları
+  // Döviz/Altın sekmesinde ayrı gösterilir (dondurulmuşlar dahil, birim TL).
+  const depositoryAccounts = useMemo(
+    () => accounts.filter((a) => a.currency === 'TRY'),
+    [accounts],
+  )
 
   // --- Döviz/altın kurları (canlı: 15sn'de bir yenilenir) ---
   const { data: ratesData } = useQuery({
@@ -864,25 +886,29 @@ export function Dashboard() {
   )
   const tryAccounts = balanceAccounts.filter((a) => a.currency === 'TRY')
   const fxAccounts = balanceAccounts.filter((a) => a.currency !== 'TRY')
-  // Toplam varlık: TL hesapları + döviz/altın hesaplarının TL karşılığı.
-  const totalBalance = balanceAccounts.reduce((sum, a) => sum + tryValueOf(a), 0)
-  const portfolioItems = (['TRY', 'USD', 'EUR', 'XAU'] as Currency[])
+  // Ana bakiye: yalnız TL hesapları (kur oynamasından etkilenmez, gerçek banka gibi).
+  const totalBalance = tryAccounts.reduce((sum, a) => sum + a.balance, 0)
+  // Döviz/altın portföy değeri: yalnız döviz/altın hesaplarının güncel TL karşılığı.
+  const fxPortfolioValue = fxAccounts.reduce((sum, a) => sum + tryValueOf(a), 0)
+  // Portföy dağılımı: yalnız döviz/altın birimleri (TL ana bakiyede ayrı gösterilir).
+  const portfolioItems = (['USD', 'EUR', 'XAU'] as Currency[])
     .map((currency) => {
-      const accountsForCurrency = balanceAccounts.filter((a) => a.currency === currency)
+      const accountsForCurrency = fxAccounts.filter((a) => a.currency === currency)
       const amount = accountsForCurrency.reduce((sum, a) => sum + a.balance, 0)
       const tryValue = accountsForCurrency.reduce((sum, a) => sum + tryValueOf(a), 0)
-      const percent = totalBalance > 0 ? Math.round((tryValue / totalBalance) * 100) : 0
+      const percent = fxPortfolioValue > 0 ? Math.round((tryValue / fxPortfolioValue) * 100) : 0
       return { currency, amount, tryValue, percent }
     })
     .filter((item) => item.tryValue > 0)
+  // Ana bakiye trendi yalnız TL hesap hareketlerinden kurulur (döviz bacakları hariç).
   const balanceHistoryQueries = useQueries({
-    queries: balanceAccounts.map((a) => ({
+    queries: tryAccounts.map((a) => ({
       queryKey: ['transactions', a.id],
       queryFn: () => getHistory(a.id),
       staleTime: 30_000,
     })),
   })
-  const balanceTrendTransactions = balanceAccounts.flatMap(
+  const balanceTrendTransactions = tryAccounts.flatMap(
     (_, i) => balanceHistoryQueries[i]?.data?.data ?? [],
   )
   const balanceTrend = buildBalanceTrend(totalBalance, balanceTrendTransactions)
@@ -1286,7 +1312,7 @@ export function Dashboard() {
   const { data: creditCardsData, isLoading: creditCardsLoading } = useQuery({
     queryKey: ['credit-cards'],
     queryFn: getMyCreditCards,
-    enabled: activeTab === 'credit-cards' || activeTab === 'payments',
+    enabled: activeTab === 'cards' || activeTab === 'payments',
   })
   const creditCards = useMemo(() => creditCardsData?.data ?? [], [creditCardsData?.data])
   // MVP: müşteri başına tek kart; ilk kredi kartını ana kart kabul et
@@ -1297,7 +1323,7 @@ export function Dashboard() {
   const { data: ccStatementsData, isLoading: ccStatementsLoading } = useQuery({
     queryKey: ['credit-card-statements', creditCard?.id],
     queryFn: () => getCreditCardStatements(creditCard!.id),
-    enabled: activeTab === 'credit-cards' && !!creditCard,
+    enabled: activeTab === 'cards' && !!creditCard,
   })
   const ccStatements = ccStatementsData?.data ?? []
   const currentStatement = ccStatements.find((s) => s.status === 'Due' || s.status === 'Overdue') ?? null
@@ -1305,14 +1331,14 @@ export function Dashboard() {
   const { data: ccTxData, isLoading: ccTxLoading } = useQuery({
     queryKey: ['credit-card-transactions', creditCard?.id],
     queryFn: () => getCreditCardTransactions(creditCard!.id),
-    enabled: activeTab === 'credit-cards' && !!creditCard,
+    enabled: activeTab === 'cards' && !!creditCard,
   })
   const ccTransactions = ccTxData?.data ?? []
 
   const { data: ccLimitRequestsData, isLoading: ccLimitRequestsLoading } = useQuery({
     queryKey: ['credit-card-limit-requests', creditCard?.id],
     queryFn: () => getCreditCardLimitIncreaseRequests(creditCard!.id),
-    enabled: activeTab === 'credit-cards' && !!creditCard,
+    enabled: activeTab === 'cards' && !!creditCard,
   })
   const ccLimitRequests = ccLimitRequestsData?.data ?? []
 
@@ -2298,17 +2324,40 @@ export function Dashboard() {
           }
         >
           <p className="dashboard-tab-edit-hint">
-            Panelde görmek istediğin bölümleri seç:
+            Panelde görmek istediğin bölümleri seç. Bir grubu kapatırsan altındaki
+            tüm sekmeler gizlenir; istersen sekmeleri tek tek de açıp kapatabilirsin.
           </p>
-          {DASHBOARD_TABS.map((t) => (
-            <div key={t.id} className="dashboard-tab-edit-row">
-              <Checkbox
-                label={t.label}
-                checked={visibleTabs.includes(t.id)}
-                onChange={() => toggleTab(t.id)}
-              />
-            </div>
-          ))}
+          {DASHBOARD_TAB_GROUPS.map((group) => {
+            const groupTabs = DASHBOARD_TABS.filter((t) => group.tabs.includes(t.id))
+            const onCount = groupTabs.filter((t) => visibleTabs.includes(t.id)).length
+            const allOn = onCount === groupTabs.length
+            const noneOn = onCount === 0
+            return (
+              <div key={group.id} className="dashboard-tab-edit-group">
+                <div className="dashboard-tab-edit-grouphead">
+                  <Checkbox
+                    label={group.label}
+                    checked={allOn}
+                    ref={(el) => {
+                      if (el) el.indeterminate = !allOn && !noneOn
+                    }}
+                    onChange={() => toggleTabGroup(group.id)}
+                  />
+                </div>
+                <div className="dashboard-tab-edit-children">
+                  {groupTabs.map((t) => (
+                    <div key={t.id} className="dashboard-tab-edit-row">
+                      <Checkbox
+                        label={t.label}
+                        checked={visibleTabs.includes(t.id)}
+                        onChange={() => toggleTab(t.id)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
         </Modal>
 
         <div key={activeTab} className="dashboard-tab-panel">
@@ -2328,15 +2377,15 @@ export function Dashboard() {
           </div>
         )}
         {isError && <Alert variant="error">Hesaplar yüklenemedi.</Alert>}
-        {!isLoading && !isError && accounts.length === 0 && (
+        {!isLoading && !isError && depositoryAccounts.length === 0 && (
           <div className="dashboard-state">
             Henüz hesabınız yok. “+ Hesap Aç” ile başlayabilirsiniz.
           </div>
         )}
 
-        {accounts.length > 0 && (
+        {depositoryAccounts.length > 0 && (
           <div className="dashboard-accounts">
-            {accounts.map((acc) => (
+            {depositoryAccounts.map((acc) => (
               <Card
                 key={acc.id}
                 className={`dashboard-account-card ${accountCardVariant(acc)}`}
@@ -2749,9 +2798,9 @@ export function Dashboard() {
 
         {activeTab === 'cards' && (
           <>
-        {/* Kartlarım */}
+        {/* Banka (debit) kartları */}
         <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
-          <h2 className="dashboard-section-title">Kartlarım</h2>
+          <h2 className="dashboard-section-title">Banka Kartlarım</h2>
           <Button size="sm" variant="primary" onClick={openCardModal}>
             + Kart Aç
           </Button>
@@ -2821,13 +2870,10 @@ export function Dashboard() {
             ))}
           </div>
         )}
-          </>
-        )}
 
-        {activeTab === 'credit-cards' && (
-          <>
-        <div className="dashboard-section-head" style={{ marginTop: '2rem' }}>
-          <h2 className="dashboard-section-title">Kredi Kartım</h2>
+        {/* Kredi kartları */}
+        <div className="dashboard-section-head" style={{ marginTop: '3rem' }}>
+          <h2 className="dashboard-section-title">Kredi Kartlarım</h2>
           {!creditCard && !creditCardsLoading && (
             <Button size="sm" variant="primary" onClick={openCcApply}>
               + Kredi Kartı Başvurusu
@@ -3409,25 +3455,21 @@ export function Dashboard() {
           <CardContent>
             <div className="dashboard-fx-portfolio-head">
               <div>
-                <p className="dashboard-fx-portfolio-kicker">Toplam Varlık</p>
-                <strong>{formatTL(totalBalance)}</strong>
+                <p className="dashboard-fx-portfolio-kicker">Döviz/Altın Portföy Değeri</p>
+                <strong>{formatTL(fxPortfolioValue)}</strong>
               </div>
-              <span>TL karşılığı</span>
+              <span>güncel TL karşılığı</span>
             </div>
 
             {portfolioItems.length === 0 ? (
-              <div className="dashboard-state">Portföy dağılımı için aktif bakiyeniz yok.</div>
+              <div className="dashboard-state">Henüz döviz/altın varlığınız yok.</div>
             ) : (
               <div className="dashboard-fx-portfolio">
                 {portfolioItems.map((item) => (
                   <div key={item.currency} className={`dashboard-fx-portfolio-row ${item.currency.toLowerCase()}`}>
                     <div className="dashboard-fx-portfolio-label">
                       <span>{CURRENCY_META[item.currency].code}</span>
-                      <strong>
-                        {item.currency === 'TRY'
-                          ? formatTL(item.amount)
-                          : formatCurrencyAmount(item.amount, item.currency)}
-                      </strong>
+                      <strong>{formatCurrencyAmount(item.amount, item.currency)}</strong>
                     </div>
                     <div className="dashboard-fx-portfolio-track" aria-hidden="true">
                       <span style={{ width: `${Math.max(item.percent, 3)}%` }} />

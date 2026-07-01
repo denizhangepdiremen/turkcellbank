@@ -87,8 +87,7 @@ type DashboardTabLabel =
   | 'Hesaplarım'
   | 'İşlemler'
   | 'Krediler'
-  | 'Kartlar'
-  | 'Kredi Kartı'
+  | 'Kartlarım'
   | 'Ödemeler'
   | 'Faturalar'
   | 'Talimatlar'
@@ -102,8 +101,7 @@ const DASHBOARD_TAB_GROUP_BY_LABEL: Record<DashboardTabLabel, string> = {
   Faturalar: 'Fatura & Talimat',
   Talimatlar: 'Fatura & Talimat',
   Krediler: 'Kredi, Kart, Yatırım',
-  Kartlar: 'Kredi, Kart, Yatırım',
-  'Kredi Kartı': 'Kredi, Kart, Yatırım',
+  Kartlarım: 'Kredi, Kart, Yatırım',
   'Vadeli Mevduat': 'Kredi, Kart, Yatırım',
   Güvenlik: 'Güvenlik',
 }
@@ -129,6 +127,12 @@ export async function openTab(
 // Personel panellerindeki (müdür/il müdürü/direktör) sekme çubuğu
 export async function openStaffTab(page: Page, label: string) {
   await page.locator('.staff-tab').filter({ hasText: label }).click()
+}
+
+// "Kart Onayları" sekmesini açıp kredi kartı alt sekmesine geçer (şube müdürü).
+export async function openCreditCardApprovalQueue(page: Page) {
+  await openStaffTab(page, 'Kart Onayları')
+  await page.getByRole('tab', { name: /Kredi Kartları/ }).click()
 }
 
 export async function openAccount(page: Page): Promise<string> {
@@ -215,9 +219,9 @@ export async function applyForLoan(
   await page.getByRole('dialog').getByRole('button', { name: 'Kapat' }).last().click()
 }
 
-/** Kart başvurusu yapar (Kartlar sekmesinden). */
+/** Banka kartı başvurusu yapar (Kartlarım sekmesi → Banka Kartlarım). */
 export async function applyForCard(page: Page) {
-  await openTab(page, 'Kartlar')
+  await openTab(page, 'Kartlarım')
   await page.getByRole('button', { name: '+ Kart Aç' }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('button', { name: 'Kart Aç', exact: true }).click()
@@ -268,7 +272,7 @@ export async function applyForCreditCard(
     expectHeading?: RegExp
   },
 ) {
-  await openTab(page, 'Kredi Kartı')
+  await openTab(page, 'Kartlarım')
   await page.getByRole('button', { name: '+ Kredi Kartı Başvurusu' }).click()
 
   const dialog = page.getByRole('dialog')
@@ -309,7 +313,7 @@ export async function requestCreditCardLimitIncrease(
     employment?: string
   },
 ) {
-  await openTab(page, 'Kredi Kartı')
+  await openTab(page, 'Kartlarım')
   await page.getByRole('button', { name: 'Limit Artışı' }).click()
 
   const dialog = page.getByRole('dialog')

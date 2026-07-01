@@ -36,8 +36,8 @@ test.describe('Genel hesap işlemleri', () => {
     await openTab(page, 'Krediler')
     await expect(page.getByRole('heading', { name: 'Kredilerim' })).toBeVisible()
 
-    await openTab(page, 'Kartlar')
-    await expect(page.getByRole('heading', { name: 'Kartlarım' })).toBeVisible()
+    await openTab(page, 'Kartlarım')
+    await expect(page.getByRole('heading', { name: 'Banka Kartlarım' })).toBeVisible()
 
     await openTab(page, 'Ödemeler')
     await expect(page.getByRole('heading', { name: 'Ödemelerim' })).toBeVisible()

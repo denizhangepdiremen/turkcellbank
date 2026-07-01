@@ -4,7 +4,7 @@ import {
   STAFF_PASSWORD,
   loginViaUi,
   openTab,
-  openStaffTab,
+  openCreditCardApprovalQueue,
   openAccount,
   depositToAccount,
   registerFreshUser,
@@ -29,7 +29,7 @@ test.describe('Kredi kartı', () => {
     await applyForCreditCard(page, { income: '20000', expenses: '8000' })
 
     // Kart aktif; limit özeti görünür
-    await openTab(page, 'Kredi Kartı')
+    await openTab(page, 'Kartlarım')
     await expect(page.getByText('Aktif').first()).toBeVisible()
     await expect(page.getByText('Kullanılabilir Limit')).toBeVisible()
     await expect(page.getByText(/Toplam Limit:/)).toBeVisible()
@@ -65,7 +65,7 @@ test.describe('Kredi kartı', () => {
     await expect(page.getByText('Ödeme başarılı.')).toBeVisible()
 
     // 4) Kredi Kartı sekmesinde güncel borç 3.000 ₺ görünür
-    await openTab(page, 'Kredi Kartı')
+    await openTab(page, 'Kartlarım')
     await expect(page.locator('.cc-limit-meta').getByText(/3\.000,00/)).toBeVisible()
 
     // 5) Borç Öde → tüm borç TL hesaptan ödenir → borç 0
@@ -93,14 +93,14 @@ test.describe('Kredi kartı', () => {
       employment: '120',
       expectHeading: /Başvurunuz Onaya Gönderildi/,
     })
-    await openTab(page, 'Kredi Kartı')
+    await openTab(page, 'Kartlarım')
     await expect(page.getByText('Onay Bekliyor').first()).toBeVisible()
     await page.evaluate(() => localStorage.clear())
 
     // 2) Şube müdürü "Kredi Kartı Onayları" kuyruğunda bu başvuruyu bulur ve onaylar
     await loginViaUi(page, STAFF.branchManager.email, STAFF_PASSWORD)
     await expect(page).toHaveURL(/\/sube-muduru$/)
-    await openStaffTab(page, 'Kredi Kartı Onayları')
+    await openCreditCardApprovalQueue(page)
 
     const card = page.locator('.approval-card', { hasText: user.email }).first()
     await expect(card).toBeVisible()
@@ -110,7 +110,7 @@ test.describe('Kredi kartı', () => {
 
     // 3) Müşteri Kredi Kartı sekmesinde kartı "Aktif" görür
     await loginViaUi(page, user.email, user.password)
-    await openTab(page, 'Kredi Kartı')
+    await openTab(page, 'Kartlarım')
     await expect(page.getByText('Aktif').first()).toBeVisible()
   })
 
@@ -124,7 +124,7 @@ test.describe('Kredi kartı', () => {
     await openTab(page, 'Hesaplarım')
     await openAccount(page)
 
-    await openTab(page, 'Kredi Kartı')
+    await openTab(page, 'Kartlarım')
     await page.getByRole('button', { name: 'Nakit Avans' }).click()
     const dialog = page.getByRole('dialog')
     await dialog.getByLabel('Tutar (₺)').fill('2000')
@@ -187,7 +187,7 @@ test.describe('Kredi kartı', () => {
 
     await loginViaUi(page, STAFF.branchManager.email, STAFF_PASSWORD)
     await expect(page).toHaveURL(/\/sube-muduru$/)
-    await openStaffTab(page, 'Kredi Kartı Onayları')
+    await openCreditCardApprovalQueue(page)
 
     const approval = page
       .locator('.approval-card', { hasText: user.email })
@@ -201,7 +201,7 @@ test.describe('Kredi kartı', () => {
     await page.evaluate(() => localStorage.clear())
 
     await loginViaUi(page, user.email, user.password)
-    await openTab(page, 'Kredi Kartı')
+    await openTab(page, 'Kartlarım')
     await expect(page.locator('.cc-limit-meta').getByText(/Toplam Limit:/)).toContainText('150.000')
   })
 })

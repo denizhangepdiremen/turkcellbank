@@ -96,7 +96,7 @@ test.describe('Sprint 4 — yönetici onayları ve görünürlük', () => {
 
     // 3) Müşteri onaylı kartında "Ekstre (PDF)" ile ekstre modalını açabilir
     await loginViaUi(page, customer.email, customer.password)
-    await openTab(page, 'Kartlar')
+    await openTab(page, 'Kartlarım')
     await page.getByRole('button', { name: 'Ekstre (PDF)' }).first().click()
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByText('Kart Ekstresi')).toBeVisible()
