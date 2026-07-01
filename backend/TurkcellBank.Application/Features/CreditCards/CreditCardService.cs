@@ -429,8 +429,10 @@ public class CreditCardService : ICreditCardService
         var interest = Math.Round(amount * (_options.MonthlyContractInterestRate / 30m), 2, MidpointRounding.AwayFromZero);
         var debtIncrease = amount + fee + interest;
 
-        if (debtIncrease > card.CreditLimit - card.CurrentDebt)
-            throw new BusinessException("Nakit avans için kredi kartı limiti yetersiz.");
+        var available = card.CreditLimit - card.CurrentDebt;
+        if (debtIncrease > available)
+            throw new BusinessException(
+                $"Nakit avans için kredi kartı limiti yetersiz. Komisyon/faiz dahil gereken tutar {debtIncrease:N2} TL, kullanılabilir limit {available:N2} TL.");
 
         var now = DateTime.UtcNow;
         account.Balance += amount;
@@ -439,11 +441,11 @@ public class CreditCardService : ICreditCardService
         _cards.AddLedgerTransaction(new Transaction
         {
             Id = Guid.NewGuid(),
-            Type = TransactionType.CreditCardCashAdvance,
+            Type = TransactionType.CreditCardAdvance,
             ToAccountId = account.Id,
             ToIban = account.Iban,
             Amount = amount,
-            Description = "Kredi kartı nakit avans",
+            Description = "Nakit avans",
             CreatedAt = now,
             Channel = _ctx.Channel,
             PerformedByEmployeeId = _ctx.PerformedByEmployeeId,

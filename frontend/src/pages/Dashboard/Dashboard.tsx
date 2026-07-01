@@ -98,6 +98,9 @@ const accountTypeOptions = [
 ]
 
 const PAGE_SIZE = 5
+const CASH_ADVANCE_FEE_RATE = 0.03
+const CASH_ADVANCE_MIN_FEE = 50
+const CASH_ADVANCE_DAILY_INTEREST_RATE = 0.035 / 30
 
 // İşlem geçmişinde "tüm hesaplar" seçeneğinin özel değeri
 const ALL_ACCOUNTS = '__all__'
@@ -115,6 +118,7 @@ const txTypeOptions = [
   { value: 'TimeDepositOpen', label: 'Vadeli mevduat açılışı' },
   { value: 'TimeDepositMaturity', label: 'Vadeli mevduat getirisi' },
   { value: 'FxConvert', label: 'Döviz/altın dönüşüm' },
+  { value: 'CreditCardAdvance', label: 'Kredi kartı nakit avans' },
 ]
 
 const txDirectionOptions = [
@@ -209,7 +213,7 @@ const txTitle = (tx: Transaction) => {
   if (tx.type === 'FxSell') return `Döviz/Altın Satış${tx.description ? ` · ${tx.description}` : ''}`
   if (tx.type === 'FxConvert') return `Döviz/Altın Dönüşüm${tx.description ? ` · ${tx.description}` : ''}`
   if (tx.type === 'CreditCardPayment') return 'Kredi Kartı Ödemesi'
-  if (tx.type === 'CreditCardCashAdvance') return 'Kredi Kartı Nakit Avans'
+  if (tx.type === 'CreditCardAdvance') return 'Kredi Kartı Nakit Avans'
   return tx.direction === 'Out'
     ? `Transfer → ${tx.counterpartyIban}`
     : `Transfer ← ${tx.counterpartyIban}`
@@ -1418,6 +1422,14 @@ export function Dashboard() {
   const [ccCashOpen, setCcCashOpen] = useState(false)
   const [ccCashAccountId, setCcCashAccountId] = useState('')
   const [ccCashAmount, setCcCashAmount] = useState('')
+  const ccCashPrincipal = Number(ccCashAmount)
+  const ccCashFee = ccCashPrincipal > 0
+    ? Math.max(ccCashPrincipal * CASH_ADVANCE_FEE_RATE, CASH_ADVANCE_MIN_FEE)
+    : 0
+  const ccCashInterest = ccCashPrincipal > 0
+    ? ccCashPrincipal * CASH_ADVANCE_DAILY_INTEREST_RATE
+    : 0
+  const ccCashDebtIncrease = ccCashPrincipal + ccCashFee + ccCashInterest
 
   const ccCashMutation = useMutation({
     mutationFn: () =>
@@ -1440,6 +1452,22 @@ export function Dashboard() {
     setCcCashAccountId(tryPayAccounts[0]?.id ?? '')
     setCcCashAmount('')
     setCcCashOpen(true)
+  }
+
+  function submitCcCashAdvance() {
+    if (!activeCreditCard) return
+    if (!ccCashAccountId || !(ccCashPrincipal > 0)) {
+      toast.error('Lütfen hesap ve tutar seçin.')
+      return
+    }
+    if (ccCashDebtIncrease > activeCreditCard.availableLimit) {
+      toast.error(
+        `Komisyon ve faiz dahil toplam borç ${formatTL(ccCashDebtIncrease)}. ` +
+        `Kullanılabilir limitiniz ${formatTL(activeCreditCard.availableLimit)}.`,
+      )
+      return
+    }
+    ccCashMutation.mutate()
   }
 
   // Limit artış talebi modalı
@@ -5095,7 +5123,7 @@ export function Dashboard() {
               variant="primary"
               loading={ccCashMutation.isPending}
               disabled={!ccCashAccountId || !(Number(ccCashAmount) > 0)}
-              onClick={() => ccCashMutation.mutate()}
+              onClick={submitCcCashAdvance}
             >
               Kullan
             </Button>
@@ -5130,6 +5158,11 @@ export function Dashboard() {
                 value={ccCashAmount}
                 onChange={(e) => setCcCashAmount(e.target.value)}
               />
+              {ccCashPrincipal > 0 && (
+                <p className="dashboard-field-hint">
+                  Komisyon/faiz dahil kart borcuna yansıyacak tutar: {formatTL(ccCashDebtIncrease)}
+                </p>
+              )}
             </div>
           </>
         )}

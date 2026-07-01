@@ -9,6 +9,7 @@ import {
   depositToAccount,
   registerFreshUser,
   applyForCreditCard,
+  requestCreditCardLimitIncrease,
 } from './helpers'
 
 // Kredi kartı akışı — backend gerektirir (5099).
@@ -111,5 +112,96 @@ test.describe('Kredi kartı', () => {
     await loginViaUi(page, user.email, user.password)
     await openTab(page, 'Kredi Kartı')
     await expect(page.getByText('Aktif').first()).toBeVisible()
+  })
+
+  test('nakit avans TL hesaba aktarılır ve kredi kartı borcuna yansır', async ({ page }) => {
+    const user = await registerFreshUser('e2e-cc-nakit')
+    await loginViaUi(page, user.email, user.password)
+    await expect(page).toHaveURL(/\/dashboard$/)
+
+    await applyForCreditCard(page, { income: '20000', expenses: '8000' })
+
+    await openTab(page, 'Hesaplarım')
+    await openAccount(page)
+
+    await openTab(page, 'Kredi Kartı')
+    await page.getByRole('button', { name: 'Nakit Avans' }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByLabel('Tutar (₺)').fill('2000')
+    await dialog.getByRole('button', { name: 'Kullan', exact: true }).click()
+    await expect(page.getByText('Nakit avans hesabınıza aktarıldı.')).toBeVisible()
+
+    // Borç = anapara 2.000 + %3 komisyon (60) + 1 günlük akdi faiz (2,33) = 2.062,33
+    await expect(page.locator('.cc-limit-meta').getByText(/Güncel Borç:/)).toContainText('2.062')
+    // Kart hareketlerinde nakit avans (anapara) ve komisyon kalemleri görünür
+    await expect(
+      page.locator('.dashboard-loan-amount').filter({ hasText: 'Nakit Avans' }),
+    ).toBeVisible()
+    await expect(page.getByText('Nakit avans komisyonu')).toBeVisible()
+
+    // Hesaba yalnızca anapara (2.000) geçer; komisyon/faiz karta borç yazılır
+    await openTab(page, 'Hesaplarım')
+    await expect(page.getByText(/₺2\.000,00/).first()).toBeVisible()
+  })
+
+  test('limit artış talebi otomatik onaylanınca yeni limit kartta görünür', async ({ page }) => {
+    const user = await registerFreshUser('e2e-cc-limit-auto')
+    await loginViaUi(page, user.email, user.password)
+    await expect(page).toHaveURL(/\/dashboard$/)
+
+    await applyForCreditCard(page, { income: '20000', expenses: '8000' })
+
+    await requestCreditCardLimitIncrease(page, {
+      requestedLimit: '80000',
+      income: '40000',
+      expenses: '12000',
+    })
+    await expect(page.getByText('Limit artış talebiniz sonuçlandı.')).toBeVisible()
+
+    await expect(page.locator('.cc-limit-meta').getByText(/Toplam Limit:/)).toContainText('80.000')
+    await expect(page.getByText('Limit Artış Talepleri')).toBeVisible()
+    await expect(page.getByText(/₺60\.000,00 → ₺80\.000,00/)).toBeVisible()
+    await expect(page.getByText('Onaylandı').first()).toBeVisible()
+  })
+
+  test('yüksek limit artış talebi müdür onayına düşer ve onaylanınca limit güncellenir', async ({ page }) => {
+    const user = await registerFreshUser('e2e-cc-limit-onay')
+
+    await loginViaUi(page, user.email, user.password)
+    await expect(page).toHaveURL(/\/dashboard$/)
+    await applyForCreditCard(page, { income: '20000', expenses: '8000' })
+
+    await requestCreditCardLimitIncrease(page, {
+      requestedLimit: '150000',
+      income: '100000',
+      expenses: '20000',
+      profession: 'Doktor',
+      housing: 'Owner',
+      marital: 'Married',
+      children: '1',
+      employment: '96',
+    })
+    await expect(page.getByText('Talebiniz onaya gönderildi.')).toBeVisible()
+    await expect(page.getByText('Onay Bekliyor').first()).toBeVisible()
+    await page.evaluate(() => localStorage.clear())
+
+    await loginViaUi(page, STAFF.branchManager.email, STAFF_PASSWORD)
+    await expect(page).toHaveURL(/\/sube-muduru$/)
+    await openStaffTab(page, 'Kredi Kartı Onayları')
+
+    const approval = page
+      .locator('.approval-card', { hasText: user.email })
+      .filter({ hasText: 'Limit artış talebi' })
+      .first()
+    await expect(approval).toBeVisible()
+    await expect(approval).toContainText('Mevcut')
+    await expect(approval).toContainText('Öneri')
+    await approval.getByRole('button', { name: 'Onayla' }).click()
+    await expect(page.getByText('Limit artış talebi onaylandı.')).toBeVisible()
+    await page.evaluate(() => localStorage.clear())
+
+    await loginViaUi(page, user.email, user.password)
+    await openTab(page, 'Kredi Kartı')
+    await expect(page.locator('.cc-limit-meta').getByText(/Toplam Limit:/)).toContainText('150.000')
   })
 })

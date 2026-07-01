@@ -293,3 +293,34 @@ export async function applyForCreditCard(
 
   await page.getByRole('dialog').getByRole('button', { name: 'Kapat' }).last().click()
 }
+
+/** Kredi kartı limit artış talebi modalını doldurur ve gönderir. */
+export async function requestCreditCardLimitIncrease(
+  page: Page,
+  opts: {
+    requestedLimit: string
+    income: string
+    expenses?: string
+    profession?: string
+    age?: string
+    marital?: 'Single' | 'Married'
+    children?: string
+    housing?: 'Tenant' | 'Owner'
+    employment?: string
+  },
+) {
+  await openTab(page, 'Kredi Kartı')
+  await page.getByRole('button', { name: 'Limit Artışı' }).click()
+
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Yeni Toplam Limit (₺)').fill(opts.requestedLimit)
+  await dialog.getByLabel('Yaş').fill(opts.age ?? '35')
+  await dialog.getByLabel('Medeni Hal').selectOption(opts.marital ?? 'Single')
+  await dialog.getByLabel('Çocuk Sayısı').fill(opts.children ?? '0')
+  await dialog.getByLabel('Konut Durumu').selectOption(opts.housing ?? 'Tenant')
+  await dialog.getByLabel('Aylık Gelir (₺)').fill(opts.income)
+  await dialog.getByLabel('Aylık Gider (₺)').fill(opts.expenses ?? '8000')
+  await dialog.getByLabel('Çalışma Kıdemi (ay)').fill(opts.employment ?? '36')
+  await dialog.getByLabel('Meslek').fill(opts.profession ?? 'Mühendis')
+  await dialog.getByRole('button', { name: 'Talep Et', exact: true }).click()
+}

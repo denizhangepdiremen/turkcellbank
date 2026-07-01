@@ -58,7 +58,7 @@ export interface Transaction {
     | 'FxSell'
     | 'FxConvert'
     | 'CreditCardPayment'
-    | 'CreditCardCashAdvance'
+    | 'CreditCardAdvance'
   direction: 'In' | 'Out' // gelen / giden (o hesabın bakışıyla)
   amount: number
   counterpartyIban: string | null

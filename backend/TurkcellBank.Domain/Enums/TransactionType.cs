@@ -16,5 +16,5 @@ public enum TransactionType
     FxSell,            // döviz/altın satış (bir bacak döviz çıkışı, diğer bacak TL girişi)
     FxConvert,         // döviz/altın çapraz dönüşüm (kaynak birim çıkışı, hedef birim girişi)
     CreditCardPayment, // kredi kartı borcu ödemesi (TL hesaptan çıkış)
-    CreditCardCashAdvance, // kredi kartı nakit avansı (TL hesaba giriş)
+    CreditCardAdvance, // kredi kartı nakit avansı (TL hesaba giriş)
 }

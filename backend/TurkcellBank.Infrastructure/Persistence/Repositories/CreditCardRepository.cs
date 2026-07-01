@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using TurkcellBank.Application.Common.Interfaces;
 using TurkcellBank.Domain.Entities;
 using TurkcellBank.Domain.Enums;
@@ -131,28 +132,58 @@ public class CreditCardRepository : ICreditCardRepository
             .Include(r => r.User)
             .FirstOrDefaultAsync(r => r.Id == id);
 
-    public Task<List<CreditCardLimitIncreaseRequest>> GetLimitIncreaseRequestsByCardIdAsync(Guid cardId)
-        => _db.CreditCardLimitIncreaseRequests
-            .Where(r => r.CreditCardId == cardId)
-            .OrderByDescending(r => r.CreatedAt)
-            .ToListAsync();
+    public async Task<List<CreditCardLimitIncreaseRequest>> GetLimitIncreaseRequestsByCardIdAsync(Guid cardId)
+    {
+        try
+        {
+            return await _db.CreditCardLimitIncreaseRequests
+                .Where(r => r.CreditCardId == cardId)
+                .OrderByDescending(r => r.CreatedAt)
+                .ToListAsync();
+        }
+        catch (PostgresException ex) when (IsMissingTable(ex))
+        {
+            return new List<CreditCardLimitIncreaseRequest>();
+        }
+    }
 
-    public Task<List<CreditCardLimitIncreaseRequest>> GetPendingLimitIncreaseRequestsAsync()
-        => _db.CreditCardLimitIncreaseRequests
-            .Include(r => r.CreditCard)
-            .Include(r => r.User)
-            .Where(r => r.Status == CreditCardLimitRequestStatus.PendingApproval)
-            .OrderByDescending(r => r.CreatedAt)
-            .ToListAsync();
+    public async Task<List<CreditCardLimitIncreaseRequest>> GetPendingLimitIncreaseRequestsAsync()
+    {
+        try
+        {
+            return await _db.CreditCardLimitIncreaseRequests
+                .Include(r => r.CreditCard)
+                .Include(r => r.User)
+                .Where(r => r.Status == CreditCardLimitRequestStatus.PendingApproval)
+                .OrderByDescending(r => r.CreatedAt)
+                .ToListAsync();
+        }
+        catch (PostgresException ex) when (IsMissingTable(ex))
+        {
+            return new List<CreditCardLimitIncreaseRequest>();
+        }
+    }
 
-    public Task<bool> HasPendingLimitIncreaseRequestAsync(Guid cardId)
-        => _db.CreditCardLimitIncreaseRequests
-            .AnyAsync(r => r.CreditCardId == cardId
-                && (r.Status == CreditCardLimitRequestStatus.Pending
-                    || r.Status == CreditCardLimitRequestStatus.PendingApproval));
+    public async Task<bool> HasPendingLimitIncreaseRequestAsync(Guid cardId)
+    {
+        try
+        {
+            return await _db.CreditCardLimitIncreaseRequests
+                .AnyAsync(r => r.CreditCardId == cardId
+                    && (r.Status == CreditCardLimitRequestStatus.Pending
+                        || r.Status == CreditCardLimitRequestStatus.PendingApproval));
+        }
+        catch (PostgresException ex) when (IsMissingTable(ex))
+        {
+            return false;
+        }
+    }
 
     // --- Ana defter bacağı ---
     public void AddLedgerTransaction(Transaction tx) => _db.Transactions.Add(tx);
 
     public Task SaveChangesAsync() => _db.SaveChangesAsync();
+
+    private static bool IsMissingTable(PostgresException ex)
+        => ex.SqlState == PostgresErrorCodes.UndefinedTable;
 }
